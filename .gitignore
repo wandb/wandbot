@@ -131,7 +131,5 @@ dmypy.json
 wandb/
 artifacts/
 data/
-.env
-dist/
 .idea/
 
