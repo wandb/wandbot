@@ -29,7 +29,7 @@ from langchain.text_splitter import (
 )
 from tqdm import tqdm
 
-from src.prompts import load_hyde_prompt
+from src.wandbot.prompts import load_hyde_prompt
 
 langchain.llm_cache = SQLiteCache(database_path="langchain.db")
 
@@ -414,26 +414,29 @@ def get_parser():
     parser.add_argument(
         "--docs_dir",
         type=str,
+        required=True,
         help="The directory containing the wandb documentation",
     )
     parser.add_argument(
         "--notebooks_dir",
         type=str,
-        help="The directory containing the wandb example colab notebooks",
+        help="The directory containing the colab notebooks from the wandb/examples repo",
     )
     parser.add_argument(
         "--code_dir",
         type=str,
-        help="The directory containing the wandb example code",
+        help="The directory containing the examples code from the wandb/examples repo",
     )
     parser.add_argument(
         "--documents_file",
         type=str,
+        default="data/documents.jsonl",
         help="The path to save or load the documents to/from",
     )
     parser.add_argument(
         "--faiss_index",
         type=str,
+        default="data/faiss_index",
         help="The directory to save or load the faiss index to/from",
     )
     parser.add_argument(
