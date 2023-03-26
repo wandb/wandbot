@@ -154,7 +154,7 @@ class DocumentationDatasetLoader:
         self.documentation_dir = documentation_dir
         self.notebooks_dir = notebooks_dir
         self.code_dir = code_dir
-        self._documents = []
+        self.documents = []
         self.md_text_splitter = MarkdownTextSplitter()
         self.code_text_splitter = PythonCodeTextSplitter()
         self.token_splitter = TokenTextSplitter(
@@ -241,9 +241,9 @@ class DocumentationDatasetLoader:
         Loads the documentation, notebooks and code documents
         :return: A list of `Document` objects
         """
-        self._documents = []
+        self.documents = []
         if self.documentation_dir and os.path.exists(self.documentation_dir):
-            self._documents.extend(
+            self.documents.extend(
                 self.load_documentation_documents(docs_dir=self.documentation_dir)
             )
         else:
@@ -251,7 +251,7 @@ class DocumentationDatasetLoader:
                 f"Documentation directory {self.documentation_dir} does not exist. Not loading documentation."
             )
         if self.notebooks_dir and os.path.exists(self.notebooks_dir):
-            self._documents.extend(
+            self.documents.extend(
                 self.load_notebook_documents(notebook_dir=self.notebooks_dir)
             )
         else:
@@ -259,12 +259,12 @@ class DocumentationDatasetLoader:
                 f"Notebooks directory {self.notebooks_dir} does not exist. Not loading notebooks."
             )
         if self.code_dir and os.path.exists(self.code_dir):
-            self._documents.extend(self.load_code_documents(code_dir=self.code_dir))
+            self.documents.extend(self.load_code_documents(code_dir=self.code_dir))
         else:
             logger.warning(
                 f"Code directory {self.code_dir} does not exist. Not loading code."
             )
-        return self._documents
+        return self.documents
 
     def save_to_disk(self, path: str) -> None:
         """
@@ -272,7 +272,7 @@ class DocumentationDatasetLoader:
         :param path: The path to save the documents to
         """
         with open(path, "w") as f:
-            for document in self._documents:
+            for document in self.documents:
                 line = json.dumps(
                     {
                         "page_content": document.page_content,
@@ -292,7 +292,7 @@ class DocumentationDatasetLoader:
         with open(path, "r") as f:
             for line in f:
                 document = json.loads(line)
-                loader._documents.append(Document(**document))
+                loader.documents.append(Document(**document))
         return loader
 
 
@@ -323,7 +323,6 @@ class DocumentStore:
         self._faiss_store = None
         self.temperature = temperature
 
-    @property
     def embeddings(self) -> Union[Chain, Embeddings]:
         """
         Returns the embeddings to use for the document store
@@ -357,7 +356,7 @@ class DocumentStore:
         :return: A `FAISS` object
         """
 
-        self._faiss_store = FAISS.from_documents(self.documents, self._embeddings)
+        self._faiss_store = FAISS.from_documents(self.documents, self.embeddings())
         return self._faiss_store
 
     @property
@@ -398,8 +397,8 @@ class DocumentStore:
         cls.use_hyde = use_hyde
         cls.hyde_prompt = hyde_prompt
         cls.temperature = temperature
-        cls._embeddings = cls.embeddings
-        cls._faiss_store = FAISS.load_local(path, cls._embeddings)
+        cls._embeddings = None
+        cls._faiss_store = FAISS.load_local(path, cls.embeddings(cls))
         obj = cls(
             list(cls._faiss_store.docstore._dict.values()),
             cls.use_hyde,
@@ -483,33 +482,34 @@ def main():
         loader.save_to_disk(args.documents_file)
     else:
         loader = DocumentationDatasetLoader.load_from_disk(args.documents_file)
+        documents = loader.documents
 
     documents_artifact = wandb.Artifact("docs_dataset", type="dataset")
     documents_artifact.add_file(args.documents_file)
     run.log_artifact(documents_artifact)
-    # if args.faiss_index is None:
-    #     document_store = DocumentStore(
-    #         documents=documents,
-    #         use_hyde=args.use_hyde,
-    #         hyde_prompt=args.hyde_prompt,
-    #         temperature=args.temperature,
-    #     )
-    #     document_store.save_to_disk(args.faiss_index)
-    # else:
-    #     document_store = DocumentStore.load_from_disk(
-    #         args.faiss_index,
-    #         use_hyde=args.use_hyde,
-    #         hyde_prompt=args.hyde_prompt,
-    #         temperature=args.temperature,
-    #     )
-    # faiss_index_artifact = wandb.Artifact("faiss_store", type="search_index")
-    # faiss_index_artifact.add_dir(args.faiss_index)
-    # run.log_artifact(faiss_index_artifact)
-    #
-    # if args.hyde_prompt is not None and os.path.isfile(args.hyde_prompt):
-    #     hyde_prompt_artifact = wandb.Artifact("hyde_prompt", type="prompt")
-    #     hyde_prompt_artifact.add_file(args.hyde_prompt)
-    #     run.log_artifact(hyde_prompt_artifact)
+    if not os.path.isdir(args.faiss_index):
+        document_store = DocumentStore(
+            documents=documents,
+            use_hyde=args.use_hyde,
+            hyde_prompt=args.hyde_prompt,
+            temperature=args.temperature,
+        )
+        document_store.save_to_disk(args.faiss_index)
+    else:
+        document_store = DocumentStore.load_from_disk(
+            args.faiss_index,
+            use_hyde=args.use_hyde,
+            hyde_prompt=args.hyde_prompt,
+            temperature=args.temperature,
+        )
+    faiss_index_artifact = wandb.Artifact("faiss_store", type="search_index")
+    faiss_index_artifact.add_dir(args.faiss_index)
+    run.log_artifact(faiss_index_artifact)
+
+    if args.hyde_prompt is not None and os.path.isfile(args.hyde_prompt):
+        hyde_prompt_artifact = wandb.Artifact("hyde_prompt", type="prompt")
+        hyde_prompt_artifact.add_file(args.hyde_prompt)
+        run.log_artifact(hyde_prompt_artifact)
 
     run.finish()
 
