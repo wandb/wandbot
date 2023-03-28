@@ -1,13 +1,12 @@
-# Import FastAPI and related classes
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from chat import Chat
 
+import os
+
 # Initialize the FastAPI app
 app = FastAPI()
-
-# Import CORS middleware
-from fastapi.middleware.cors import CORSMiddleware
 
 # Add CORS middleware to the FastAPI app
 app.add_middleware(
