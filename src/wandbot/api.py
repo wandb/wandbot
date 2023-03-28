@@ -2,6 +2,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from chat import Chat
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Initialize the FastAPI app
 app = FastAPI()
