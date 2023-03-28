@@ -1,7 +1,7 @@
 import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
-from langchain.chains import VectorDBQAWithSourcesChain
+from langchain.chains import RetrievalQAWithSourcesChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts.chat import (
@@ -11,25 +11,20 @@ from langchain.prompts.chat import (
 )
 from langchain.vectorstores import FAISS
 
-PROJECT = "wandb_docs_bot"
-
-run = wandb.init(project=PROJECT)
-
-
 def load_artifacts():
     faiss_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/faiss_store:latest", type="search_index"
+      config.faiss_artifact, type="search_index"
     )
     faiss_artifact_dir = faiss_artifact.download()
 
     hyde_prompt_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/hyde_prompt:latest", type="prompt"
+      config.hyde_prompt_artifact, type="prompt"
     )
     hyde_artifact_dir = hyde_prompt_artifact.download()
     hyde_prompt_file = f"{hyde_artifact_dir}/hyde_prompt.txt"
 
     chat_prompt_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/system_prompt:latest", type="prompt"
+      config.chat_prompt_artifact, type="prompt"
     )
     chat_artifact_dir = chat_prompt_artifact.download()
     chat_prompt_file = f"{chat_artifact_dir}/chat_prompt.txt"
@@ -78,20 +73,20 @@ def load_chat_prompt(f_name):
     return prompt
 
 
-def load_qa_chain():
+def load_qa_chain(model_name="gpt-4"):
     artifacts = load_artifacts()
     vector_store = load_faiss_store(
         artifacts["faiss"],
         artifacts["hyde_prompt"],
     )
     chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
-    chain = VectorDBQAWithSourcesChain.from_chain_type(
+    chain = RetrievalQAWithSourcesChain.from_chain_type(
         ChatOpenAI(
-            model_name="gpt-3.5-turbo",
+            model_name=model_name,
             temperature=0,
         ),
         chain_type="stuff",
-        vectorstore=vector_store,
+        retriever=vector_store.as_retriever(),
         chain_type_kwargs={"prompt": chat_prompt},
         return_source_documents=True,
     )
@@ -107,27 +102,51 @@ def get_answer(chain, question):
         return_only_outputs=True,
     )
     sources = ["- " + doc.metadata["source"] for doc in result["source_documents"]]
-    response = result["answer"]  # + "\n\n*References*:\n\n>" + "\n>".join(sources)
+    response = result["answer"] # + "\n\n*References*:\n\n>" + "\n>".join(sources)
     return response
 
 
 class Chat:
     def __init__(
         self,
+        model_name="gpt-4",
+        wandb_run=None,
     ):
-        self.qa_chain = load_qa_chain()
+        self.model_name = model_name
+        self.qa_chain = load_qa_chain(self.model_name)
+
+        self.settings = ""
+        if wandb_run is not None:
+            self.wandb_run_id = wandb_run.id
+            config = wandb_run.config.to_dict()
+            for k,v in config: 
+                self.settings + f"{k}:{v}\n"
+        
+
 
     def __call__(self, query):
+        # Try call GPT-4, if not fall back to 3.5
         response = get_answer(self.qa_chain, query)
-        return response + "\n\n"
-
-
+        if "--v" or "--verbose" in query:
+          return response + "\n\n" + self.settings
+        else:
+          return response + "\n\n"
+        # if "xxx" not in response:
+        #   return response + "\n" + "gpt-3.5-turbo\n\n"
+        # else:
+        #   self.chain = load_qa_chain("gpt-3.5-turbo")
+        #   response = get_answer(self.qa_chain, query)
+        #   return response + "\n\n" + f"powered-by: {self.model_name}\n\n"
+          
 def main():
-    chat = Chat()
+    chat = Chat(
+      model_name=run.config.model_name, 
+      config=run.config.to_dict()
+      wandb_run=run,
+    )
     user_query = input("Enter your question:")
     response = chat(user_query)
     print(response)
-
 
 if __name__ == "__main__":
     main()

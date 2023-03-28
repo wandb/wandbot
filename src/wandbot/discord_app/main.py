@@ -5,11 +5,15 @@ import functools
 import sqlite3
 import logging
 
+import wandb
 import discord
 from discord.ext import commands
 
 from chat import Chat
+from config import default_config, TEAM, PROJECT, JOB_TYPE
 
+
+WAIT_TIME = 60.0
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -21,7 +25,15 @@ intents.presences = False
 intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-chat = Chat()
+
+wandb_run = wandb.init(entity=TEAM, 
+                 project=PROJECT,
+                 job_type=JOB_TYPE, 
+                 config=default_config,
+                )
+
+chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
+
 
 # Create and connect to the SQLite database
 conn = sqlite3.connect('responses.db')
@@ -29,7 +41,7 @@ cursor = conn.cursor()
 
 # Create a table in the database for storing user questions, bot responses, and reactions
 cursor.execute('''CREATE TABLE IF NOT EXISTS responses (
-                    user_id INTEGER,
+                    discord_id INTEGER,
                     question TEXT,
                     response TEXT,
                     feedback TEXT
@@ -85,7 +97,7 @@ async def on_message(message):
             return user == message.author and str(reaction.emoji) in ['👍', '👎']
 
         try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=5.0, check=check)
+            reaction, user = await bot.wait_for('reaction_add', timeout=WAIT_TIME, check=check)
 
         except asyncio.TimeoutError:
             await thread.send('Sorry, you took too long to give feedback.')
@@ -93,9 +105,14 @@ async def on_message(message):
 
         else:
             # Get the feedback value
-            feedback = str(reaction.emoji)
+            if str(reaction.emoji) == '👍':
+                feedback = "positive"
+            elif str(reaction.emoji) == '👎':
+                feedback = "negative"
+            else:
+                feedback = "none"
         logger.info(f"Feedback: {feedback}")
-        cursor.execute(f"INSERT INTO responses (user_id,  question, response, feedback) VALUES (?, ?, ?, ?)",
+        cursor.execute(f"INSERT INTO responses (discord_id,  question, response, feedback) VALUES (?, ?, ?, ?)",
                        (message.author.id, message.content, response, feedback))
         conn.commit()
 
