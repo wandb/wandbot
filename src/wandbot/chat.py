@@ -87,7 +87,7 @@ def load_qa_chain():
     chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
     chain = VectorDBQAWithSourcesChain.from_chain_type(
         ChatOpenAI(
-            model_name="gpt-4",
+            model_name="gpt-3.5-turbo",
             temperature=0,
         ),
         chain_type="stuff",
