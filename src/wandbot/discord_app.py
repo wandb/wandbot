@@ -47,7 +47,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS responses (
                     feedback TEXT
                   )''')
 
-
 async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.Any:
     """Runs a blocking function in a non-blocking way"""
     func = functools.partial(
@@ -56,14 +55,10 @@ async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.An
     return await bot.loop.run_in_executor(None, func)
 
 
-INTRO_MESSAGE = f"""Please note that Wandbot is currently in alpha testing and will experience frequent updates. Please do not share any private or sensitive information in your query at this time. Generating response... 🤖\n{'-'*80}\n"""
+INTRO_MESSAGE = f"""Please note that **Wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖"""
 
-OUTRO_MESSAGE = f"""{'-'*80}
-Was this response helpful? Please react with 👍or 👎
-If you still need help please try re-phrase your question, 
-or alternatively reach out to the Weights & Biases Support Team
-at support@wandb.com
-{'-'*80}"""
+OUTRO_MESSAGE = f"""Was this response helpful? Please react with 👍 or 👎 to let us know.\nIf you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com
+"""
 
 
 @bot.event
@@ -75,15 +70,16 @@ async def on_ready():
 
 
 @bot.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     logger.info('Mentioned in message')
     if message.author == bot.user:
         return
-    if bot.user.mentioned_in(message):
+    if bot.user is not None and bot.user.mentioned_in(message):
+        mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
-            name="Thread", type=discord.ChannelType.public_thread
+                name=f"W&B Support", type=discord.ChannelType.public_thread
         )
-        await thread.send(f"Hi @{message.author}: {INTRO_MESSAGE}", mention_author=True)
+        await thread.send(f"Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
         response = await run_chat(chat, message.clean_content)
         sent_message = await thread.send(response)
         sent_message = await thread.send(OUTRO_MESSAGE)
