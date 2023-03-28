@@ -42,6 +42,7 @@ cursor = conn.cursor()
 # Create a table in the database for storing user questions, bot responses, and reactions
 cursor.execute('''CREATE TABLE IF NOT EXISTS responses (
                     discord_id INTEGER,
+                    wandb_run_id TEXT,
                     question TEXT,
                     response TEXT,
                     feedback TEXT
@@ -108,8 +109,8 @@ async def on_message(message: discord.Message):
             else:
                 feedback = "none"
         logger.info(f"Feedback: {feedback}")
-        cursor.execute(f"INSERT INTO responses (discord_id,  question, response, feedback) VALUES (?, ?, ?, ?)",
-                       (message.author.id, message.content, response, feedback))
+        cursor.execute(f"INSERT INTO responses (discord_id,  wandb_run_id, question, response, feedback) VALUES (?, ?, ?, ?, ?)",
+                       (message.author.id, chat.wandb_run.id, message.content, response, feedback))
         conn.commit()
 
     await bot.process_commands(message)

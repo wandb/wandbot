@@ -11,19 +11,20 @@ from langchain.prompts.chat import (
 )
 from langchain.vectorstores import FAISS
 
-def load_artifacts():
-    faiss_artifact = run.use_artifact(
+
+def load_artifacts(config):
+    faiss_artifact = wandb.use_artifact(
       config.faiss_artifact, type="search_index"
     )
     faiss_artifact_dir = faiss_artifact.download()
 
-    hyde_prompt_artifact = run.use_artifact(
+    hyde_prompt_artifact = wandb.use_artifact(
       config.hyde_prompt_artifact, type="prompt"
     )
     hyde_artifact_dir = hyde_prompt_artifact.download()
     hyde_prompt_file = f"{hyde_artifact_dir}/hyde_prompt.txt"
 
-    chat_prompt_artifact = run.use_artifact(
+    chat_prompt_artifact = wandb.use_artifact(
       config.chat_prompt_artifact, type="prompt"
     )
     chat_artifact_dir = chat_prompt_artifact.download()
@@ -73,8 +74,8 @@ def load_chat_prompt(f_name):
     return prompt
 
 
-def load_qa_chain(model_name="gpt-4"):
-    artifacts = load_artifacts()
+def load_qa_chain(config, model_name="gpt-4"):
+    artifacts = load_artifacts(config)
     vector_store = load_faiss_store(
         artifacts["faiss"],
         artifacts["hyde_prompt"],
@@ -113,16 +114,14 @@ class Chat:
         wandb_run=None,
     ):
         self.model_name = model_name
-        self.qa_chain = load_qa_chain(self.model_name)
 
         self.settings = ""
-        if wandb_run is not None:
-            self.wandb_run_id = wandb_run.id
-            config = wandb_run.config.to_dict()
-            for k,v in config: 
-                self.settings + f"{k}:{v}\n"
-        
+        for k,v in wandb_run.config.to_dict(): 
+            self.settings + f"{k}:{v}\n"
 
+        self.qa_chain = load_qa_chain(config=wandb_run.config, 
+                                      model_name=self.model_name)
+        
 
     def __call__(self, query):
         # Try call GPT-4, if not fall back to 3.5
@@ -140,9 +139,9 @@ class Chat:
           
 def main():
     chat = Chat(
-      model_name=run.config.model_name, 
-      config=run.config.to_dict()
-      wandb_run=run,
+      model_name=wandb.config.model_name, 
+      config=wandb.config.to_dict(),
+      wandb_wandb=wandb,
     )
     user_query = input("Enter your question:")
     response = chat(user_query)
