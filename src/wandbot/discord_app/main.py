@@ -1,12 +1,15 @@
 import os
-import discord
-from discord.ext import commands
 import asyncio
-# from chat import Chat
 import typing
 import functools
 import sqlite3
 import logging
+
+import discord
+from discord.ext import commands
+
+from chat import Chat
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -18,7 +21,7 @@ intents.presences = False
 intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-# chat = Chat()
+chat = Chat()
 
 # Create and connect to the SQLite database
 conn = sqlite3.connect('responses.db')
@@ -69,10 +72,9 @@ async def on_message(message):
             name="Thread", type=discord.ChannelType.public_thread
         )
         await thread.send(f"Hi @{message.author}: {INTRO_MESSAGE}", mention_author=True)
-        # response = await run_chat(chat, message.clean_content)
-        response = 'Hello World!'
+        response = await run_chat(chat, message.clean_content)
         sent_message = await thread.send(response)
-        # sent_message = await thread.send(OUTRO_MESSAGE)
+        sent_message = await thread.send(OUTRO_MESSAGE)
 
         # # Add reactions for feedback
         await sent_message.add_reaction('👍')
