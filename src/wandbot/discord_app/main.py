@@ -13,7 +13,7 @@ from chat import Chat
 from config import default_config, TEAM, PROJECT, JOB_TYPE
 
 
-WAIT_TIME = 60.0
+WAIT_TIME = 300.0
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

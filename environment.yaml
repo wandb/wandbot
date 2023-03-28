@@ -1,0 +1,24 @@
+name: wandbot
+channels:
+  - defaults
+dependencies:
+  - python<3.11
+  - numpy=1.24.*
+  - wandb=0.14.*
+  - openai=0.27.*
+  - tiktoken=0.3.*
+  - pandas=1.5.*
+  - pip:
+    - unstructured==0.5.*
+    - faiss-cpu==1.7.*
+    - langchain==0.0.123
+    # - replit==3.2.4
+    - Flask==2.2.0
+    - urllib3==1.26.*
+    # - slack-bolt==1.16.*
+    # - slack-sdk==3.12.0
+    - discord==2.2.2
+    - fastapi[all]==0.95.*
+    - uvicorn==0.21.*
+    - debugpy==1.6.*
+    # - replit-python-lsp-server[yapf,rope,pyflakes]==1.5.9
