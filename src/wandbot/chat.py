@@ -11,7 +11,7 @@ from langchain.prompts.chat import (
 )
 from langchain.vectorstores import FAISS
 
-PROJECT = "wandb_docs_bot"
+PROJECT = "wandb_docs_bot_dev"
 
 run = wandb.init(project=PROJECT)
 
@@ -116,7 +116,27 @@ class Chat:
         self,
     ):
         self.qa_chain = load_qa_chain()
+        self.intro_message = """Please note that Wandbot is currently in alpha testing and will experience frequent updates.
+         Please do not share any private or sensitive information in your query at this time.
+         Generating response... 🤖"""
+        self.outro_message = """----------------------------------------------------------------
+        Was this response helpful? Please react with 👍or 👎
+        If you still need help please try re-phrase your question, 
+        or alternatively reach out to the Weights & Biases Support Team
+        at support@wandb.com
+        ----------------------------------------------------------------"""
 
     def __call__(self, query):
         response = get_answer(self.qa_chain, query)
-        return response
+        return self.intro_message + "\n\n" + response + "\n\n" + self.outro_message
+
+
+def main():
+    chat = Chat()
+    user_query = input("Enter your question:")
+    response = chat(user_query)
+    print(response)
+
+
+if __name__ == "__main__":
+    main()
