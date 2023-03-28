@@ -114,9 +114,9 @@ class Chat:
         wandb_run=None,
     ):
         self.model_name = model_name
-
+        self.wandb_run = wandb_run
         self.settings = ""
-        for k,v in wandb_run.config.to_dict(): 
+        for k,v in wandb_run.config.as_dict().items(): 
             self.settings + f"{k}:{v}\n"
 
         self.qa_chain = load_qa_chain(config=wandb_run.config, 
@@ -136,16 +136,3 @@ class Chat:
         #   self.chain = load_qa_chain("gpt-3.5-turbo")
         #   response = get_answer(self.qa_chain, query)
         #   return response + "\n\n" + f"powered-by: {self.model_name}\n\n"
-          
-def main():
-    chat = Chat(
-      model_name=wandb.config.model_name, 
-      config=wandb.config.to_dict(),
-      wandb_wandb=wandb,
-    )
-    user_query = input("Enter your question:")
-    response = chat(user_query)
-    print(response)
-
-if __name__ == "__main__":
-    main()
