@@ -11,7 +11,7 @@ from langchain.prompts.chat import (
 )
 from langchain.vectorstores import FAISS
 
-PROJECT = "wandb_docs_bot_dev"
+PROJECT = "wandb_docs_bot"
 
 run = wandb.init(project=PROJECT)
 
@@ -41,8 +41,8 @@ def load_artifacts():
     }
 
 
-def load_hyde_prompt(fname):
-    prompt_template = open(fname).read()
+def load_hyde_prompt(f_name):
+    prompt_template = open(f_name).read()
     messages = [
         SystemMessagePromptTemplate.from_template(prompt_template),
         HumanMessagePromptTemplate.from_template("{question}"),
@@ -67,8 +67,8 @@ def load_faiss_store(store_dir, prompt_file, temperature=0.3):
     return faiss_store
 
 
-def load_chat_prompt(fname):
-    prompt_template = open(fname).read()
+def load_chat_prompt(f_name):
+    prompt_template = open(f_name).read()
 
     messages = [
         SystemMessagePromptTemplate.from_template(prompt_template),
@@ -80,7 +80,7 @@ def load_chat_prompt(fname):
 
 def load_qa_chain():
     artifacts = load_artifacts()
-    vectorstore = load_faiss_store(
+    vector_store = load_faiss_store(
         artifacts["faiss"],
         artifacts["hyde_prompt"],
     )
@@ -91,7 +91,7 @@ def load_qa_chain():
             temperature=0,
         ),
         chain_type="stuff",
-        vectorstore=vectorstore,
+        vectorstore=vector_store,
         chain_type_kwargs={"prompt": chat_prompt},
         return_source_documents=True,
     )
@@ -107,7 +107,7 @@ def get_answer(chain, question):
         return_only_outputs=True,
     )
     sources = ["- " + doc.metadata["source"] for doc in result["source_documents"]]
-    response = result["answer"] + "\n\n*References*:\n\n>" + "\n>".join(sources)
+    response = result["answer"]  # + "\n\n*References*:\n\n>" + "\n>".join(sources)
     return response
 
 
@@ -116,19 +116,10 @@ class Chat:
         self,
     ):
         self.qa_chain = load_qa_chain()
-        self.intro_message = """Please note that Wandbot is currently in alpha testing and will experience frequent updates.
-         Please do not share any private or sensitive information in your query at this time.
-         Generating response... 🤖"""
-        self.outro_message = """----------------------------------------------------------------
-        Was this response helpful? Please react with 👍or 👎
-        If you still need help please try re-phrase your question, 
-        or alternatively reach out to the Weights & Biases Support Team
-        at support@wandb.com
-        ----------------------------------------------------------------"""
 
     def __call__(self, query):
         response = get_answer(self.qa_chain, query)
-        return self.intro_message + "\n\n" + response + "\n\n" + self.outro_message
+        return response + "\n\n"
 
 
 def main():
