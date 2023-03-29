@@ -44,7 +44,7 @@ class FAISSWithScore(FAISS):
         return VectorStoreRetrieverWithScore(
             vectorstore=self,
             search_type="similarity",
-            search_kwargs={"k": 4},
+            search_kwargs={"k": 5},
         )
 
 
