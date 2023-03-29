@@ -1,4 +1,3 @@
-# from fake_chat import FakeChat as Chat
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,8 +5,11 @@ from pydantic import BaseModel
 
 from chat import Chat
 
+# from fake_chat import FakeChat as Chat
+
 # Load environment variables
 load_dotenv()
+
 
 # Initialize the FastAPI app
 app = FastAPI()

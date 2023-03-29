@@ -37,46 +37,23 @@ langchain.llm_cache = SQLiteCache(database_path="langchain.db")
 logger = logging.getLogger(__name__)
 
 
-def create_qa_prompt(df, source=""):
-    df = df.apply(
+def create_qa_prompt(df):
+    new_df = df.apply(
         lambda x: f"Question:\n{'-' * 10}\n{x['question']}\n\nAnswer:\n{'-' * 10}\n{x['answer']}",
         axis=1,
     )
-    df = pd.DataFrame(df, columns=["reference"])
-    df["source"] = f"{source}-" + df.index.map(str)
-    return df.to_dict(orient="records")
+    new_df = pd.DataFrame(new_df, columns=["reference"])
+    new_df["source"] = df["source"]
+    return new_df.to_dict(orient="records")
 
 
-def load_forum_data(f_name):
+def load_csv_data(f_name):
     df = pd.read_csv(f_name)
-    return create_qa_prompt(df, f_name.split(".")[0])
-
-
-def load_api_docs_data(f_name):
-    df = pd.read_csv(f_name)[["prompt", "completion"]]
-    df = df.rename({"prompt": "question", "completion": "answer"}, axis=1)
-    return create_qa_prompt(df, f_name.split(".")[0])
-
-
-def load_extra_documents(
-    forum_data="forum_data.csv",
-    support_rotation_data="support_rotation_data.csv",
-    wandb_bot_data="wandb_bot_data.csv",
-):
-    extra_data = (
-        load_forum_data(forum_data)
-        + load_forum_data(support_rotation_data)
-        + load_api_docs_data(wandb_bot_data)
-    )
-    documents = [
-        Document(page_content=doc["reference"], metadata={"source": doc["source"]})
-        for doc in extra_data
-    ]
-    token_splitter = TokenTextSplitter(
-        encoding_name="cl100k_base", chunk_size=768, chunk_overlap=0
-    )
-    document_sections = token_splitter.split_documents(documents)
-    return document_sections
+    if "title" in df.columns:
+        df["question"] = df["title"] + "\n\n" + df["question"]
+    if "source" not in df.columns:
+        df["source"] = f"{f_name}-" + df.index.map(str)
+    return create_qa_prompt(df)
 
 
 def map_git_to_local_paths(paths: List[str]) -> Dict[str, str]:
@@ -139,6 +116,7 @@ class DocumentationDatasetLoader:
         documentation_dir: str = "docodile",
         notebooks_dir: str = "examples/colabs/",
         code_dir: str = "examples/examples/",
+        extra_data_dir: str = "extra_data",
         chunk_size: int = 1024,
         chunk_overlap: int = 128,
         encoding_name: str = "cl100k_base",
@@ -147,6 +125,7 @@ class DocumentationDatasetLoader:
         :param documentation_dir: The directory containing the documentation from wandb/docodile
         :param notebooks_dir: The directory containing the wandb/examples/colab notebooks
         :param code_dir: The directory containing the wandb/examples/examples code
+        :param extra_data_dir: The directory containing extra data to load
         :param chunk_size: The size of the chunks to split the text into using the `TokenTextSplitter`
         :param chunk_overlap: The amount of overlap between chunks of text using the `TokenTextSplitter`
         :param encoding_name: The name of the encoding to use when splitting the text using the `TokenTextSplitter`
@@ -154,6 +133,7 @@ class DocumentationDatasetLoader:
         self.documentation_dir = documentation_dir
         self.notebooks_dir = notebooks_dir
         self.code_dir = code_dir
+        self.extra_data_dir = extra_data_dir
         self.documents = []
         self.md_text_splitter = MarkdownTextSplitter()
         self.code_text_splitter = PythonCodeTextSplitter()
@@ -236,6 +216,18 @@ class DocumentationDatasetLoader:
         code_sections = self.token_splitter.split_documents(code_sections)
         return code_sections
 
+    def load_extra_documents(self, extra_data_dir: str) -> List[Document]:
+        extra_data = []
+        for f_name in pathlib.Path(extra_data_dir).glob("*.csv"):
+            extra_data.extend(load_csv_data(str(f_name)))
+
+        documents = [
+            Document(page_content=doc["reference"], metadata={"source": doc["source"]})
+            for doc in tqdm(extra_data, desc="loading extra data")
+        ]
+        document_sections = self.token_splitter.split_documents(documents)
+        return document_sections
+
     def load(self) -> List[Document]:
         """
         Loads the documentation, notebooks and code documents
@@ -263,6 +255,12 @@ class DocumentationDatasetLoader:
         else:
             logger.warning(
                 f"Code directory {self.code_dir} does not exist. Not loading code."
+            )
+        if self.extra_data_dir and os.path.exists(self.extra_data_dir):
+            self.documents.extend(self.load_extra_documents(self.extra_data_dir))
+        else:
+            logger.warning(
+                f"Extra data directory {self.extra_data_dir} does not exist. Not loading extra data."
             )
         return self.documents
 
@@ -428,6 +426,11 @@ def get_parser():
         help="The directory containing the examples code from the wandb/examples repo",
     )
     parser.add_argument(
+        "--extra_data_dir",
+        type=str,
+        help="The directory containing the extra data to add to the dataset",
+    )
+    parser.add_argument(
         "--documents_file",
         type=str,
         default="data/documents.jsonl",
@@ -475,6 +478,7 @@ def main():
             documentation_dir=args.docs_dir,
             notebooks_dir=args.notebooks_dir,
             code_dir=args.code_dir,
+            extra_data_dir=args.extra_data_dir,
         )
         documents = loader.load()
         loader.save_to_disk(args.documents_file)
