@@ -1,7 +1,9 @@
+from typing import List, Any, Dict
+
 import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
-from langchain.chains import VectorDBQAWithSourcesChain
+from langchain.chains import RetrievalQAWithSourcesChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts.chat import (
@@ -9,27 +11,62 @@ from langchain.prompts.chat import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
+from langchain.schema import Document
 from langchain.vectorstores import FAISS
+from langchain.vectorstores.base import VectorStoreRetriever
 
 PROJECT = "wandb_docs_bot"
 
 run = wandb.init(project=PROJECT)
 
 
-def load_artifacts():
-    faiss_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/faiss_store:latest", type="search_index"
-    )
+class VectorStoreRetrieverWithScore(VectorStoreRetriever):
+    def get_relevant_documents(self, query: str) -> List[Document]:
+        if self.search_type == "similarity":
+            docs_and_scores = self.vectorstore.similarity_search_with_score(
+                query, **self.search_kwargs
+            )
+            docs = []
+            for doc, score in docs_and_scores:
+                doc.metadata["score"] = score
+                docs.append(doc)
+        elif self.search_type == "mmr":
+            docs = self.vectorstore.max_marginal_relevance_search(
+                query, **self.search_kwargs
+            )
+        else:
+            raise ValueError(f"search_type of {self.search_type} not allowed.")
+        return docs
+
+
+class FAISSWithScore(FAISS):
+    def as_retriever(self) -> VectorStoreRetrieverWithScore:
+        return VectorStoreRetrieverWithScore(
+            vectorstore=self,
+            search_type="similarity",
+            search_kwargs={"k": 5},
+        )
+
+
+class RetrievalQAWithSourcesChainWithScore(RetrievalQAWithSourcesChain):
+    def _get_docs(self, inputs: Dict[str, Any]) -> List[Document]:
+        question = inputs[self.question_key]
+        docs = self.retriever.get_relevant_documents(question)
+        return self._reduce_tokens_below_limit(docs)
+
+
+def load_artifacts(config):
+    faiss_artifact = wandb.use_artifact(config.faiss_artifact, type="search_index")
     faiss_artifact_dir = faiss_artifact.download()
 
-    hyde_prompt_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/hyde_prompt:latest", type="prompt"
+    hyde_prompt_artifact = wandb.use_artifact(
+        config.hyde_prompt_artifact, type="prompt"
     )
     hyde_artifact_dir = hyde_prompt_artifact.download()
     hyde_prompt_file = f"{hyde_artifact_dir}/hyde_prompt.txt"
 
-    chat_prompt_artifact = run.use_artifact(
-        "parambharat/wandb_docs_bot/system_prompt:latest", type="prompt"
+    chat_prompt_artifact = wandb.use_artifact(
+        config.chat_prompt_artifact, type="prompt"
     )
     chat_artifact_dir = chat_prompt_artifact.download()
     chat_prompt_file = f"{chat_artifact_dir}/chat_prompt.txt"
@@ -63,7 +100,7 @@ def load_hyde_embeddings(prompt_file, temperature=0.3):
 
 def load_faiss_store(store_dir, prompt_file, temperature=0.3):
     embeddings = load_hyde_embeddings(prompt_file, temperature)
-    faiss_store = FAISS.load_local(store_dir, embeddings)
+    faiss_store = FAISSWithScore.load_local(store_dir, embeddings)
     return faiss_store
 
 
@@ -78,20 +115,20 @@ def load_chat_prompt(f_name):
     return prompt
 
 
-def load_qa_chain():
-    artifacts = load_artifacts()
+def load_qa_chain(config, model_name="gpt-4"):
+    artifacts = load_artifacts(config)
     vector_store = load_faiss_store(
         artifacts["faiss"],
         artifacts["hyde_prompt"],
     )
     chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
-    chain = VectorDBQAWithSourcesChain.from_chain_type(
+    chain = RetrievalQAWithSourcesChainWithScore.from_chain_type(
         ChatOpenAI(
             model_name="gpt-4",
             temperature=0,
         ),
         chain_type="stuff",
-        vectorstore=vector_store,
+        retriever=vector_store.as_retriever(),
         chain_type_kwargs={"prompt": chat_prompt},
         return_source_documents=True,
     )
@@ -106,24 +143,52 @@ def get_answer(chain, question):
         },
         return_only_outputs=True,
     )
-    sources = ["- " + doc.metadata["source"] for doc in result["source_documents"]]
-    response = result["answer"]  # + "\n\n*References*:\n\n>" + "\n>".join(sources)
+    sources = list(
+        {
+            "- " + doc.metadata["source"]
+            for doc in result["source_documents"]
+            if doc.metadata["score"] <= 0.4
+        }
+    )
+
+    if len(sources):
+        response = result["answer"] + "\n\n*References*:\n\n" + "\n".join(sources)
+    else:
+        response = result["answer"]
     return response
 
 
 class Chat:
     def __init__(
         self,
+        model_name="gpt-4",
+        wandb_run=None,
     ):
-        self.qa_chain = load_qa_chain()
+        self.model_name = model_name
+        self.wandb_run = wandb_run
+
+        self.settings = ""
+        for k, v in wandb_run.config.as_dict().items():
+            self.settings + f"{k}:{v}\n"
+
+        self.qa_chain = load_qa_chain(
+            config=wandb_run.config, model_name=self.model_name
+        )
 
     def __call__(self, query):
+        # Try call GPT-4, if not fall back to 3.5
         response = get_answer(self.qa_chain, query)
-        return response + "\n\n"
+        if "--v" or "--verbose" in query:
+            return response + "\n\n" + self.settings
+        else:
+            return response + "\n\n"
 
 
 def main():
-    chat = Chat()
+    from wandbot.config import default_config
+
+    run.config.update(default_config.__dict__)
+    chat = Chat(model_name="gpt-4", wandb_run=run)
     user_query = input("Enter your question:")
     response = chat(user_query)
     print(response)
