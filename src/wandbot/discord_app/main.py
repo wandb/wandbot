@@ -1,23 +1,20 @@
-import os
 import asyncio
-import typing
 import functools
-import sqlite3
 import logging
+import os
+import sqlite3
+import typing
 
-import wandb
 import discord
-from discord.ext import commands
-
+import wandb
 from chat import Chat
 from config import default_config, TEAM, PROJECT, JOB_TYPE
-
+from discord.ext import commands
 
 WAIT_TIME = 300.0
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 
 intents = discord.Intents.all()
 intents.typing = False
@@ -35,7 +32,6 @@ wandb_run = wandb.init(
 )
 
 chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
-
 
 # Create and connect to the SQLite database
 conn = sqlite3.connect("responses.db")
@@ -83,8 +79,8 @@ async def on_message(message: discord.Message):
     if bot.user is not None and bot.user.mentioned_in(message):
         mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
-            name=f"W&B Support", type=discord.ChannelType.public_thread
-        )
+            name=f"Thread", type=discord.ChannelType.public_thread
+        )  # currently calling it "Thread" because W&B Support makes it sound too official.
         await thread.send(f"Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
         response = await run_chat(chat, message.clean_content)
         sent_message = await thread.send(response)
