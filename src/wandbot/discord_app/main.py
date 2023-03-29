@@ -57,7 +57,7 @@ async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.An
     return await bot.loop.run_in_executor(None, func)
 
 
-INTRO_MESSAGE = f"""Please note that **Wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖"""
+INTRO_MESSAGE = f"""Please note that **Wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖\n"""
 
 OUTRO_MESSAGE = f"""\nIf you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know.\n
 """
