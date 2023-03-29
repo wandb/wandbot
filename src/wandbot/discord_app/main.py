@@ -12,7 +12,7 @@ from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
 
 WAIT_TIME = 300.0
-PROD_DISCORD_CHANNEL_ID = 983676008072900629
+PROD_DISCORD_CHANNEL_ID = 1090739438310654023
 TEST_DISCORD_CHANNEL_ID = 1088892013321142484
 
 logger = logging.getLogger(__name__)
