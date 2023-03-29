@@ -1,5 +1,6 @@
 from typing import List, Any, Dict
 
+import time
 import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
