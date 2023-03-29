@@ -12,7 +12,7 @@ from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
 
 WAIT_TIME = 300.0
-PROD_DISCORD_CHANNEL_ID = 983676008072900629
+PROD_DISCORD_CHANNEL_ID = 1090739438310654023
 TEST_DISCORD_CHANNEL_ID = 1088892013321142484
 
 logger = logging.getLogger(__name__)
@@ -29,14 +29,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 wandb_run = wandb.init(
     entity=TEAM,
     project=PROJECT,
-    job_type=JOB_TYPE,
+    job_type=JOB_TYPE, 
     config=default_config,
 )
 
 chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
 
 # Create and connect to the SQLite database
-conn = sqlite3.connect("responses.db")
+conn = sqlite3.connect("responses2.db")
 cursor = conn.cursor()
 
 # Create a table in the database for storing user questions, bot responses, and reactions
@@ -71,7 +71,7 @@ async def on_ready():
     logger.info(f"We have logged in as {bot.user}")
     print(f"We have logged in as {bot.user}")
     logger.info(
-        f"Servers connected: {len(bot.guilds)}"
+        f"Connected to {len(bot.guilds)} Discord servers"
     )  # Add this line to see the number of servers the bot is connected to
     print(f"Servers connected: {len(bot.guilds)}")
 
