@@ -23,6 +23,7 @@ intents = discord.Intents.all()
 intents.typing = False
 intents.presences = False
 intents.messages = True
+intents.reactions = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
