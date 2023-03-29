@@ -12,6 +12,8 @@ from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
 
 WAIT_TIME = 300.0
+PROD_DISCORD_CHANNEL_ID = 983676008072900629
+TEST_DISCORD_CHANNEL_ID = 1088892013321142484
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -42,12 +44,13 @@ cursor.execute(
     """CREATE TABLE IF NOT EXISTS responses (
                     discord_id INTEGER,
                     wandb_run_id TEXT,
-                    question TEXT,
+                    query TEXT,
                     response TEXT,
-                    feedback TEXT
+                    feedback TEXT,
+                    elapsed_time REAL,
+                    start_time REAL
                   )"""
 )
-
 
 async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.Any:
     """Runs a blocking function in a non-blocking way"""
@@ -59,7 +62,9 @@ async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.An
 
 INTRO_MESSAGE = f"""Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖\n\n"""
 
-OUTRO_MESSAGE = f"""```If you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know```"""
+# OUTRO_MESSAGE = f"""```🤖 If you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know```"""
+
+OUTRO_MESSAGE = f"""🤖 If you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know"""
 
 
 @bot.event
@@ -73,16 +78,19 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     logger.info("Mentioned in message")
+    print("Mentioned in message")
     if message.author == bot.user:
         return
-    if bot.user is not None and bot.user.mentioned_in(message):
+    if bot.user is not None and bot.user.mentioned_in(message) and (message.channel.id == PROD_DISCORD_CHANNEL_ID or message.channel.id == TEST_DISCORD_CHANNEL_ID):
         mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
             name=f"Thread", type=discord.ChannelType.public_thread
         )  # currently calling it "Thread" because W&B Support makes it sound too official.
-        await thread.send(f"Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
-        response = await run_chat(chat, message.clean_content)
-        sent_message = await thread.send(response)
+        await thread.send(f"🤖 Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
+        query, response, timings = await run_chat(chat, message.clean_content)
+        start_time, end_time, elapsed_time = timings
+        print(start_time)
+        sent_message = await thread.send(f"🤖 {response}")
         sent_message = await thread.send(OUTRO_MESSAGE)
 
         # # Add reactions for feedback
@@ -99,7 +107,7 @@ async def on_message(message: discord.Message):
             )
 
         except asyncio.TimeoutError:
-            await thread.send("")
+            await thread.send("🤖")
             feedback = "none"
 
         else:
@@ -112,8 +120,8 @@ async def on_message(message: discord.Message):
                 feedback = "none"
         logger.info(f"Feedback: {feedback}")
         cursor.execute(
-            f"INSERT INTO responses (discord_id,  wandb_run_id, question, response, feedback) VALUES (?, ?, ?, ?, ?)",
-            (message.author.id, chat.wandb_run.id, message.content, response, feedback),
+            f"INSERT INTO responses (discord_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (message.author.id, chat.wandb_run.id, query, response, feedback, elapsed_time, start_time),
         )
         conn.commit()
 
