@@ -223,7 +223,7 @@ class DocumentationDatasetLoader:
 
         documents = [
             Document(page_content=doc["reference"], metadata={"source": doc["source"]})
-            for doc in extra_data
+            for doc in tqdm(extra_data, desc="loading extra data")
         ]
         document_sections = self.token_splitter.split_documents(documents)
         return document_sections
