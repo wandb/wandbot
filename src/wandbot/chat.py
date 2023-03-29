@@ -172,14 +172,18 @@ class Chat:
         )
 
     def __call__(self, query):
+        start_time = time.time()
         # Try call GPT-4, if not fall back to 3.5
         response = get_answer(self.qa_chain, query)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        timings = (start_time, end_time, elapsed_time)
         if "--v" or "--verbose" in query:
-            return response + "\n\n" + self.settings
+            return query, response + "\n\n" + self.settings, timings
         else:
-            return response + "\n\n"
-
-
+            return query, response + "\n\n", timings
+    
+    
 def main():
     from wandbot.config import default_config
 
