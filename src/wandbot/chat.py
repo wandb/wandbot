@@ -149,7 +149,7 @@ def get_answer(chain, question):
     )
 
     if len(sources):
-        response = result["answer"] + "\n\n*References*:\n\n" + "\n".join(sources)
+        response = result["answer"] #+ "\n\n*References*:\n\n" + "\n".join(sources)
     else:
         response = result["answer"]
     return response

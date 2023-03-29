@@ -29,7 +29,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 wandb_run = wandb.init(
     entity=TEAM,
     project=PROJECT,
-    job_type=JOB_TYPE,
+    job_type=JOB_TYPE, l
     config=default_config,
 )
 
@@ -71,7 +71,7 @@ async def on_ready():
     logger.info(f"We have logged in as {bot.user}")
     print(f"We have logged in as {bot.user}")
     logger.info(
-        f"Servers connected: {len(bot.guilds)}"
+        f"Connected to {len(bot.guilds)} Discord servers"
     )  # Add this line to see the number of servers the bot is connected to
     print(f"Servers connected: {len(bot.guilds)}")
 
