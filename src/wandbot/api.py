@@ -1,11 +1,15 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from chat import Chat
+from wandbot.config import TEAM, PROJECT, JOB_TYPE, default_config
 
 # from fake_chat import FakeChat as Chat
 
+# Load environment variables
+load_dotenv()
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -35,7 +39,14 @@ class GreetingResponse(BaseModel):
 
 
 # Initialize Chat instance as a global variable
-chat = Chat()
+wandb_run = wandb.init(
+    entity=TEAM,
+    project=PROJECT,
+    job_type=JOB_TYPE,
+    config=default_config,
+)
+
+chat = Chat(model_name=wandb_run.config.model_name, wandb_run=wandb_run)
 
 
 @app.get("/")

@@ -15,10 +15,6 @@ from langchain.schema import Document
 from langchain.vectorstores import FAISS
 from langchain.vectorstores.base import VectorStoreRetriever
 
-PROJECT = "wandb_docs_bot"
-
-run = wandb.init(project=PROJECT)
-
 
 class VectorStoreRetrieverWithScore(VectorStoreRetriever):
     def get_relevant_documents(self, query: str) -> List[Document]:
@@ -124,7 +120,7 @@ def load_qa_chain(config, model_name="gpt-4"):
     chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
     chain = RetrievalQAWithSourcesChainWithScore.from_chain_type(
         ChatOpenAI(
-            model_name="gpt-4",
+            model_name=model_name,
             temperature=0,
         ),
         chain_type="stuff",
