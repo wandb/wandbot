@@ -59,7 +59,7 @@ async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.An
 
 INTRO_MESSAGE = f"""Please note that **Wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖"""
 
-OUTRO_MESSAGE = f"""Was this response helpful? Please react with 👍 or 👎 to let us know.\nIf you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com
+OUTRO_MESSAGE = f"""\nIf you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know.\n
 """
 
 
@@ -100,7 +100,7 @@ async def on_message(message: discord.Message):
             )
 
         except asyncio.TimeoutError:
-            await thread.send("Sorry, you took too long to give feedback.")
+            await thread.send("")
             feedback = "none"
 
         else:
