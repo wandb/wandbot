@@ -29,7 +29,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 wandb_run = wandb.init(
     entity=TEAM,
     project=PROJECT,
-    job_type=JOB_TYPE, l
+    job_type=JOB_TYPE, 
     config=default_config,
 )
 
