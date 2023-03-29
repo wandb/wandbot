@@ -36,7 +36,7 @@ wandb_run = wandb.init(
 chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
 
 # Create and connect to the SQLite database
-conn = sqlite3.connect("responses.db")
+conn = sqlite3.connect("responses2.db")
 cursor = conn.cursor()
 
 # Create a table in the database for storing user questions, bot responses, and reactions
