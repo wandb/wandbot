@@ -11,6 +11,8 @@ from chat import Chat
 from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
 
+from ..stream_table import StreamTable
+
 WAIT_TIME = 300.0
 PROD_DISCORD_CHANNEL_ID = 1090739438310654023
 TEST_DISCORD_CHANNEL_ID = 1088892013321142484
@@ -32,6 +34,9 @@ wandb_run = wandb.init(
     job_type=JOB_TYPE, 
     config=default_config,
 )
+
+cols = ["discord_id", "wandb_run_id", "query", "response", "feedback", "elapsed_time", "start_time"]
+wandb_table = StreamTable('wandbot-results', cols)
 
 chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
 
@@ -105,7 +110,7 @@ async def on_message(message: discord.Message):
             )
 
         except asyncio.TimeoutError:
-            await thread.send("")
+            await thread.send("🤖")
             feedback = "none"
 
         else:
@@ -117,6 +122,13 @@ async def on_message(message: discord.Message):
             else:
                 feedback = "none"
         logger.info(f"Feedback: {feedback}")
+
+        # lot to wandb stream table
+        wandb_table.add_data(
+            message.author.id, chat.wandb_run.id,
+            query, response, feedback, 
+            elapsed_time, start_time,
+        )
         cursor.execute(
             f"INSERT INTO responses (discord_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (message.author.id, chat.wandb_run.id, query, response, feedback, elapsed_time, start_time),
