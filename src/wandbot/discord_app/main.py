@@ -124,11 +124,15 @@ async def on_message(message: discord.Message):
         logger.info(f"Feedback: {feedback}")
 
         # lot to wandb stream table
-        wandb_table.add_data(
-            message.author.id, chat.wandb_run.id,
-            query, response, feedback, 
-            elapsed_time, start_time,
-        )
+        try:
+            wandb_table.add_data(
+                message.author.id, chat.wandb_run.id,
+                query, response, feedback, 
+                elapsed_time, start_time,
+            )
+        except Exception as e:
+            logger.error(e)
+            
         cursor.execute(
             f"INSERT INTO responses (discord_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (message.author.id, chat.wandb_run.id, query, response, feedback, elapsed_time, start_time),
