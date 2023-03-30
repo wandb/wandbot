@@ -16,7 +16,7 @@ PROD_DISCORD_CHANNEL_ID = 1090739438310654023
 TEST_DISCORD_CHANNEL_ID = 1088892013321142484
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 intents = discord.Intents.all()
 intents.typing = False
@@ -69,11 +69,11 @@ OUTRO_MESSAGE = f"""🤖 If you still need help please try re-phrase your questi
 @bot.event
 async def on_ready():
     logger.info(f"We have logged in as {bot.user}")
-    print(f"We have logged in as {bot.user}")
+    # print(f"We have logged in as {bot.user}")
     logger.info(
         f"Connected to {len(bot.guilds)} Discord servers"
     )  # Add this line to see the number of servers the bot is connected to
-    print(f"Servers connected: {len(bot.guilds)}")
+    # print(f"Servers connected: {len(bot.guilds)}")
 
 @bot.event
 async def on_message(message: discord.Message):
