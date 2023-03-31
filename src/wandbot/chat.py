@@ -1,6 +1,6 @@
+import time
 from typing import List, Any, Dict
 
-import time
 import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
@@ -41,11 +41,14 @@ class FAISSWithScore(FAISS):
         return VectorStoreRetrieverWithScore(
             vectorstore=self,
             search_type="similarity",
-            search_kwargs={"k": 5},
+            search_kwargs={"k": 10},
         )
 
 
 class RetrievalQAWithSourcesChainWithScore(RetrievalQAWithSourcesChain):
+    reduce_k_below_max_tokens: bool = True
+    max_tokens_limit: int = 2048
+
     def _get_docs(self, inputs: Dict[str, Any]) -> List[Document]:
         question = inputs[self.question_key]
         docs = self.retriever.get_relevant_documents(question)
@@ -112,13 +115,18 @@ def load_chat_prompt(f_name):
     return prompt
 
 
-def load_qa_chain(config, model_name="gpt-4"):
+def load_vector_store_and_prompt(config):
     artifacts = load_artifacts(config)
     vector_store = load_faiss_store(
         artifacts["faiss"],
         artifacts["hyde_prompt"],
     )
     chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
+
+    return vector_store, chat_prompt
+
+
+def load_qa_chain(model_name="gpt-4", vector_store=None, chat_prompt=None):
     chain = RetrievalQAWithSourcesChainWithScore.from_chain_type(
         ChatOpenAI(
             model_name=model_name,
@@ -149,7 +157,7 @@ def get_answer(chain, question):
     )
 
     if len(sources):
-        response = result["answer"] #+ "\n\n*References*:\n\n" + "\n".join(sources)
+        response = result["answer"]  # + "\n\n*References*:\n\n" + "\n".join(sources)
     else:
         response = result["answer"]
     return response
@@ -168,23 +176,40 @@ class Chat:
         for k, v in wandb_run.config.as_dict().items():
             self.settings + f"{k}:{v}\n"
 
+        self.vector_store, self.chat_prompt = load_vector_store_and_prompt(
+            config=wandb_run.config
+        )
         self.qa_chain = load_qa_chain(
-            config=wandb_run.config, model_name=self.model_name
+            model_name="gpt-4",
+            vector_store=self.vector_store,
+            chat_prompt=self.chat_prompt,
         )
 
     def __call__(self, query):
         start_time = time.time()
-        # Try call GPT-4, if not fall back to 3.5
-        response = get_answer(self.qa_chain, query)
+        # Try call GPT-4, if not fall back to 3.5 turbo
+        try:
+            response = get_answer(self.qa_chain, query)
+        except:
+            print("Falling back to gpt-3.5-turbo")
+            self.qa_chain = load_qa_chain(
+                model_name="gpt-3.5-turbo",
+                vector_store=self.vector_store,
+                chat_prompt=self.chat_prompt,
+            )
+            response = get_answer(self.qa_chain, query)
+            fallback_warning = "**Warning: Falling back to gpt-3.5.** These results are sometimes not as good as gpt-4"
+            response = fallback_warning + "\n\n" + response
+
         end_time = time.time()
         elapsed_time = end_time - start_time
         timings = (start_time, end_time, elapsed_time)
-        if "--v" or "--verbose" in query:
-            return query, response + "\n\n" + self.settings, timings
-        else:
-            return query, response + "\n\n", timings
-    
-    
+        # To consider, add verbose mode
+        # if "--v" or "--verbose" in query:
+        #     return query, response + "\n\n" + self.settings, timings
+        return query, response + "\n\n", timings
+
+
 def main():
     from wandbot.config import default_config
 

@@ -10,8 +10,7 @@ import wandb
 from chat import Chat
 from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
-
-from ..stream_table import StreamTable
+from stream_table import StreamTable
 
 WAIT_TIME = 300.0
 PROD_DISCORD_CHANNEL_ID = 1090739438310654023
@@ -29,14 +28,19 @@ intents.reactions = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 wandb_run = wandb.init(
-    entity=TEAM,
-    project=PROJECT,
-    job_type=JOB_TYPE, 
-    config=default_config,
+    entity=TEAM, project=PROJECT, job_type=JOB_TYPE, config=default_config, resume=True
 )
 
-cols = ["discord_id", "wandb_run_id", "query", "response", "feedback", "elapsed_time", "start_time"]
-wandb_table = StreamTable('wandbot-results', cols)
+cols = [
+    "discord_id",
+    "wandb_run_id",
+    "query",
+    "response",
+    "feedback",
+    "elapsed_time",
+    "start_time",
+]
+wandb_table = StreamTable("wandbot-results", cols)
 
 chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
 
@@ -66,7 +70,7 @@ async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.An
     return await bot.loop.run_in_executor(None, func)
 
 
-INTRO_MESSAGE = f"""Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response... 🤖\n\n"""
+INTRO_MESSAGE = f"""Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response...\n\n"""
 
 OUTRO_MESSAGE = f"""🤖 If you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know"""
 
@@ -80,18 +84,27 @@ async def on_ready():
     )  # Add this line to see the number of servers the bot is connected to
     # print(f"Servers connected: {len(bot.guilds)}")
 
+
 @bot.event
 async def on_message(message: discord.Message):
     logger.info("Mentioned in message")
     if message.author == bot.user:
         return
-    if bot.user is not None and bot.user.mentioned_in(message) and (message.channel.id == PROD_DISCORD_CHANNEL_ID or message.channel.id == TEST_DISCORD_CHANNEL_ID):
+    if (
+        bot.user is not None
+        and bot.user.mentioned_in(message)
+        and (
+            message.channel.id == PROD_DISCORD_CHANNEL_ID
+            or message.channel.id == TEST_DISCORD_CHANNEL_ID
+        )
+    ):
         mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
             name=f"Thread", type=discord.ChannelType.public_thread
         )  # currently calling it "Thread" because W&B Support makes it sound too official.
         await thread.send(f"🤖 Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
         query, response, timings = await run_chat(chat, message.clean_content)
+        print("Response generated")
         start_time, end_time, elapsed_time = timings
         sent_message = await thread.send(f"🤖 {response}")
         sent_message = await thread.send(OUTRO_MESSAGE)
@@ -126,16 +139,28 @@ async def on_message(message: discord.Message):
         # lot to wandb stream table
         try:
             wandb_table.add_data(
-                message.author.id, chat.wandb_run.id,
-                query, response, feedback, 
-                elapsed_time, start_time,
+                message.author.id,
+                chat.wandb_run.id,
+                query,
+                response,
+                feedback,
+                elapsed_time,
+                start_time,
             )
         except Exception as e:
             logger.error(e)
-            
+
         cursor.execute(
             f"INSERT INTO responses (discord_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (message.author.id, chat.wandb_run.id, query, response, feedback, elapsed_time, start_time),
+            (
+                message.author.id,
+                chat.wandb_run.id,
+                query,
+                response,
+                feedback,
+                elapsed_time,
+                start_time,
+            ),
         )
         conn.commit()
 
