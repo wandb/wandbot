@@ -47,7 +47,7 @@ class FAISSWithScore(FAISS):
 
 class RetrievalQAWithSourcesChainWithScore(RetrievalQAWithSourcesChain):
     reduce_k_below_max_tokens: bool = True
-    max_tokens_limit: int = 2048
+    max_tokens_limit: int = 2816
 
     def _get_docs(self, inputs: Dict[str, Any]) -> List[Document]:
         question = inputs[self.question_key]
