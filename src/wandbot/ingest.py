@@ -56,12 +56,13 @@ def load_csv_data(f_name):
 
 def map_git_to_local_paths(paths: List[str], examples=True) -> Dict[str, str]:
     local_paths = list(map(lambda x: str(x), paths))
-    git_paths = map(lambda x: "/".join(x.split("/")[1:]), local_paths)
     if examples:
+        git_paths = map(lambda x: "/".join(x.split("/")[1:]), local_paths)
         git_paths = map(
             lambda x: f"https://github.com/wandb/examples/blob/master/{x}", git_paths
         )
     else:
+        git_paths = map(lambda x: "/".join(x.split("/")[3:]), local_paths)
         git_paths = map(
             lambda x: f"https://github.com/wandb/wandb/blob/main/{x}", git_paths
         )
