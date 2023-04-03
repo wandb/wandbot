@@ -27,7 +27,6 @@ from langchain.text_splitter import (
     TokenTextSplitter,
 )
 from tqdm import tqdm
-
 from wandbot.prompts import load_hyde_prompt
 
 langchain.llm_cache = SQLiteCache(database_path="langchain.db")
@@ -55,43 +54,64 @@ def load_csv_data(f_name):
 
 
 def map_git_to_local_paths(paths: List[str], examples=True) -> Dict[str, str]:
+    paths = list(paths)
     local_paths = list(map(lambda x: str(x), paths))
+    local_path_parts = list(map(lambda x: x.parts, paths))
     if examples:
-        git_paths = map(lambda x: "/".join(x.split("/")[1:]), local_paths)
-        git_paths = map(
-            lambda x: f"https://github.com/wandb/examples/blob/master/{x}", git_paths
+        examples_idx = list(map(lambda x: x.index("examples"), local_path_parts))
+        git_paths = list(
+            map(
+                lambda x: "/".join(x[1][x[0] + 1 :]),
+                zip(examples_idx, local_path_parts),
+            )
+        )
+        git_paths = list(
+            map(
+                lambda x: f"https://github.com/wandb/examples/blob/master/{x}",
+                git_paths,
+            )
         )
     else:
-        git_paths = map(lambda x: "/".join(x.split("/")[3:]), local_paths)
-        git_paths = map(
-            lambda x: f"https://github.com/wandb/wandb/blob/main/{x}", git_paths
+        examples_idx = list(map(lambda x: x.index("wandb"), local_path_parts))
+        git_paths = list(
+            map(
+                lambda x: "/".join(x[1][x[0] + 1 :]),
+                zip(examples_idx, local_path_parts),
+            )
+        )
+        git_paths = list(
+            map(lambda x: f"https://github.com/wandb/wandb/blob/main/{x}", git_paths)
         )
     return dict(zip(local_paths, git_paths))
 
 
 def load_notebook_paths(notebook_dir: str = "examples/colabs/") -> Dict[str, str]:
-    paths = pathlib.Path(notebook_dir).rglob("*.ipynb*")
+    paths = list(pathlib.Path(notebook_dir).rglob("*.ipynb*"))
     return map_git_to_local_paths(paths)
 
 
 def load_code_paths(
     code_dir: str = "examples/examples/", examples=True
 ) -> Dict[str, str]:
-    paths = pathlib.Path(code_dir).rglob("*.py*")
+    paths = list(pathlib.Path(code_dir).rglob("*.py*"))
     return map_git_to_local_paths(paths, examples=examples)
 
 
 def load_documentation_paths(docs_dir: str = "docodile") -> Dict[str, str]:
     paths = pathlib.Path(docs_dir).rglob("*.md*")
-    paths = filter(lambda x: "readme" not in str(x).lower(), paths)
     path_parts = map(lambda x: x.parts, paths)
     path_parts = list(filter(lambda x: len(x) > 2, path_parts))
+    doc_indices = list(map(lambda x: x.index("docodile"), path_parts))
+
     git_paths = map(lambda x: str(pathlib.Path(*x)), path_parts)
 
-    link_paths = map(lambda x: pathlib.Path(*x[2:]), path_parts)
     link_paths = map(
-        lambda x: str(x.parent / "" if "intro" in x.stem else x.stem), link_paths
+        lambda x: str(pathlib.Path(*x[1][(x[0] + 2) :]))[:-3],
+        zip(doc_indices, path_parts),
     )
+    link_paths = map(lambda x: x.replace("/other", ""), link_paths)
+    link_paths = map(lambda x: x.replace("/intro", ""), link_paths)
+    link_paths = map(lambda x: x.replace("/README", ""), link_paths)
 
     link_paths = map(lambda x: f"https://docs.wandb.ai/{x}", link_paths)
     return dict(zip(git_paths, link_paths))
@@ -119,9 +139,8 @@ class DocumentationDatasetLoader:
     def __init__(
         self,
         documentation_dir: str = "docodile",
-        notebooks_dir: str = "examples/colabs/",
-        code_dir: str = "examples/examples/",
-        wandb_code_dir: str = "wandb",
+        examples_dir: str = "examples",
+        sdk_dir: str = "wandb",
         extra_data_dir: str = "extra_data",
         chunk_size: int = 768,
         chunk_overlap: int = 0,
@@ -129,17 +148,16 @@ class DocumentationDatasetLoader:
     ):
         """
         :param documentation_dir: The directory containing the documentation from wandb/docodile
-        :param notebooks_dir: The directory containing the wandb/examples/colab notebooks
-        :param code_dir: The directory containing the wandb/examples/examples code
+        :param examples_dir: The directory containing the wandb/examples repo
+        :param sdk_dir: The directory containing the wandb/wandb repo
         :param extra_data_dir: The directory containing extra data to load
         :param chunk_size: The size of the chunks to split the text into using the `TokenTextSplitter`
         :param chunk_overlap: The amount of overlap between chunks of text using the `TokenTextSplitter`
         :param encoding_name: The name of the encoding to use when splitting the text using the `TokenTextSplitter`
         """
         self.documentation_dir = documentation_dir
-        self.notebooks_dir = notebooks_dir
-        self.code_dir = code_dir
-        self.wandb_code_dir = wandb_code_dir
+        self.examples_dir = examples_dir
+        self.sdk_dir = sdk_dir
         self.extra_data_dir = extra_data_dir
         self.documents = []
         self.md_text_splitter = MarkdownTextSplitter()
@@ -173,8 +191,8 @@ class DocumentationDatasetLoader:
     def load_notebook_documents(
         self,
         notebook_dir: str,
-        include_outputs: bool = True,
-        max_output_length: int = 20,
+        include_outputs: bool = False,
+        max_output_length: int = 0,
         remove_newline: bool = True,
     ) -> List[Document]:
         """
@@ -252,27 +270,29 @@ class DocumentationDatasetLoader:
             logger.warning(
                 f"Documentation directory {self.documentation_dir} does not exist. Not loading documentation."
             )
-        if self.notebooks_dir and os.path.exists(self.notebooks_dir):
+        if self.examples_dir and os.path.exists(f"{self.examples_dir}/colabs"):
             self.documents.extend(
-                self.load_notebook_documents(notebook_dir=self.notebooks_dir)
+                self.load_notebook_documents(notebook_dir=f"{self.examples_dir}/colabs")
             )
         else:
             logger.warning(
-                f"Notebooks directory {self.notebooks_dir} does not exist. Not loading notebooks."
+                f"Notebooks directory {self.examples_dir}/colabs does not exist. Not loading notebooks."
             )
-        if self.code_dir and os.path.exists(self.code_dir):
-            self.documents.extend(self.load_code_documents(code_dir=self.code_dir))
-        else:
-            logger.warning(
-                f"Code directory {self.code_dir} does not exist. Not loading code."
-            )
-        if self.wandb_code_dir and os.path.exists(self.wandb_code_dir + "/wandb"):
+        if self.examples_dir and os.path.exists(f"{self.examples_dir}/examples"):
             self.documents.extend(
-                self.load_code_documents(code_dir=self.wandb_code_dir, examples=False)
+                self.load_code_documents(code_dir=f"{self.examples_dir}/examples")
             )
         else:
             logger.warning(
-                f"Code directory {self.wandb_code_dir} does not exist. Not loading code."
+                f"Code directory {self.examples_dir}/examples does not exist. Not loading code."
+            )
+        if self.sdk_dir and os.path.exists(self.sdk_dir + "/wandb"):
+            self.documents.extend(
+                self.load_code_documents(code_dir=self.sdk_dir, examples=False)
+            )
+        else:
+            logger.warning(
+                f"Code directory {self.sdk_dir} does not exist. Not loading code."
             )
         if self.extra_data_dir and os.path.exists(self.extra_data_dir):
             self.documents.extend(self.load_extra_documents(self.extra_data_dir))
@@ -434,19 +454,14 @@ def get_parser():
         help="The directory containing the wandb documentation",
     )
     parser.add_argument(
-        "--notebooks_dir",
+        "--examples_dir",
         type=str,
-        help="The directory containing the colab notebooks from the wandb/examples repo",
+        help="The directory containing the wandb/examples repo",
     )
     parser.add_argument(
-        "--code_dir",
+        "--sdk_dir",
         type=str,
-        help="The directory containing the examples code from the wandb/examples repo",
-    )
-    parser.add_argument(
-        "--wandb_code_dir",
-        type=str,
-        help="The directory containing the wandb sdk code from the wandb/examples repo",
+        help="The directory containing the wandb sdk code from the wandb/wandb repo",
     )
     parser.add_argument(
         "--extra_data_dir",
@@ -499,9 +514,8 @@ def main():
     if not os.path.isfile(args.documents_file):
         loader = DocumentationDatasetLoader(
             documentation_dir=args.docs_dir,
-            notebooks_dir=args.notebooks_dir,
-            code_dir=args.code_dir,
-            wandb_code_dir=args.wandb_code_dir,
+            examples_dir=args.examples_dir,
+            sdk_dir=args.sdk_dir,
             extra_data_dir=args.extra_data_dir,
         )
         documents = loader.load()
