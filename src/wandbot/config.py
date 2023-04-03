@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
 TEAM = "wandbot"
-PROJECT = "wandb_bot"
-JOB_TYPE = "testing"
+PROJECT = "wandbbot"
+JOB_TYPE = "production"
 
 default_config = SimpleNamespace(
     faiss_artifact="parambharat/wandb_docs_bot/faiss_store:latest",

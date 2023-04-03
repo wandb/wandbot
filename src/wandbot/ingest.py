@@ -17,7 +17,6 @@ from langchain.docstore.document import Document
 from langchain.document_loaders import (
     UnstructuredMarkdownLoader,
     NotebookLoader,
-    UnstructuredFileLoader,
 )
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.embeddings.base import Embeddings
@@ -29,10 +28,9 @@ from langchain.text_splitter import (
 )
 from tqdm import tqdm
 
-from src.wandbot.prompts import load_hyde_prompt
+from wandbot.prompts import load_hyde_prompt
 
 langchain.llm_cache = SQLiteCache(database_path="langchain.db")
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +54,18 @@ def load_csv_data(f_name):
     return create_qa_prompt(df)
 
 
-def map_git_to_local_paths(paths: List[str]) -> Dict[str, str]:
+def map_git_to_local_paths(paths: List[str], examples=True) -> Dict[str, str]:
     local_paths = list(map(lambda x: str(x), paths))
-    git_paths = map(lambda x: "/".join(x.split("/")[1:]), local_paths)
-
-    git_paths = map(
-        lambda x: f"https://github.com/wandb/examples/blob/master/{x}", git_paths
-    )
+    if examples:
+        git_paths = map(lambda x: "/".join(x.split("/")[1:]), local_paths)
+        git_paths = map(
+            lambda x: f"https://github.com/wandb/examples/blob/master/{x}", git_paths
+        )
+    else:
+        git_paths = map(lambda x: "/".join(x.split("/")[3:]), local_paths)
+        git_paths = map(
+            lambda x: f"https://github.com/wandb/wandb/blob/main/{x}", git_paths
+        )
     return dict(zip(local_paths, git_paths))
 
 
@@ -71,9 +74,11 @@ def load_notebook_paths(notebook_dir: str = "examples/colabs/") -> Dict[str, str
     return map_git_to_local_paths(paths)
 
 
-def load_code_paths(code_dir: str = "examples/examples/") -> Dict[str, str]:
+def load_code_paths(
+    code_dir: str = "examples/examples/", examples=True
+) -> Dict[str, str]:
     paths = pathlib.Path(code_dir).rglob("*.py*")
-    return map_git_to_local_paths(paths)
+    return map_git_to_local_paths(paths, examples=examples)
 
 
 def load_documentation_paths(docs_dir: str = "docodile") -> Dict[str, str]:
@@ -116,9 +121,10 @@ class DocumentationDatasetLoader:
         documentation_dir: str = "docodile",
         notebooks_dir: str = "examples/colabs/",
         code_dir: str = "examples/examples/",
+        wandb_code_dir: str = "wandb",
         extra_data_dir: str = "extra_data",
-        chunk_size: int = 1024,
-        chunk_overlap: int = 128,
+        chunk_size: int = 768,
+        chunk_overlap: int = 0,
         encoding_name: str = "cl100k_base",
     ):
         """
@@ -133,6 +139,7 @@ class DocumentationDatasetLoader:
         self.documentation_dir = documentation_dir
         self.notebooks_dir = notebooks_dir
         self.code_dir = code_dir
+        self.wandb_code_dir = wandb_code_dir
         self.extra_data_dir = extra_data_dir
         self.documents = []
         self.md_text_splitter = MarkdownTextSplitter()
@@ -197,17 +204,20 @@ class DocumentationDatasetLoader:
         notebook_sections = self.token_splitter.split_documents(notebook_sections)
         return notebook_sections
 
-    def load_code_documents(self, code_dir: str) -> List[Document]:
+    def load_code_documents(self, code_dir: str, examples=True) -> List[Document]:
         """
         Loads the code documents from the wandb/examples repository
         :param code_dir: The directory containing the wandb/examples/examples code
         :return: A list of `Document` objects
         """
-        code_files = load_code_paths(code_dir=code_dir)
+        code_files = load_code_paths(code_dir=code_dir, examples=examples)
         codes = []
         for f_name in tqdm(code_files, desc="Loading code"):
             try:
-                codes.extend(UnstructuredFileLoader(f_name).load())
+                contents = open(f_name, "r").read()
+                codes.append(
+                    Document(page_content=contents, metadata={"source": f_name})
+                )
             except:
                 logger.warning(f"Failed to load code {f_name}")
 
@@ -255,6 +265,14 @@ class DocumentationDatasetLoader:
         else:
             logger.warning(
                 f"Code directory {self.code_dir} does not exist. Not loading code."
+            )
+        if self.wandb_code_dir and os.path.exists(self.wandb_code_dir + "/wandb"):
+            self.documents.extend(
+                self.load_code_documents(code_dir=self.wandb_code_dir, examples=False)
+            )
+        else:
+            logger.warning(
+                f"Code directory {self.wandb_code_dir} does not exist. Not loading code."
             )
         if self.extra_data_dir and os.path.exists(self.extra_data_dir):
             self.documents.extend(self.load_extra_documents(self.extra_data_dir))
@@ -426,6 +444,11 @@ def get_parser():
         help="The directory containing the examples code from the wandb/examples repo",
     )
     parser.add_argument(
+        "--wandb_code_dir",
+        type=str,
+        help="The directory containing the wandb sdk code from the wandb/examples repo",
+    )
+    parser.add_argument(
         "--extra_data_dir",
         type=str,
         help="The directory containing the extra data to add to the dataset",
@@ -478,6 +501,7 @@ def main():
             documentation_dir=args.docs_dir,
             notebooks_dir=args.notebooks_dir,
             code_dir=args.code_dir,
+            wandb_code_dir=args.wandb_code_dir,
             extra_data_dir=args.extra_data_dir,
         )
         documents = loader.load()

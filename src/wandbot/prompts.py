@@ -21,10 +21,11 @@ def load_hyde_prompt(f_name: str = None):
             """Please answer the user's question about the Weights & Biases, W&B or wandb. """
             """Provide a detailed code example with explanations whenever possible. """
             """If the question is not related to Weights & Biases or wandb """
-            """just say "I'm not sure how to respond to that." """
-            """Begin"""
-            """=========="""
-            """Question: {question}"""
+            """just say "I'm not sure how to respond to that."\n"""
+            """\n"""
+            """Begin\n"""
+            """==========\n"""
+            """Question: {question}\n"""
             """Answer:"""
         )
     messages = [
