@@ -14,7 +14,7 @@ poetry install
 
 ## Usage
 ### Data Ingestion
-To ingest the data yo first need to clone the [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) into the data directory.
+To ingest the data you first need to clone the [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) into the data directory.
 The data directory is located at `wandbot/data`. 
 To clone the repositories, run the following commands:
 
