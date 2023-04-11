@@ -133,3 +133,4 @@ artifacts/
 data/
 .idea/
 
+*.db
