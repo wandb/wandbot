@@ -1,4 +1,4 @@
-# services/db_service.py
+# llm-service-adapter/services/db_service.py
 import sqlite3 #TODO: sqlite sucks replace with postgres
 from wandb_utils.stream_table import StreamTable
 

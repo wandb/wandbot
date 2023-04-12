@@ -1,3 +1,4 @@
+# llm-service-adapter/adapters/slack/app.py
 import os
 from slack_bolt import App
 from.config import INTRO_MESSAGE, OUTRO_MESSAGE

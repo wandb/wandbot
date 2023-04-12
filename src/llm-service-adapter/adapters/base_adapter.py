@@ -1,3 +1,4 @@
+# llm-service-adapter/adapters/base_adapter.py
 class BaseAdapter:
     def __init__(self, llm_service, db_service, config: dict = {}):
         self.llm_service = llm_service

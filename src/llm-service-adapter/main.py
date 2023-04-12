@@ -1,3 +1,4 @@
+# llm-service-adapter/main.py
 import argparse
 from managers import ServiceManager, AdapterManager
 from adapters.discord.app import create_bot

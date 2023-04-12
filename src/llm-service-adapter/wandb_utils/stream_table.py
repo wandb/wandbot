@@ -1,3 +1,4 @@
+# llm-service-adapter/wandb_utils/stream_table.py
 """Table matching wandb.Table API with streaming/append support"""
 
 import threading

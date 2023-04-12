@@ -1,3 +1,4 @@
+# llm-service-adapter/adapters/slack/adapter.py
 import functools
 from typing import Callable, Tuple
 from adapters.base_adapter import BaseAdapter

@@ -1,3 +1,4 @@
+# llm-service-adapter/adapters/discord/adapter.py
 import asyncio
 import functools
 from typing import Callable, Tuple
