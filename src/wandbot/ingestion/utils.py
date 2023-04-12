@@ -2,12 +2,14 @@ import hashlib
 import logging
 import pathlib
 import subprocess
-from typing import Dict, Union
+from typing import Dict, Union, List, Optional, Any
 
 import regex as re
 from git import Repo
 from giturlparse import parse
+from langchain.schema import Document
 from langchain.vectorstores import Chroma
+from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
 
 from src.wandbot.ingestion.settings import BaseDataConfig
@@ -127,3 +129,38 @@ class ChromaWithEmbeddings(Chroma):
             ids=ids,
             metadatas=metadatas,
         )
+
+
+def add_metadata_to_documents(
+    documents: List[Document], source_map: Optional[Dict[str, str]] = None
+) -> List[Document]:
+    out_documents = []
+    for document in documents:
+        doc_id = hashlib.md5(document.page_content.encode("UTF-8")).hexdigest()
+        if isinstance(source_map, dict):
+            source = source_map.get(
+                document.metadata["source"], document.metadata["source"]
+            )
+        else:
+            source = document.metadata["source"]
+        metadata = {"source": source, "doc_id": doc_id}
+        out_documents.append(
+            Document(page_content=document.page_content, metadata=metadata)
+        )
+    return out_documents
+
+
+def convert_llama_docstore_to_vectorstore_kwargs(
+    documents: Dict[str, LlamaDocument]
+) -> Dict[str, Any]:
+    docs_dict = {}
+    for doc_id, document in documents.items():
+        docs_dict["ids"] = docs_dict.get("ids", []) + [doc_id]
+        docs_dict["documents"] = docs_dict.get("documents", []) + [
+            document.to_langchain_format()
+        ]
+    return docs_dict
+
+
+def load_docstore_class(module, cls: str):
+    return getattr(module, cls)
