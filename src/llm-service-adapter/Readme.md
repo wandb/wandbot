@@ -15,6 +15,34 @@
    2. [Steps to Create a Custom App](#92-steps-to-create-a-custom-app)
 10. [Contributing and Improvements](#10-contributing-and-improvements)
 
+## TLDR
+
+```mermaid
+graph TD
+  A[main.py] -->|1. Get LLM Service and DB Service| B[ServiceManager]
+  B -->|2. Instantiate LLM Service and DB Service| C[LLM Service & DB Service]
+  A -->|3. Get Adapter| D[AdapterManager]
+  D -->|4. Instantiate Adapter with LLM Service and DB Service| E[Adapter]
+  F[Custom LLM Service] -.-> B
+  F -.-> C
+  G[Custom Adapter] -.-> D
+  G -.-> E
+  A -->|5. Create & Run App| H[Platform-specific App e.g. FastAPI, Discord]
+  H -->|6. Receive user input| I
+  H -->|7. Send response to user| J
+  E -->|8. Process user input and generate response| I[Adapter's process_message]
+  E -->|9. Return generated response| J[Adapter's return value]
+  C -->|10. Provide AI-driven chat functionality| K[LLM Service's chat]
+
+  classDef service fill:#f9f7f7,stroke:#333,stroke-width:1px
+  classDef adapter fill:#fff0e0,stroke:#333,stroke-width:1px
+  classDef app fill:#e0f0ff,stroke:#333,stroke-width:1px
+
+  class B,F service
+  class D,G adapter
+  class H app
+```
+
 ## File Structure
 
 ```
