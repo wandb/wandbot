@@ -1,3 +1,4 @@
+# llm-service-adapter/services/wandbot/llm_service.py
 from .chat import Chat
 from global_config import TEAM, PROJECT, JOB_TYPE
 from .default_config import default_config

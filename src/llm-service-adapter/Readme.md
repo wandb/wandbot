@@ -1,5 +1,60 @@
 # LLM Service Adapter Framework
 
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+2. [Importance and Utility](#2-importance-and-utility)
+3. [When to Use](#3-when-to-use)
+4. [Benefits](#4-benefits)
+5. [Installation and Usage](#5-installation-and-usage)
+6. [Example Flow](#6-example-flow)
+7. [Building a Custom LLM Service](#7-building-a-custom-llm-service)
+8. [Building a Custom Adapter](#8-building-a-custom-adapter)
+9. [Building an App For Your Custom Adapter](#9-building-an-app-for-your-custom-adapter)
+   1. [Understanding the Custom App Requirements](#91-understanding-the-custom-app-requirements)
+   2. [Steps to Create a Custom App](#92-steps-to-create-a-custom-app)
+10. [Contributing and Improvements](#10-contributing-and-improvements)
+
+## File Structure
+
+```
+.
+├── services/
+│   ├── db_service.py
+│   ├── wandbot/
+│   │   ├── chat.py
+│   │   ├── default_config.py
+│   │   └── llm_service.py
+│   ├── custom/
+│   │   ├── chat.py
+│   │   └── llm_service.py
+├── adapters/
+│   ├── base_adapter.py
+│   ├── discord/
+│   │   ├── adapter.py
+|   │   ├── config.py
+│   │   └── app.py
+│   ├── slack/
+│   │   ├── adapter.py
+|   │   ├── config.py
+│   │   └── app.py
+|   ├── custom/
+│   │   ├── adapter.py
+|   │   ├── config.py
+│   │   └── app.py
+│   └── fastapi/
+│       └── adapter.py
+|       └── app.py
+├── managers/
+│   └── service_manager.py
+|   └── adapter_manager.py
+├── wandb_utils/
+│   └──stream_table.py
+├── global_config.py
+├── main.py
+└── models.py
+```
+
 ## 1. Introduction
 
 The LLM Service Adapter Framework is a versatile and customizable solution designed to simplify the integration of various AI-driven chat applications with multiple platforms, such as Discord, Slack, and FastAPI. By providing a unified approach to managing different chat services and adapters, this framework enables rapid development and deployment of chatbots across different platforms with ease.

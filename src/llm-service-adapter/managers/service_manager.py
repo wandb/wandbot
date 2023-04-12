@@ -1,4 +1,4 @@
-# managers.py
+# llm-service-adapter/managers/service_manager.py
 from services.wandbot.llm_service import WandbotLLMService
 from services.db_service import DBService
 
