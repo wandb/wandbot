@@ -1,5 +1,6 @@
 import logging
-import os
+import pathlib
+from typing import Union
 
 from langchain.prompts import (
     SystemMessagePromptTemplate,
@@ -10,9 +11,11 @@ from langchain.prompts import (
 logger = logging.getLogger(__name__)
 
 
-def load_hyde_prompt(f_name: str = None):
-    if f_name and os.path.isfile(f_name):
-        hyde_template = open(f_name).read()
+def load_hyde_prompt(f_name: Union[pathlib.Path, str] = None):
+    if isinstance(f_name, str) and f_name:
+        f_name = pathlib.Path(f_name)
+    if f_name and f_name.is_file():
+        hyde_template = f_name.open("r").read()
     else:
         logger.warning(
             f"No hyde_prompt provided. Using default hyde prompt from {__name__}"

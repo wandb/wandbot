@@ -3,8 +3,9 @@ import hashlib
 import json
 import logging
 import pathlib
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 
+import tiktoken
 import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
@@ -20,13 +21,17 @@ from langchain.text_splitter import (
 from langchain.vectorstores import Chroma
 from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
+from llama_index.schema import BaseDocument
 
 from src.wandbot.ingestion.settings import (
     DocStoreConfig,
     BaseDataConfig,
+    CombinedDocStoreConfig,
 )
 from src.wandbot.ingestion.utils import (
     fetch_git_remote_hash,
+    md5_dir,
+    ChromaWithEmbeddings,
 )
 from src.wandbot.prompts import load_hyde_prompt
 
@@ -64,7 +69,7 @@ def convert_llama_docstore_to_vectorstore_kwargs(
     return docs_dict
 
 
-class DocStore:
+class BaseDocStore:
     config = DocStoreConfig()
 
     def __init__(self, config: Optional[DocStoreConfig] = None, **kwargs):
@@ -81,7 +86,7 @@ class DocStore:
         )
         self.document_store: Optional[LlamaDocumentStore] = None
 
-        self.hyde_prompt = load_hyde_prompt()
+        self.hyde_prompt = load_hyde_prompt(self.config.hyde_prompt)
 
         self.embedding_fn = HypotheticalDocumentEmbedder(
             llm_chain=LLMChain(
@@ -91,18 +96,46 @@ class DocStore:
             base_embeddings=OpenAIEmbeddings(),
         )
         self.vector_store = None
-        self.wandb_run = (
-            wandb.init(project=self.config.wandb_project)
-            if wandb.run is None
-            else wandb.run
-        )
+        self.wandb_run = None
+
+    def _maybe_create_run(
+        self,
+    ):
+        if self.wandb_run is None:
+            self.wandb_run = (
+                wandb.init(
+                    project=self.config.wandb_project, entity=self.config.wandb_entity
+                )
+                if wandb.run is None
+                else wandb.run
+            )
+        return self.wandb_run
+
+    def _make_documents_tokenization_safe(self, documents):
+        encoding = tiktoken.get_encoding(self.config.encoding_name)
+        special_tokens_set = encoding.special_tokens_set
+
+        def remove_special_tokens(text):
+            for token in special_tokens_set:
+                text = text.replace(token, "")
+            return text
+
+        cleaned_documents = []
+        for document in documents:
+            document = Document(
+                page_content=remove_special_tokens(document.page_content),
+                metadata=document.metadata,
+            )
+            cleaned_documents.append(document)
+        return cleaned_documents
 
     def create_docstore(
         self,
         documents: List[Document],
-        source_map: Dict[str, str],
-        metadata: Dict[str, str] = {},
+        source_map: Optional[Dict[str, str]] = None,
+        metadata: Dict[str, str] = None,
     ) -> LlamaDocumentStore:
+        documents = self._make_documents_tokenization_safe(documents)
         documents = self.token_splitter.split_documents(documents)
         documents = add_metadata(documents, source_map)
         llama_documents: Dict[str, LlamaDocument] = {}
@@ -112,6 +145,8 @@ class DocStore:
                 extra_info=doc.metadata,
                 doc_id=doc.metadata["doc_id"],
             )
+        if metadata is None:
+            metadata = {}
         return LlamaDocumentStore(
             docs=llama_documents, ref_doc_info={"metadata": metadata}
         )
@@ -124,33 +159,39 @@ class DocStore:
 
     def _maybe_load_documents(self, paths=None):
         docstore_file = pathlib.Path(self.config.docstore_file)
-
+        ignore_cache = self.config.data_config.ignore_cache
         if self.document_store is None:
-            if docstore_file.is_file() and not self.config.data_config.ignore_cache:
+            if docstore_file.is_file() and not ignore_cache:
                 logger.debug(f"{docstore_file} was found, loading existing docs")
                 doc_store_dict = json.load(open(docstore_file))
                 cache_document_store = LlamaDocumentStore.load_from_dict(doc_store_dict)
                 cache_commit_hash = cache_document_store.ref_doc_info.get(
                     "metadata", {}
                 ).get("commit_hash")
-                if paths.is_git_repo:
-                    remote_hash = fetch_git_remote_hash(paths.repo_path)
-                    if cache_commit_hash != remote_hash:
-                        logger.debug(
-                            f"cache_commit_hash: {cache_commit_hash}, remote_hash: {remote_hash}"
-                        )
-                        logger.warning(
-                            "Local repo is not upto date with remote. Updating local repo"
-                        )
-                        document_store = self._load_documents(paths)
-                    else:
-                        logger.debug(
-                            "Local repo is upto date with remote, loading from cache"
-                        )
-                        document_store = cache_document_store
+                if self.config.data_config.is_git_repo:
+                    source_commit_hash = fetch_git_remote_hash(
+                        paths.repo_path, self.config.data_config.git_id_file
+                    )
                 else:
                     logger.debug(
-                        "Local directory is not a git repo, loading from cache"
+                        "Docstore is not sourced from a git repo, validating with commit hash of the directory instead."
+                    )
+                    source_commit_hash = md5_dir(
+                        self.config.data_config.local_path,
+                        self.config.data_config.file_pattern,
+                    )
+                if cache_commit_hash != source_commit_hash:
+                    ignore_cache = True
+                    logger.debug(
+                        f"cache_commit_hash: {cache_commit_hash}, source_commit_hash: {source_commit_hash}"
+                    )
+                    logger.warning(
+                        "Local repo is not upto date with remote. Updating local repo"
+                    )
+                    document_store = self._load_documents(paths)
+                else:
+                    logger.debug(
+                        "Local repo is upto date with remote, loading from cache"
                     )
                     document_store = cache_document_store
             else:
@@ -158,7 +199,7 @@ class DocStore:
                 document_store = self._load_documents(paths)
 
             doc_store_dict = document_store.serialize_to_dict()
-            if docstore_file.is_file() and self.config.data_config.ignore_cache:
+            if docstore_file.is_file() and ignore_cache:
                 logger.debug(f"{docstore_file} was found, but ignoring cache")
                 json.dump(
                     doc_store_dict,
@@ -195,10 +236,13 @@ class DocStore:
             )
         return self.vector_store
 
-    def _maybe_load_vector_store(self, documents: Dict[str, LlamaDocument]):
+    def maybe_load_vector_store(
+        self, documents: Dict[str, Union[LlamaDocument, BaseDocument]]
+    ):
         vector_store_dir = pathlib.Path(self.config.vectorstore_dir)
+        ignore_cache = self.config.data_config.ignore_cache
         if self.vector_store is None:
-            if vector_store_dir.is_dir() and not self.config.data_config.ignore_cache:
+            if vector_store_dir.is_dir() and not ignore_cache:
                 logger.debug(
                     f"{vector_store_dir} was found, loading existing vector store"
                 )
@@ -213,10 +257,12 @@ class DocStore:
                         f"Failed to load vector store from {vector_store_dir}, recreating"
                     )
                     vector_store = self._create_vector_store(documents)
+                    ignore_cache = ignore_cache or True
 
                 collection_ids = vector_store._collection.get()["ids"]
 
                 if not sorted(collection_ids) == sorted(documents.keys()):
+                    ignore_cache = ignore_cache or True
                     logger.warning(
                         "The document ids in the vector store do not match the document ids loaded from files"
                     )
@@ -232,7 +278,7 @@ class DocStore:
                         )
                     collection_docs_to_add = set(documents.keys()) - set(collection_ids)
                     if collection_docs_to_add:
-                        logger.warning(
+                        logger.debug(
                             f"Adding {len(collection_docs_to_add)} documents to the vector store"
                         )
                         vector_store.add_documents(
@@ -246,12 +292,14 @@ class DocStore:
                     logger.debug(
                         "The document ids in the vector store match the document ids loaded from files"
                     )
+                    ignore_cache = ignore_cache and False
             else:
                 logger.debug(
                     f"{vector_store_dir} was not found, create a fresh vector store"
                 )
                 vector_store = self._create_vector_store(documents)
-            if vector_store_dir.exists() and self.config.data_config.ignore_cache:
+                ignore_cache = ignore_cache or True
+            if vector_store_dir.exists() and ignore_cache:
                 logger.debug(f"{vector_store_dir} was found, but overwriting cache")
                 vector_store.persist()
             elif not vector_store_dir.exists():
@@ -264,25 +312,29 @@ class DocStore:
         if documents is None:
             documents = self.load_docstore(paths=paths)
         if self.vector_store is None:
-            self.vector_store = self._maybe_load_vector_store(documents.docs)
+            self.vector_store = self.maybe_load_vector_store(documents.docs)
         return self.vector_store
 
     def save(self):
-        if self.document_store is not None:
+        self.wandb_run = self._maybe_create_run()
+        if self.document_store is None:
             self.document_store = self.load_docstore(self.config.data_config)
-        if self.vector_store is not None:
+        if self.vector_store is None:
             self.vector_store = self.load_vector_store()
         artifact_metadata = json.loads(self.config.json())
         artifact_metadata["doc_store_info"] = self.document_store.ref_doc_info
         artifact_metadata["num_docs"] = len(self.document_store.docs)
 
         artifact = wandb.Artifact(
-            self.config.name, type="document_store", metadata=artifact_metadata
+            self.config.name, type=self.config.type, metadata=artifact_metadata
         )
-        artifact.add_dir(str(self.config.data_config.local_path), name="raw_data")
-        artifact.add_file(str(self.config.docstore_file), name="document_store")
-        artifact.add_dir(str(self.config.vectorstore_dir), name="vector_store")
-        with artifact.new_file("hyde_prompt.txt", "w+") as f:
+        artifact.add_file(
+            str(self.config.docstore_file), name=self.config.docstore_file.name
+        )
+        artifact.add_dir(
+            str(self.config.vectorstore_dir), name=self.config.vectorstore_dir.name
+        )
+        with artifact.new_file(self.config.hyde_prompt.name, "w+") as f:
             f.write(self.hyde_prompt.messages[0].prompt.template)
         self.wandb_run.log_artifact(artifact)
         return self
@@ -291,48 +343,155 @@ class DocStore:
         artifact = self.wandb_run.use_artifact(artifact_path)
         artifact_dir = artifact.download()
         artifact_dir = pathlib.Path(artifact_dir)
-        self.config.data_config.local_path = artifact_dir / "raw_data"
-        self.config.docstore_file = artifact_dir / "document_store.json"
-        self.config.vectorstore_dir = artifact_dir / "vector_store"
-        self.hyde_prompt = load_hyde_prompt(str(artifact_dir / "hyde_prompt.txt"))
+
+        self.config.docstore_file = artifact_dir / self.config.docstore_file.name
+        self.config.vectorstore_dir = artifact_dir / self.config.vectorstore_dir.name
+        self.hyde_prompt = load_hyde_prompt(
+            str(artifact_dir / self.config.hyde_prompt.name)
+        )
         self.document_store = self.load_docstore(self.config.data_config)
         self.vector_store = self.load_vector_store()
         return self
 
-    def maybe_load_from_artifact(self, artifact_path: str = None):
+    def maybe_load_from_artifact(self, artifact_path: str = None, version="latest"):
+        self.wandb_run = self._maybe_create_run()
         if artifact_path is None:
-            artifact_path = f"{self.wandb_run.entity}/{self.wandb_run.project}/{self.config.name}:latest"
+            artifact_path = f"{self.wandb_run.entity}/{self.wandb_run.project}/{self.config.name}:{version}"
         try:
-            if self.config.data_config.is_git_repo:
-                api = wandb.Api()
-                artifact = api.artifact(artifact_path)
-                metadata = artifact.metadata
-                artifact_commit_hash = metadata.get("doc_store_info").get("commit_hash")
-                if artifact_commit_hash is not None:
-                    remote_commit_hash = fetch_git_remote_hash(
-                        self.config.data_config.repo_path
+            api = wandb.Api()
+            artifact = api.artifact(artifact_path)
+            metadata = artifact.metadata
+            artifact_commit_hash = (
+                metadata.get("doc_store_info").get("metadata").get("commit_hash")
+            )
+            if artifact_commit_hash is not None:
+                if self.config.data_config.is_git_repo:
+                    source_commit_hash = fetch_git_remote_hash(
+                        self.config.data_config.repo_path,
+                        self.config.data_config.git_id_file,
                     )
-                    if artifact_commit_hash != remote_commit_hash:
-                        logger.warning(
-                            f"Artifact commit hash {artifact_commit_hash} does not match remote commit hash "
-                            "{remote_commit_hash}, recreating artifact"
-                        )
-                        return self.save()
-                    else:
-                        logger.debug(
-                            f"Artifact commit hash {artifact_commit_hash} matches remote commit hash "
-                            f"{remote_commit_hash}, loading artifact"
-                        )
-                        return self._load_from_artifact(artifact_path)
-
+                else:
+                    logger.debug(
+                        "Docstore is not sourced from a git repo, validating with commit hash of the directory "
+                        "and files instead."
+                    )
+                    source_commit_hash = md5_dir(
+                        self.config.data_config.local_path,
+                        self.config.data_config.file_pattern,
+                    )
+                if artifact_commit_hash != source_commit_hash:
+                    logger.warning(
+                        f"Artifact commit hash {artifact_commit_hash} does not match source commit hash "
+                        f"{source_commit_hash}, recreating artifact"
+                    )
+                    return self.save()
+                else:
+                    logger.debug(
+                        f"Artifact commit hash {artifact_commit_hash} matches source commit hash "
+                        f"{source_commit_hash}, loading artifact"
+                    )
+                    return self._load_from_artifact(artifact_path)
             else:
-                logger.debug("Docstore is not a git repo, loading from artifact")
-                return self._load_from_artifact(artifact_path)
+                logger.debug(f"Artifact commit hash not found, recreating artifact")
+                return self.save()
         except:
             logger.warning(
-                f"Failed to load artifact {artifact_path}, recreating artifact"
+                f"Failed to load artifact from {artifact_path}, recreating artifact"
             )
             return self.save()
 
-    def load(self, artifact_path: str = None):
-        return self.maybe_load_from_artifact(artifact_path)
+    def load(self, artifact_path: str = None, version="latest"):
+        return self.maybe_load_from_artifact(artifact_path, version=version)
+
+
+class BaseCombinedDocStore:
+    config: CombinedDocStoreConfig
+
+    def __init__(self, config: CombinedDocStoreConfig = None, **kwargs):
+        if config is not None:
+            self.config = config
+        self.document_store_dict = None
+        self.document_store: Optional[LlamaDocumentStore] = None
+        self.vector_store = None
+        self.wandb_run = None
+        self.hyde_prompt = load_hyde_prompt(self.config.hyde_prompt)
+        self.embedding_fn = HypotheticalDocumentEmbedder(
+            llm_chain=LLMChain(
+                llm=ChatOpenAI(temperature=self.config.hyde_temperature),
+                prompt=self.hyde_prompt,
+            ),
+            base_embeddings=OpenAIEmbeddings(),
+        )
+
+    def _maybe_create_run(self):
+        if self.wandb_run is None:
+            self.wandb_run = wandb.init(
+                project=self.config.wandb_project, entity=self.config.wandb_entity
+            )
+        return self.wandb_run
+
+    def load_docstore_dict(self, configs: Dict[str, DocStoreConfig] = None):
+        self.document_store_dict = self._load_docstore_dict(configs)
+        return self.document_store_dict
+
+    @abc.abstractmethod
+    def _load_docstore_dict(self, configs: Dict[str, DocStoreConfig]):
+        raise NotImplementedError("You need to implement this method is the subclass")
+
+    def create_docstore(self, config: CombinedDocStoreConfig):
+        logger.debug(f"Creating document store from {config.docstore_configs.keys()}")
+        self.document_store_dict = self.load_docstore_dict(config.docstore_configs)
+        stores = []
+        stores_metadata = {}
+        for k, v in self.document_store_dict.items():
+            v.document_store.ref_doc_info["metadata"]["source"] = v.config.name
+            v.document_store.ref_doc_info["metadata"]["cls"] = v.config.cls
+            stores.append(v.document_store)
+            stores_metadata[k] = v.document_store.ref_doc_info["metadata"]
+
+        metadata = {"stores_info": stores_metadata}
+        metadata["commit_hash"] = hashlib.md5(
+            json.dumps(stores_metadata, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+
+        logger.debug(f"Merging document stores stored")
+        self.document_store = LlamaDocumentStore.merge(stores)
+        self.document_store.ref_doc_info["metadata"] = metadata
+        return self.document_store
+
+    def maybe_load_docstore(self, config: CombinedDocStoreConfig = None):
+        docstore_file = pathlib.Path(config.docstore_file)
+        ignore_cache = config.data_config.ignore_cache
+        if self.document_store is None:
+            if docstore_file.is_file() and not ignore_cache:
+                logger.debug(f"{docstore_file} was found, loading existing docs")
+                doc_store_dict = json.load(open(docstore_file))
+                cache_document_store = LlamaDocumentStore.load_from_dict(doc_store_dict)
+
+    def load_docstore(self, config: CombinedDocStoreConfig = None):
+        if config is None:
+            config = self.config
+        if self.document_store is None:
+            self.document_store = self.create_docstore(config)
+        return self.document_store
+
+    def create_vector_store(self, config: CombinedDocStoreConfig):
+        self.document_store_dict = self.load_docstore_dict(config.docstore_configs)
+        store_data = {}
+        vector_store = ChromaWithEmbeddings(
+            collection_name=self.config.name,
+            embedding_function=self.embedding_fn,
+            persist_directory=str(self.config.vectorstore_dir),
+        )
+        for name, docstore in self.document_store_dict.items():
+            for key, values in docstore.vectorstore._collection.get().items():
+                store_data[key] = store_data.get(key, []) + values
+        vector_store.add_texts_and_embeddings(**store_data)
+        return vector_store
+
+    def load_vector_store(self, config: CombinedDocStoreConfig = None):
+        if config is None:
+            configs = self.config
+        if self.vector_store is None:
+            self.vector_store = self.create_vector_store(config)
+        return self.vector_store

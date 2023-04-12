@@ -1,20 +1,38 @@
+import json
 import logging
 import pathlib
-from types import SimpleNamespace
+import sys
+from typing import Dict
 
 import pandas as pd
-from langchain.document_loaders import UnstructuredMarkdownLoader, NotebookLoader
+from langchain.document_loaders import (
+    UnstructuredMarkdownLoader,
+    NotebookLoader,
+    TextLoader,
+)
 from langchain.schema import Document
 from tqdm import tqdm
 
-from src.wandbot.ingestion.base import DocStore, add_metadata
-from src.wandbot.ingestion.settings import DocumentationStoreConfig, BaseDataConfig
-from src.wandbot.ingestion.utils import fetch_git_repo, map_local_to_remote
+from src.wandbot.ingestion.base import BaseDocStore, BaseCombinedDocStore
+from src.wandbot.ingestion.settings import (
+    DocumentationStoreConfig,
+    BaseDataConfig,
+    CodeStoreConfig,
+    ExamplesCodeStoreConfig,
+    ExamplesNotebookStoreConfig,
+    SDKCodeStoreConfig,
+    CsvStoreConfig,
+    JsonlStoreConfig,
+    ExtraDataStoreConfig,
+    WandbotDocStoreConfig,
+    DocStoreConfig,
+)
+from src.wandbot.ingestion.utils import fetch_git_repo, map_local_to_remote, md5_dir
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentationDocStore(DocStore):
+class DocumentationDocStore(BaseDocStore):
     config = DocumentationStoreConfig()
 
     def __init__(self, config: DocumentationStoreConfig = None, **kwargs):
@@ -22,7 +40,9 @@ class DocumentationDocStore(DocStore):
 
     def _load_documents(self, paths: BaseDataConfig):
         if paths.is_git_repo:
-            doc_store_metadata = fetch_git_repo(paths)
+            doc_store_metadata = fetch_git_repo(
+                paths, self.config.data_config.git_id_file
+            )
         else:
             doc_store_metadata = {}
         local_paths = (paths.local_path / paths.base_path).rglob(paths.file_pattern)
@@ -62,23 +82,32 @@ class DocumentationDocStore(DocStore):
         return document_store
 
 
-class CodeDocStore(DocStore):
-    def __init__(self, config: SimpleNamespace, **kwargs):
+class CodeDocStore(BaseDocStore):
+    config = CodeStoreConfig()
+
+    def __init__(self, config: CodeStoreConfig, **kwargs):
         super().__init__(config, **kwargs)
 
-    def _load_documents(self, paths, base_path="", file_pattern="*.py"):
-        repo_metadata = fetch_git_repo(paths)
-        code_paths = (paths.local / base_path).rglob(file_pattern)
+    def _load_documents(self, paths: BaseDataConfig):
+        if paths.is_git_repo:
+            doc_store_metadata = fetch_git_repo(
+                paths, self.config.data_config.git_id_file
+            )
+        else:
+            doc_store_metadata = {}
+        local_paths = (paths.local_path / paths.base_path).rglob(paths.file_pattern)
 
-        code_files = map_local_to_remote(
-            code_paths, paths.local_path.stem, paths.remote_path
+        document_files = map_local_to_remote(
+            local_paths, paths.local_path.stem, paths.remote_path
         )
 
-        codes = []
-        for f_name in tqdm(code_files, desc=f"Loading code from {paths.local}"):
+        documents = []
+        for f_name in tqdm(
+            document_files, desc=f"Loading code from {paths.local_path}"
+        ):
             try:
-                if file_pattern == "*.ipynb":
-                    codes.extend(
+                if paths.file_pattern == "*.ipynb":
+                    documents.extend(
                         NotebookLoader(
                             f_name,
                             include_outputs=False,
@@ -87,84 +116,67 @@ class CodeDocStore(DocStore):
                         ).load()
                     )
                 else:
-                    contents = open(f_name, "r").read()
-                    codes.append(
-                        Document(page_content=contents, metadata={"source": f_name})
-                    )
+                    documents.extend(TextLoader(f_name).load())
             except:
                 logger.warning(f"Failed to load code in {f_name}")
-        code_sections = self.code_text_splitter.split_documents(codes)
-        code_sections = self.token_splitter.split_documents(code_sections)
-        code_sections = add_metadata(code_sections, code_files)
-        return {"documents": code_sections, "metadata": repo_metadata}
+        document_sections = self.code_text_splitter.split_documents(documents)
+        document_store = self.create_docstore(
+            document_sections, document_files, doc_store_metadata
+        )
+        return document_store
 
 
 class ExamplesCodeDocStore(CodeDocStore):
-    def __init__(self, config: SimpleNamespace, **kwargs):
-        super().__init__(config, **kwargs)
-        self.config = config
-        self.config.data_paths = (
-            SimpleNamespace(
-                local=pathlib.Path("../data/raw_dataset/examples"),
-                remote="https://github.com/wandb/examples/blob/master/",
-                repo_path="https://github.com/wandb/examples",
-            ),
-        )
+    config = ExamplesCodeStoreConfig()
 
-    def _load_documents(self, paths, base_path="examples", file_pattern="*.py"):
-        return super()._load_documents(
-            paths, base_path=base_path, file_pattern=file_pattern
-        )
+    def __init__(self, config: ExamplesCodeStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_documents(self, paths: BaseDataConfig):
+        return super()._load_documents(paths)
 
 
 class ExamplesNotebookDocStore(CodeDocStore):
-    def __init__(self, config: SimpleNamespace, **kwargs):
-        super().__init__(config, **kwargs)
-        self.config = config
-        self.config.data_paths = (
-            SimpleNamespace(
-                local=pathlib.Path("../data/raw_dataset/examples"),
-                remote="https://github.com/wandb/examples/blob/master/",
-                repo_path="https://github.com/wandb/examples",
-            ),
-        )
+    config = ExamplesNotebookStoreConfig()
 
-    def _load_documents(self, paths, base_path="colabs", file_pattern="*.ipynb"):
+    def __init__(self, config: ExamplesNotebookStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_documents(self, paths: BaseDataConfig):
+        return super()._load_documents(paths)
+
+
+class SDKCodeDocStore(CodeDocStore):
+    config = SDKCodeStoreConfig()
+
+    def __init__(self, config: SDKCodeStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_documents(self, paths: BaseDataConfig):
         return super()._load_documents(
-            paths, base_path=base_path, file_pattern=file_pattern
+            paths,
         )
 
 
-class SdkCodeDocStore(CodeDocStore):
-    def __init__(self, config: SimpleNamespace, **kwargs):
+class CsvDocStore(BaseDocStore):
+    config = CsvStoreConfig()
+
+    def __init__(self, config: CsvStoreConfig, **kwargs):
         super().__init__(config, **kwargs)
-        self.config = config
-        self.config.data_paths = (
-            SimpleNamespace(
-                local=pathlib.Path("../data/raw_dataset/wandb"),
-                remote="https://github.com/wandb/wandb/blob/main/",
-                repo_path="https://github.com/wandb/wandb",
-            ),
-        )
 
-    def _load_documents(self, paths, base_path="wandb", file_pattern="*.py"):
-        return super()._load_documents(
-            paths, base_path=base_path, file_pattern=file_pattern
-        )
+    def _load_documents(self, paths):
+        if paths.is_git_repo:
+            doc_store_metadata = fetch_git_repo(
+                paths, self.config.data_config.git_id_file
+            )
+        else:
+            doc_store_metadata = {
+                "commit_hash": md5_dir(
+                    paths.local_path, file_pattern=paths.file_pattern
+                )
+            }
 
-
-class CsvDocStore(DocStore):
-    def __init__(self, config: SimpleNamespace, **kwargs):
-        super().__init__(config, **kwargs)
-        self.config = config
-        self.config.data_paths = SimpleNamespace(
-            local=pathlib.Path("../data/raw_dataset/extra_data"),
-            remote=None,
-            repo_path=None,
-        )
-
-    def _load_documents(self, paths, base_path="", file_pattern="*.csv"):
-        csv_paths = (paths.local / base_path).rglob(file_pattern)
+        csv_paths = (paths.local_path / paths.base_path).rglob(paths.file_pattern)
         all_documents = []
         for path in csv_paths:
             df = pd.read_csv(path).fillna("")
@@ -192,13 +204,70 @@ class CsvDocStore(DocStore):
                 )
                 for doc in tqdm(documents, desc=f"loading csv data from {path}")
             ]
+            all_documents.extend(documents)
+        document_sections = self.md_text_splitter.split_documents(all_documents)
+        document_store = self.create_docstore(
+            document_sections, None, doc_store_metadata
+        )
+        return document_store
 
-            document_sections = self.md_text_splitter.split_documents(documents)
-            document_sections = self.token_splitter.split_documents(document_sections)
-            document_sections = add_metadata(document_sections, None)
-            all_documents.extend(document_sections)
-        return all_documents
+
+class JsonlDocStore(BaseDocStore):
+    config = JsonlStoreConfig()
+
+    def __init__(self, config: JsonlStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_documents(self, paths):
+        if paths.is_git_repo:
+            doc_store_metadata = fetch_git_repo(
+                paths, self.config.data_config.git_id_file
+            )
+        else:
+            doc_store_metadata = {
+                "commit_hash": md5_dir(
+                    paths.local_path, file_pattern=paths.file_pattern
+                )
+            }
+
+        jsonl_paths = (paths.local_path / paths.base_path).rglob(paths.file_pattern)
+
+        all_documents = []
+        for path in jsonl_paths:
+            for line in path.open("r"):
+                doc = json.loads(line)
+                document = Document(
+                    page_content=doc["document"], metadata={"source": doc["source"]}
+                )
+                all_documents.append(document)
+        document_sections = self.md_text_splitter.split_documents(all_documents)
+        document_store = self.create_docstore(
+            document_sections, None, doc_store_metadata
+        )
+        return document_store
 
 
-def main():
-    DocumentationDocStore().load()
+class ExtraDataDocStore(JsonlDocStore):
+    config = ExtraDataStoreConfig()
+
+    def __init__(self, config: ExtraDataStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_documents(self, paths):
+        return super()._load_documents(paths)
+
+
+class WandbotDocStore(BaseCombinedDocStore):
+    config: WandbotDocStoreConfig = WandbotDocStoreConfig()
+
+    def __init__(self, config: WandbotDocStoreConfig, **kwargs):
+        super().__init__(config, **kwargs)
+
+    def _load_docstore_dict(self, configs: Dict[str, DocStoreConfig]):
+        docstores = {}
+        for docstore_name, config in configs.items():
+            logger.debug(f"Loading {docstore_name} from {config.cls}")
+            docstore_class = getattr(sys.modules[__name__], config.cls)
+            docstore = docstore_class(config)
+            docstores[docstore_name] = docstore.load()
+        return docstores

@@ -27,7 +27,8 @@ from langchain.text_splitter import (
     TokenTextSplitter,
 )
 from tqdm import tqdm
-from wandbot.prompts import load_hyde_prompt
+
+from src.wandbot.prompts import load_hyde_prompt
 
 langchain.llm_cache = SQLiteCache(database_path="langchain.db")
 

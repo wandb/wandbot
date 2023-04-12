@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import pathlib
 import subprocess
@@ -6,6 +7,7 @@ from typing import Dict, Union
 import regex as re
 from git import Repo
 from giturlparse import parse
+from langchain.vectorstores import Chroma
 from pydantic import AnyHttpUrl
 
 from src.wandbot.ingestion.settings import BaseDataConfig
@@ -13,11 +15,7 @@ from src.wandbot.ingestion.settings import BaseDataConfig
 logger = logging.getLogger(__name__)
 
 
-def get_git_command(id_file=None):
-    if id_file is None:
-        logger.warning(f"Using default ssh file")
-        id_file = pathlib.Path.home() / ".ssh/id_rsa.pub"
-
+def get_git_command(id_file):
     assert id_file.is_file()
 
     git_command = f"ssh -v -i /{id_file}"
@@ -57,7 +55,7 @@ def fetch_repo_metadata(repo: Repo) -> Dict[str, str]:
     )
 
 
-def fetch_git_repo(paths: BaseDataConfig, id_file=None) -> Dict[str, str]:
+def fetch_git_repo(paths: BaseDataConfig, id_file) -> Dict[str, str]:
     git_command = get_git_command(id_file)
 
     if paths.local_path.is_dir():
@@ -97,3 +95,35 @@ def map_local_to_remote(
         )
     )
     return dict(zip(local_paths, remote_paths))
+
+
+def md5_update_from_dir(directory, file_pattern, computed_hash):
+    # ref: https://stackoverflow.com/a/54477583
+    assert pathlib.Path(directory).is_dir()
+    if file_pattern is not None:
+        path_iterator = pathlib.Path(directory).glob(file_pattern)
+    else:
+        path_iterator = pathlib.Path(directory).iterdir()
+    for path in sorted(path_iterator, key=lambda p: str(p).lower()):
+        computed_hash.update(path.name.encode())
+        if path.is_file():
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    computed_hash.update(chunk)
+        elif path.is_dir():
+            computed_hash = md5_update_from_dir(path, file_pattern, computed_hash)
+    return computed_hash
+
+
+def md5_dir(directory, file_pattern=None):
+    return md5_update_from_dir(directory, file_pattern, hashlib.md5()).hexdigest()
+
+
+class ChromaWithEmbeddings(Chroma):
+    def add_texts_and_embeddings(self, documents, embeddings, ids, metadatas):
+        self._collection.add(
+            documents=documents,
+            embeddings=embeddings,
+            ids=ids,
+            metadatas=metadatas,
+        )
