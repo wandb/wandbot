@@ -2,14 +2,16 @@ import argparse
 from managers import ServiceManager, AdapterManager
 from adapters.discord.app import create_bot
 from adapters.slack.app import create_app
+from adapters.fastapi.app import create_app
 import os
+import uvicorn
 #TODO: Move this to a better location
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 # Set up the command line arguments
 parser = argparse.ArgumentParser(description="Run the chatbot for Discord or Slack.")
 parser.add_argument("--service", default="wandbot", help="The service to use (default: wandbot).")
-parser.add_argument("--app", default="slack", help="The app to use (default: discord).")
+parser.add_argument("--app", default="fastapi", help="The app to use (default: discord).")
 args = parser.parse_args()
 
 selected_service = args.service
@@ -31,3 +33,6 @@ elif selected_app == "slack":
     app = create_app(adapter)
     handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
     handler.start()
+elif selected_app == "fastapi":
+    app = create_app(adapter)
+    uvicorn.run(app, host="0.0.0.0", port=8000) 
