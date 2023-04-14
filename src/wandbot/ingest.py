@@ -7,6 +7,7 @@ from typing import Dict, List, Union, Optional
 
 import langchain
 import pandas as pd
+import tiktoken
 import wandb
 from langchain import LLMChain, FAISS
 from langchain.cache import SQLiteCache
@@ -27,7 +28,6 @@ from langchain.text_splitter import (
     TokenTextSplitter,
 )
 from tqdm import tqdm
-
 from wandbot.prompts import load_hyde_prompt
 
 langchain.llm_cache = SQLiteCache(database_path="langchain.db")
@@ -141,6 +141,7 @@ class DocumentationDatasetLoader:
         self.code_dir = code_dir
         self.wandb_code_dir = wandb_code_dir
         self.extra_data_dir = extra_data_dir
+        self.encoding_name = encoding_name
         self.documents = []
         self.md_text_splitter = MarkdownTextSplitter()
         self.code_text_splitter = PythonCodeTextSplitter()
@@ -150,6 +151,24 @@ class DocumentationDatasetLoader:
             chunk_overlap=chunk_overlap,
             allowed_special={"<|endoftext|>"},
         )
+
+    def make_documents_tokenization_safe(self, documents):
+        encoding = tiktoken.get_encoding(self.encoding_name)
+        special_tokens_set = encoding.special_tokens_set
+
+        def remove_special_tokens(text):
+            for token in special_tokens_set:
+                text = text.replace(token, "")
+            return text
+
+        cleaned_documents = []
+        for document in documents:
+            document = Document(
+                page_content=remove_special_tokens(document.page_content),
+                metadata=document.metadata,
+            )
+            cleaned_documents.append(document)
+        return cleaned_documents
 
     def load_documentation_documents(self, docs_dir: str) -> List[Document]:
         """
@@ -280,6 +299,7 @@ class DocumentationDatasetLoader:
             logger.warning(
                 f"Extra data directory {self.extra_data_dir} does not exist. Not loading extra data."
             )
+        self.documents = self.make_documents_tokenization_safe(self.documents)
         return self.documents
 
     def save_to_disk(self, path: str) -> None:
@@ -372,7 +392,9 @@ class DocumentStore:
         :return: A `FAISS` object
         """
 
-        self._faiss_store = FAISS.from_documents(self.documents, self.embeddings())
+        self._faiss_store = FAISS.from_documents(
+            self.documents, embedding=self.embeddings()
+        )
         return self._faiss_store
 
     @property
