@@ -140,7 +140,7 @@ def load_qa_chain(model_name="gpt-4", vector_store=None, chat_prompt=None):
     return chain
 
 
-def get_answer(chain, question):
+def get_answer(chain, question, sources=False):
     query = " ".join(question.strip().split())
     result = chain(
         {
@@ -160,6 +160,10 @@ def get_answer(chain, question):
         response = result["answer"]  # + "\n\n*References*:\n\n" + "\n".join(sources)
     else:
         response = result["answer"]
+
+    if sources:
+        return response, result["source_documents"]
+
     return response
 
 
@@ -180,16 +184,19 @@ class Chat:
             config=wandb_run.config
         )
         self.qa_chain = load_qa_chain(
-            model_name="gpt-4",
+            model_name=self.model_name,
             vector_store=self.vector_store,
             chat_prompt=self.chat_prompt,
         )
 
-    def __call__(self, query):
+    def __call__(self, query, sources=False):
         start_time = time.time()
         # Try call GPT-4, if not fall back to 3.5 turbo
         try:
-            response = get_answer(self.qa_chain, query)
+            if sources:
+                response, sources = get_answer(self.qa_chain, query, sources=True)
+            else: 
+                response = get_answer(self.qa_chain, query, sources=False)
         except:
             print("Falling back to gpt-3.5-turbo")
             self.qa_chain = load_qa_chain(
@@ -197,7 +204,11 @@ class Chat:
                 vector_store=self.vector_store,
                 chat_prompt=self.chat_prompt,
             )
-            response = get_answer(self.qa_chain, query)
+            if sources:
+                response, sources = get_answer(self.qa_chain, query, sources=True)
+            else: 
+                response = get_answer(self.qa_chain, query, sources=False)
+            
             fallback_warning = "**Warning: Falling back to gpt-3.5.** These results are sometimes not as good as gpt-4"
             response = fallback_warning + "\n\n" + response
 
@@ -207,18 +218,6 @@ class Chat:
         # To consider, add verbose mode
         # if "--v" or "--verbose" in query:
         #     return query, response + "\n\n" + self.settings, timings
+        if sources: 
+            return query, response + "\n\n", timings, sources
         return query, response + "\n\n", timings
-
-
-def main():
-    from wandbot.config import default_config
-
-    run.config.update(default_config.__dict__)
-    chat = Chat(model_name="gpt-4", wandb_run=run)
-    user_query = input("Enter your question:")
-    response = chat(user_query)
-    print(response)
-
-
-if __name__ == "__main__":
-    main()
