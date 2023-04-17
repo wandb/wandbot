@@ -31,6 +31,8 @@ def create_bot(discord_adapter):
         # print(f"Servers connected: {len(bot.guilds)}")
 
 
+    #TODO: Processing the rxn in on message doesnt make sense. If the rxn changes it isnt propogated.
+    # Find an on_reaction_add event
     @bot.event
     async def on_message(message: discord.Message):
         logger.info("Mentioned in message")

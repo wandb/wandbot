@@ -6,7 +6,7 @@ import os
 # Set up the command line arguments
 parser = argparse.ArgumentParser(description="Run the chatbot for Discord or Slack.")
 parser.add_argument("--service", default="wandbot", help="The service to use (default: wandbot).")
-parser.add_argument("--app", default="slack", help="The app to use (default: discord).")
+parser.add_argument("--app", default="discord", help="The app to use (default: discord).")
 args = parser.parse_args()
 
 selected_service = args.service
