@@ -19,7 +19,12 @@ class SlackAdapter(BaseAdapter):
         )
         return await asyncio.get_event_loop().run_in_executor(None, func)
 
-    async def add_response_to_db(self, user_id, run_id, query, response, feedback, elapsed_time, start_time):
+    def add_response_to_db(self, user_id, run_id, query, response, feedback, elapsed_time, start_time):
         self.db_service.add_response(
             "slack", user_id, run_id, query, response, feedback, elapsed_time, start_time
+        )
+
+    def update_feedback_in_db(self, user_id, query, feedback):
+        self.db_service.update_feedback(
+            "slack", user_id, query, feedback
         )

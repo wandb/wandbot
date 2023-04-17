@@ -1,30 +1,36 @@
-# llm-service-adapter/services/db_service.py
-import sqlite3 #TODO: sqlite sucks replace with postgres
+from sqlalchemy import create_engine, Column, String, Float, Integer
+from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 from wandb_utils.stream_table import StreamTable
 
+Base = declarative_base()
+
+#TODO: Validate these are the right columns
+class Response(Base):
+    __tablename__ = "responses"
+
+    id = Column(Integer, primary_key=True)
+    source_name = Column(String)
+    source_id = Column(String)
+    wandb_run_id = Column(String)
+    query = Column(String)
+    response = Column(String)
+    feedback = Column(String)
+    elapsed_time = Column(Float)
+    start_time = Column(Float)
+
 class DBService:
-    #TODO: parameterize the database name and table name
     def __init__(self, config: dict = {}):
-        self.conn = sqlite3.connect("responses.db")
-        self.cursor = self.conn.cursor()
+        #TODO: Make this configurable
+        DATABASE_URL = "sqlite:///responses.db"
+        self.engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+        self.SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=self.engine))
         self.init_db()
         self.wandb_table = self.init_wandb_stream_table("wandbot-results")
 
     def init_db(self):
-        self.cursor.execute(
-            """CREATE TABLE IF NOT EXISTS responses (
-                    source_name TEXT,
-                    source_id TEXT,
-                    wandb_run_id TEXT,
-                    query TEXT,
-                    response TEXT,
-                    feedback TEXT,
-                    elapsed_time REAL,
-                    start_time REAL
-                  )"""
-        )
-        self.conn.commit()
+        Base.metadata.create_all(bind=self.engine)
 
+    #TODO: Validate these are the right columns
     def init_wandb_stream_table(self, table_name):
         cols = [
             "source_name",
@@ -42,12 +48,34 @@ class DBService:
         self.wandb_table.add_data(source_name, source_id, run_id, query, response, feedback, elapsed_time, start_time)
 
     def add_response(self, source_name, source_id, wandb_run_id, query, response, feedback, elapsed_time, start_time):
-        self.cursor.execute(
-            f"INSERT INTO responses (source_name, source_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (source_name, source_id, wandb_run_id, query, response, feedback, elapsed_time, start_time),
-        )
-        self.conn.commit()
-        self.log_to_wandb_stream_table(source_name, source_id, wandb_run_id, query, response, feedback, elapsed_time, start_time)
+        session = self.SessionLocal()
+        try:
+            new_response = Response(
+                source_name=source_name,
+                source_id=source_id,
+                wandb_run_id=wandb_run_id,
+                query=query,
+                response=response,
+                feedback=feedback,
+                elapsed_time=elapsed_time,
+                start_time=start_time,
+            )
+            session.add(new_response)
+            session.commit()
+            self.log_to_wandb_stream_table(source_name, source_id, wandb_run_id, query, response, feedback, elapsed_time, start_time)
+        finally:
+            session.close()
+
+    #TODO: Make this more generic and see if query makes sense here
+    def update_feedback(self, source_name, source_id, query, feedback):
+        session = self.SessionLocal()
+        try:
+            response = session.query(Response).filter_by(source_name=source_name, source_id=source_id, query=query).first()
+            if response:
+                response.feedback = feedback
+                session.commit()
+        finally:
+            session.close()
 
     def close(self):
-        self.conn.close()
+        self.SessionLocal.remove()
