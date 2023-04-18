@@ -145,10 +145,15 @@ def load_vector_store_and_prompt(config):
 
 
 def load_qa_chain(model_name="gpt-4", vector_store=None, chat_prompt=None):
+    if model_name == "gpt-4":
+        max_retries = 1
+    else:
+        max_retries = 6
     chain = RetrievalQAWithSourcesChainWithScore.from_chain_type(
         ChatOpenAI(
             model_name=model_name,
             temperature=0,
+            max_retries=max_retries,
         ),
         chain_type="stuff",
         retriever=vector_store.as_retriever(),
