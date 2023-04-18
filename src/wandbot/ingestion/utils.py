@@ -8,7 +8,6 @@ import regex as re
 from git import Repo
 from giturlparse import parse
 from langchain.schema import Document
-from langchain.vectorstores import Chroma
 from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
 
@@ -119,16 +118,6 @@ def md5_update_from_dir(directory, file_pattern, computed_hash):
 
 def md5_dir(directory, file_pattern=None):
     return md5_update_from_dir(directory, file_pattern, hashlib.md5()).hexdigest()
-
-
-class ChromaWithEmbeddings(Chroma):
-    def add_texts_and_embeddings(self, documents, embeddings, ids, metadatas):
-        self._collection.add(
-            documents=documents,
-            embeddings=embeddings,
-            ids=ids,
-            metadatas=metadatas,
-        )
 
 
 def add_metadata_to_documents(

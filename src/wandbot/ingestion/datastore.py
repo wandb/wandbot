@@ -31,6 +31,11 @@ from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from llama_index.schema import BaseDocument
 from tqdm import tqdm
 
+from src.wandbot.customization.langchain import (
+    ChromaWithEmbeddings,
+    TFIDFRetrieverWithDocuments,
+    HybridRetriever,
+)
 from src.wandbot.ingestion.settings import (
     DocStoreConfig,
     BaseDataConfig,
@@ -47,7 +52,6 @@ from src.wandbot.ingestion.settings import (
 )
 from src.wandbot.ingestion.utils import (
     md5_dir,
-    ChromaWithEmbeddings,
     fetch_git_repo,
     map_local_to_remote,
     add_metadata_to_documents,
@@ -137,16 +141,16 @@ class BaseDocStore:
         return vectorstore
 
     @abc.abstractmethod
-    def load_docstore(*args, **kwargs):
+    def load_docstore(self, config: DocStoreConfig):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def load_vectorstore(*args, **kwargs):
+    def load_vectorstore(self, config: DocStoreConfig):
         raise NotImplementedError
 
     def save(self):
         self.wandb_run = self.maybe_create_run()
-        self.vectorstore = self.load_vectorstore(self.config.data_config)
+        self.vectorstore = self.load_vectorstore(self.config)
         artifact_metadata = json.loads(self.config.json())
         artifact_metadata["doc_store_info"] = self.document_store.ref_doc_info
         artifact_metadata["num_docs"] = len(self.document_store.docs)
@@ -165,7 +169,10 @@ class BaseDocStore:
         self.wandb_run.log_artifact(artifact)
         return self
 
-    def load_from_artifact(self, artifact_path: str):
+    def load_from_artifact(self, artifact_path: str, version: str = "latest"):
+        self.wandb_run = self.maybe_create_run()
+        if artifact_path is None:
+            artifact_path = f"{self.wandb_run.entity}/{self.wandb_run.project}/{self.config.name}:{version}"
         artifact = self.wandb_run.use_artifact(artifact_path)
         artifact_dir = artifact.download()
         artifact_dir = pathlib.Path(artifact_dir)
@@ -175,8 +182,8 @@ class BaseDocStore:
         self.hyde_prompt = load_hyde_prompt(
             str(artifact_dir / self.config.hyde_prompt.name)
         )
-        self.document_store = self.load_docstore(self.config.data_config)
-        self.vectorstore = self.load_vectorstore()
+        self.document_store = self.load_docstore(self.config)
+        self.vectorstore = self.load_vectorstore(self.config)
         return self
 
     def verify_and_load_artifact(
@@ -325,11 +332,11 @@ class DocStore(BaseDocStore):
         )
         return document_store
 
-    def load_docstore(self, paths: BaseDataConfig = None) -> LlamaDocumentStore:
-        if paths is None:
-            paths = self.config.data_config
+    def load_docstore(self, config: DocStoreConfig = None) -> LlamaDocumentStore:
+        if config is None:
+            config = self.config
         if self.document_store is None:
-            self.document_store = self.maybe_load_docstore(paths=paths)
+            self.document_store = self.maybe_load_docstore(paths=config.data_config)
         return self.document_store
 
     def create_vectorstore(
@@ -415,9 +422,11 @@ class DocStore(BaseDocStore):
         )
         return vectorstore
 
-    def load_vectorstore(self, paths: BaseDataConfig = None):
+    def load_vectorstore(self, config: DocStoreConfig = None):
+        if config is None:
+            config = self.config
         if self.document_store is None:
-            self.document_store = self.load_docstore(paths=paths)
+            self.document_store = self.load_docstore(config=config)
         if self.vectorstore is None:
             self.vectorstore = self.maybe_load_vectorstore(self.document_store)
         return self.vectorstore
@@ -869,6 +878,8 @@ class WandbotDocStore(CombinedDocStore):
 
     def __init__(self, config: WandbotDocStoreConfig, **kwargs):
         super().__init__(config, **kwargs)
+        self.sparse_retriever: Optional[TFIDFRetrieverWithDocuments] = None
+        self.hybrid_retriever: Optional[HybridRetriever] = None
 
     def _load_docstore_dict(
         self, configs: Dict[str, DocStoreConfig]
@@ -880,3 +891,44 @@ class WandbotDocStore(CombinedDocStore):
             docstore = docstore_class(config)
             docstores[docstore_name] = docstore.load()
         return docstores
+
+    def _load_sparse_retriever(
+        self,
+    ):
+        if self.document_store is None:
+            self.document_store = self.load_docstore()
+        if self.sparse_retriever is not None:
+            self.sparse_retriever.from_documents(
+                [
+                    doc.to_langchain_format()
+                    for doc in self.document_store.docs.values()
+                ],
+                vectorizer_kwargs={
+                    "max_df": 0.9,
+                    "min_df": 0.1,
+                    "ngram_range": (1, 3),
+                },
+            )
+        return self.sparse_retriever
+
+    def _load_hybrid_retriever(self):
+        if self.document_store is None:
+            self.document_store = self.load_docstore()
+        if self.vectorstore is None:
+            self.vectorstore = self.load_vectorstore()
+        if self.sparse_retriever is None:
+            self.sparse_retriever = self._load_sparse_retriever()
+        if self.hybrid_retriever is None:
+            self.hybrid_retriever = HybridRetriever(
+                chroma=self.vectorstore, tfidf=self.sparse_retriever
+            )
+        return self.hybrid_retriever
+
+    def get_retriever(self):
+        if self.hybrid_retriever is None:
+            self.hybrid_retriever = self._load_hybrid_retriever()
+        return self.hybrid_retriever
+
+    def load_for_retriever_for_inference(self, artifacts_path: str = None):
+        self.hybrid_retriever = self.load_from_artifact(artifacts_path).get_retriever()
+        return self.hybrid_retriever

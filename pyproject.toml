@@ -31,6 +31,7 @@ python-dotenv = "^1.0.0"
 chromadb = "^0.3.21"
 jsonargparse = {extras = ["signatures"], version = "^4.20.1"}
 llama-index = "^0.5.11"
+jupyter = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.6.2"
