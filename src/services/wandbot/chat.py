@@ -35,6 +35,27 @@ from langchain.vectorstores import FAISS
 from langchain.vectorstores.base import VectorStoreRetriever
 
 
+def truncate_string(string, max_length=4097, direction='end'):
+    """Truncates a string based on the specified maximum length and direction.
+
+    Args:
+        string (str): The string to truncate.
+        max_length (int): The maximum length of the truncated string in tokens (default is 4097).
+        direction (str): The direction from which to truncate the string. Can be 'beginning' or 'end' (default is 'end').
+
+    Returns:
+        str: The truncated string.
+    """
+    tokens = string.split()
+
+    if len(tokens) <= max_length:
+        return string
+
+    if direction == 'beginning':
+        return ' '.join(['...'] + tokens[-max_length+1:])
+    else:
+        return ' '.join(tokens[:max_length-1] + ['...'])
+
 class VectorStoreRetrieverWithScore(VectorStoreRetriever):
     def get_relevant_documents(self, query: str) -> List[Document]:
         if self.search_type == "similarity":
@@ -203,23 +224,36 @@ class Chat:
             config=wandb_run.config
         )
         self.qa_chain = load_qa_chain(
-            model_name="gpt-4",
+            model_name=model_name,
             vector_store=self.vector_store,
             chat_prompt=self.chat_prompt,
         )
 
     def __call__(self, query):
         start_time = time.time()
+        # If the input is >4097 tokens, truncate it
+        print("Input was too long, truncating to 4097 tokens")
+        query = truncate_string(query)
         # Try call GPT-4, if not fall back to 3.5 turbo
         try:
+            print("Trying gpt4")
+            if self.model_name != "gpt-4":
+                self.model_name = "gpt-4"
+                self.qa_chain = load_qa_chain(
+                    model_name=self.model_name,
+                    vector_store=self.vector_store,
+                    chat_prompt=self.chat_prompt,
+                )
             response = get_answer(self.qa_chain, query)
         except:
             print("Falling back to gpt-3.5-turbo")
-            self.qa_chain = load_qa_chain(
-                model_name="gpt-3.5-turbo",
-                vector_store=self.vector_store,
-                chat_prompt=self.chat_prompt,
-            )
+            if self.model_name != "gpt-3.5-turbo":
+                self.model_name = "gpt-3.5-turbo"
+                self.qa_chain = load_qa_chain(
+                    model_name=self.model_name,
+                    vector_store=self.vector_store,
+                    chat_prompt=self.chat_prompt,
+                )
             response = get_answer(self.qa_chain, query)
             fallback_warning = "**Warning: Falling back to gpt-3.5.** These results are sometimes not as good as gpt-4"
             response = fallback_warning + "\n\n" + response
