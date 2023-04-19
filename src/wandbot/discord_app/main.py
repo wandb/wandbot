@@ -7,7 +7,7 @@ import typing
 
 import discord
 import wandb
-from chat import Chat
+from wandbot.chat import Chat
 from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
 from stream_table import StreamTable

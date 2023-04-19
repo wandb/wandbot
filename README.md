@@ -15,9 +15,14 @@ A question answering bot for Weights & Biases [documentation](https://docs.wandb
 The project uses `python = ">=3.10.0,<3.11"` and uses [poetry](https://python-poetry.org/) for dependency management. To install the dependencies:
 
 ```bash
-cd wandbot/data
-git clone git@github.com:wandb/docodile.git
-git clone git@github.com:wandb/examples.git
+git clone git@github.com:wandb/wandbot.git
+pip install poetry
+cd wandbot
+poetry install
+# Depending on which platform you want to run on run the following command:
+# poetry install --extras discord # for discord
+# poetry install --extras slack # for slack
+# poetry install --extras api # for api
 ```
 
 ## Usage
@@ -27,6 +32,12 @@ git clone git@github.com:wandb/examples.git
 To ingest the data, you first need to clone the [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) into the data directory.
 The data directory is located at `wandbot/data`.
 To clone the repositories, follow the commands:
+
+```bash
+cd wandbot/data
+git clone git@github.com:your_md_repo/your_md_docs.git
+git clone git@github.com:your_python_repo/your_python_codebase.git
+```
 
 To ingest the data, run the following command:
 
