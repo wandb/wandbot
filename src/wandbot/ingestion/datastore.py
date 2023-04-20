@@ -8,7 +8,6 @@ from typing import List, Dict, Optional, Any, Union
 
 import pandas as pd
 import tiktoken
-import wandb
 from langchain import LLMChain
 from langchain.chains import HypotheticalDocumentEmbedder
 from langchain.chat_models import ChatOpenAI
@@ -31,8 +30,9 @@ from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from llama_index.schema import BaseDocument
 from tqdm import tqdm
 
+import wandb
 from src.wandbot.customization.langchain import (
-    ChromaWithEmbeddings,
+    ChromaWithEmbeddingsAndScores,
     TFIDFRetrieverWithDocuments,
     HybridRetriever,
 )
@@ -581,7 +581,7 @@ class CombinedDocStore(BaseDocStore):
 
     def create_vectorstore(self, document_store_dict, metadata: Dict[str, Any]):
         store_data = {}
-        vectorstore = ChromaWithEmbeddings(
+        vectorstore = ChromaWithEmbeddingsAndScores(
             collection_name=self.config.name,
             embedding_function=self.embedding_fn,
             persist_directory=str(self.config.vectorstore_dir),

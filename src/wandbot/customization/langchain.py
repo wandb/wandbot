@@ -30,7 +30,7 @@ class VectorStoreRetrieverWithScore(VectorStoreRetriever):
         return docs
 
 
-class ChromaWithEmbeddings(Chroma):
+class ChromaWithEmbeddingsAndScores(Chroma):
     def add_texts_and_embeddings(self, documents, embeddings, ids, metadatas):
         self._collection.add(
             documents=documents,
@@ -43,34 +43,34 @@ class ChromaWithEmbeddings(Chroma):
         return VectorStoreRetrieverWithScore(
             vectorstore=self,
             search_type="similarity",
-            search_kwargs={"k": 10},
+            search_kwargs={"k": 4},
         )
 
 
-class TFIDFRetrieverWithDocuments(TFIDFRetriever):
-    @classmethod
-    def from_documents(
-        cls, documents: List[Document], **kwargs: Any
-    ) -> "TFIDFRetriever":
-        from sklearn.feature_extraction.text import TfidfVectorizer
+class TFIDFRetrieverWithScore(TFIDFRetriever):
+    def get_relevant_documents(self, query: str) -> List[Document]:
+        from sklearn.metrics.pairwise import cosine_similarity
 
-        if kwargs.get("vectorizer_kwargs"):
-            vectorizer = TfidfVectorizer(**kwargs.get("vectorizer_kwargs"))
-        else:
-            vectorizer = TfidfVectorizer()
-        tfidf_array = vectorizer.fit_transform([d.page_content for d in documents])
-        return cls(
-            vectorizer=vectorizer, docs=documents, tfidf_array=tfidf_array, **kwargs
-        )
+        query_vec = self.vectorizer.transform(
+            [query]
+        )  # Ip -- (n_docs,x), Op -- (n_docs,n_Feats)
+        results = cosine_similarity(self.tfidf_array, query_vec).reshape(
+            (-1,)
+        )  # Op -- (n_docs,1) -- Cosine Sim with each doc
+        return_docs = []
+        for i in results.argsort()[-self.k :][::-1]:
+            doc = self.docs[i]
+            doc.metadata["score"] = results[i]
+            return_docs.append(doc)
+        return return_docs
 
     async def aget_relevant_documents(self, query: str) -> List[Document]:
         raise NotImplementedError("This method is not implemented for this retriever.")
 
 
 class HybridRetriever(BaseRetriever, BaseModel):
-
-    chroma: VectorStoreRetriever
-    tfidf: TFIDFRetriever
+    dense: VectorStoreRetriever
+    sparse: TFIDFRetriever
 
     class Config:
         """Configuration for this pydantic object."""
@@ -78,8 +78,8 @@ class HybridRetriever(BaseRetriever, BaseModel):
         arbitrary_types_allowed = True
 
     def get_relevant_documents(self, query: str) -> List[Document]:
-        chroma_results = self.chroma.get_relevant_documents(query)
-        tfidf_results = self.tfidf.get_relevant_documents(query)
+        chroma_results = self.dense.get_relevant_documents(query)
+        tfidf_results = self.sparse.get_relevant_documents(query)
         return chroma_results + tfidf_results
 
     async def aget_relevant_documents(self, query: str) -> List[Document]:

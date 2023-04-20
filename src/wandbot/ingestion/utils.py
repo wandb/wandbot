@@ -2,7 +2,9 @@ import hashlib
 import logging
 import pathlib
 import subprocess
-from typing import Dict, Union, List, Optional, Any
+import time
+from typing import Any
+from typing import Dict, Union, List, Optional
 
 import regex as re
 from git import Repo
@@ -10,8 +12,6 @@ from giturlparse import parse
 from langchain.schema import Document
 from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
-
-from src.wandbot.ingestion.settings import BaseDataConfig
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def fetch_repo_metadata(repo: Repo) -> Dict[str, str]:
     )
 
 
-def fetch_git_repo(paths: BaseDataConfig, id_file) -> Dict[str, str]:
+def fetch_git_repo(paths, id_file) -> Dict[str, str]:
     git_command = get_git_command(id_file)
 
     if paths.local_path.is_dir():
@@ -109,7 +109,7 @@ def md5_update_from_dir(directory, file_pattern, computed_hash):
         computed_hash.update(path.name.encode())
         if path.is_file():
             with open(path, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
+                for chunk in iter(lambda: f.read(), b""):
                     computed_hash.update(chunk)
         elif path.is_dir():
             computed_hash = md5_update_from_dir(path, file_pattern, computed_hash)
@@ -153,3 +153,19 @@ def convert_llama_docstore_to_vectorstore_kwargs(
 
 def load_docstore_class(module, cls: str):
     return getattr(module, cls)
+
+
+class Timer:
+    def __init__(self) -> None:
+        self.start: float = time.perf_counter()
+        self.stop: float = self.start
+
+    def __enter__(self) -> "Timer":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.stop = time.perf_counter()
+
+    @property
+    def elapsed(self) -> float:
+        return self.stop - self.start
