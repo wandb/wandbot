@@ -1,16 +1,15 @@
 import time
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 import wandb
 from langchain import LLMChain
-from langchain.chains import HypotheticalDocumentEmbedder
-from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains import HypotheticalDocumentEmbedder, RetrievalQAWithSourcesChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts.chat import (
     ChatPromptTemplate,
-    SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
 )
 from langchain.schema import Document
 from langchain.vectorstores import FAISS
