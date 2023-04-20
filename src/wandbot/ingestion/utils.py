@@ -3,8 +3,7 @@ import logging
 import pathlib
 import subprocess
 import time
-from typing import Any
-from typing import Dict, Union, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import regex as re
 from git import Repo
@@ -157,14 +156,14 @@ def load_docstore_class(module, cls: str):
 
 class Timer:
     def __init__(self) -> None:
-        self.start: float = time.perf_counter()
+        self.start: float = time.time()
         self.stop: float = self.start
 
     def __enter__(self) -> "Timer":
         return self
 
     def __exit__(self, *args: Any) -> None:
-        self.stop = time.perf_counter()
+        self.stop = time.time()
 
     @property
     def elapsed(self) -> float:

@@ -1,41 +1,21 @@
 import pathlib
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
+import tiktoken
+from langchain.chains.conversational_retrieval.base import (
+    BaseConversationalRetrievalChain,
+)
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
 from pydantic import BaseModel
-
 from src.wandbot.customization.langchain import (
     ConversationalRetrievalQAWithSourcesChainWithScore,
 )
-from src.wandbot.ingestion.ingest import VectorIndex, VectorIndexConfig
 from src.wandbot.ingestion.utils import Timer
 from src.wandbot.prompts import load_chat_prompt
-
-
-def get_answer(chain, question, chat_history=[]):
-    query = " ".join(question.strip().split())
-    result = chain(
-        {
-            "question": query,
-            "chat_history": chat_history,
-        },
-        return_only_outputs=True,
-    )
-    sources = list(
-        {
-            "- " + doc.metadata["source"]
-            for doc in result["source_documents"]
-            if doc.metadata["score"] <= 0.4
-        }
-    )
-
-    if len(sources):
-        response = result["answer"]  # + "\n\n*References*:\n\n" + "\n".join(sources)
-    else:
-        response = result["answer"]
-    return response
+from wandbot.ingestion.datastore import VectorIndex
+from wandbot.ingestion.settings import VectorIndexConfig
 
 
 class ChatConfig(BaseModel):
@@ -56,6 +36,7 @@ class ChatConfig(BaseModel):
     wandb_entity: str = "wandb"
     respond_with_sources: bool = True
     source_score_threshold: float = 1.0
+    query_tokens_threshold: int = 1024
 
 
 class Chat:
@@ -69,14 +50,13 @@ class Chat:
         )
         self.chat_prompt: ChatPromptTemplate = load_chat_prompt(self.config.chat_prompt)
         self._retriever: BaseRetriever = self._load_retriever()
-        self._chain: ConversationalRetrievalQAWithSourcesChainWithScore = (
-            self._load_chain(self.config.model_name, self.config.max_retries)
+        self._chain: BaseConversationalRetrievalChain = self._load_chain(
+            self.config.model_name, self.config.max_retries
         )
-        self._fallback_chain: ConversationalRetrievalQAWithSourcesChainWithScore = (
-            self._load_chain(
-                self.config.fallback_model_name, self.config.max_fallback_retries
-            )
+        self._fallback_chain: BaseConversationalRetrievalChain = self._load_chain(
+            self.config.fallback_model_name, self.config.max_fallback_retries
         )
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
     def _load_retriever(self) -> BaseRetriever:
         self.vector_index = self.vector_index.load_from_artifact(
@@ -92,7 +72,7 @@ class Chat:
 
     def _load_chain(
         self, model_name: str = None, max_retries: int = 1
-    ) -> ConversationalRetrievalQAWithSourcesChainWithScore:
+    ) -> BaseConversationalRetrievalChain:
         chain = ConversationalRetrievalQAWithSourcesChainWithScore.from_llm(
             ChatOpenAI(
                 model_name=model_name,
@@ -125,17 +105,14 @@ class Chat:
             )
         return self._fallback_chain
 
-    @staticmethod
-    def validate_and_format_question(question: str) -> str:
-        if len(question.strip().split()) < 2:
+    def validate_and_format_question(self, question: str) -> str:
+        question = " ".join(question.strip().split())
+
+        if len(self.tokenizer.encode(question)) > 1024:
             raise ValueError(
-                "Question is too short. Please ask a more detailed question."
+                f"Question is too long. Please rephrase your question to be shorter than {1024 * 3 // 4} words."
             )
-        elif len(question.strip().split()) * 3 > 1024:
-            raise ValueError(
-                f"Question is too long. Please rephrase your question to be shorter than {1024 // 3} words."
-            )
-        return " ".join(question.strip().split())
+        return question
 
     def get_answer(
         self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
@@ -151,7 +128,6 @@ class Chat:
                 },
                 return_only_outputs=True,
             )
-            model_used = self.config.model_name
         except Exception as e:
             result = self.fallback_chain(
                 {
