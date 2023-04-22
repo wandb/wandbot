@@ -3,13 +3,18 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 
-def get_question_answer(db: Session, question_answer_id: str, thread_id: str):
+def create_chat_thread(db: Session, thread_id: str, application: str):
+    db_thread = models.ChatThread(thread_id=thread_id, application=application)
+    db.add(db_thread)
+    db.commit()
+    db.refresh(db_thread)
+    return db_thread
+
+
+def get_thread(db: Session, thread_id: str):
     return (
-        db.query(models.QuestionAnswers)
-        .filter(
-            models.QuestionAnswers.question_answer_id == question_answer_id,
-            models.QuestionAnswers.thread_id == thread_id,
-        )
+        db.query(models.ChatThread)
+        .filter(models.ChatThread.thread_id == thread_id)
         .first()
     )
 
@@ -31,12 +36,14 @@ def create_question_answer(db: Session, question_answer: schemas.QuestionAnswerC
     return db_question_answer
 
 
-def get_thread_question_answers(db: Session, thread_id: str):
+def get_question_answer(db: Session, question_answer_id: str, thread_id: str):
     return (
         db.query(models.QuestionAnswers)
-        .filter(models.QuestionAnswers.thread_id == thread_id)
-        .order_by(models.QuestionAnswers.start_time.asc())
-        .all()
+        .filter(
+            models.QuestionAnswers.question_answer_id == question_answer_id,
+            models.QuestionAnswers.thread_id == thread_id,
+        )
+        .first()
     )
 
 

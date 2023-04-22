@@ -19,6 +19,22 @@ class QuestionAnswerCreate(QuestionAnswerBase):
     pass
 
 
-class QuestionAnswer(QuestionAnswerCreate):
+class QuestionAnswer(QuestionAnswerBase):
+    class Config:
+        orm_mode = True
+
+
+class ChatThreadBase(BaseModel):
+    thread_id: str
+    application: str
+
+
+class ChatThreadCreate(ChatThreadBase):
+    pass
+
+
+class ChatThread(ChatThreadBase):
+    question_answers: list[QuestionAnswer] = []
+
     class Config:
         orm_mode = True

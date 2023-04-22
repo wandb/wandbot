@@ -35,6 +35,7 @@ def startup_event():
 class QueryRequest(BaseModel):
     question: str
     thread_id: Optional[str] = None
+    application: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -45,11 +46,18 @@ class QueryResponse(BaseModel):
 
 
 def get_chat_history(db: Session, thread_id: str):
-    question_answers = crud.get_thread_question_answers(db=db, thread_id=thread_id)
-    if question_answers is None or len(question_answers) < 1:
-        return []
+    chat_thread = crud.get_thread(db=db, thread_id=thread_id)
+    if chat_thread is not None:
+        if (
+            chat_thread.question_answers is None
+            or len(chat_thread.question_answers) < 1
+        ):
+            result = []
+        else:
+            result = [(qa.question, qa.answer) for qa in chat_thread.question_answers]
     else:
-        return [(qa.question, qa.answer) for qa in question_answers]
+        result = []
+    return result
 
 
 @app.post("/query", response_model=QueryResponse)
@@ -57,6 +65,10 @@ async def query(request: QueryRequest, db: Session = Depends(get_db)):
     question_answer_id = str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     chat_history = get_chat_history(db, thread_id)
+    if not chat_history:
+        crud.create_chat_thread(
+            db=db, thread_id=thread_id, application=request.application
+        )
     logger.info(f"chat_history: {chat_history}")
     result = chat(question=request.question, chat_history=chat_history)
     question_answer = schemas.QuestionAnswerCreate(
