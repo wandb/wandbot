@@ -1,8 +1,8 @@
+import datetime
 import hashlib
 import logging
 import pathlib
 import subprocess
-import time
 from typing import Any, Dict, List, Optional, Union
 
 import regex as re
@@ -156,15 +156,15 @@ def load_docstore_class(module, cls: str):
 
 class Timer:
     def __init__(self) -> None:
-        self.start: float = time.time()
-        self.stop: float = self.start
+        self.start = datetime.datetime.utcnow()
+        self.stop = self.start
 
     def __enter__(self) -> "Timer":
         return self
 
     def __exit__(self, *args: Any) -> None:
-        self.stop = time.time()
+        self.stop = datetime.datetime.utcnow()
 
     @property
     def elapsed(self) -> float:
-        return self.stop - self.start
+        return (self.stop - self.start).total_seconds()

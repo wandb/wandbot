@@ -267,8 +267,8 @@ class VectorIndex:
             data_dict = source.load()
             datastore["docs"] = dict(**datastore.get("docs", {}), **data_dict.docs)
             datastore["metadata"][
-                data_dict.ref_doc_info["metadata"]["source_name"]
-            ] = data_dict.ref_doc_info["metadata"]
+                data_dict._ref_doc_info["metadata"]["source_name"]
+            ] = data_dict._ref_doc_info["metadata"]
         datastore = LlamaDocumentStore(
             docs=datastore["docs"], ref_doc_info={"metadata": datastore["metadata"]}
         )
@@ -292,7 +292,7 @@ class VectorIndex:
                 persist_directory=str(self.config.vectorindex_dir),
                 embedding_function=self.embedding_fn,
                 collection_name=self.config.name,
-                collection_metadata=datastore.ref_doc_info["metadata"],
+                collection_metadata=datastore._ref_doc_info["metadata"],
             )
             logger.debug("Validating the vector store")
             collection_ids = vectorstore._collection.get()["ids"]
@@ -332,7 +332,7 @@ class VectorIndex:
                 collection_name=self.config.name,
                 persist_directory=str(self.config.vectorindex_dir / "dense_retriever"),
                 embedding_function=self.embedding_fn,
-                collection_metadata=datastore.ref_doc_info["metadata"],
+                collection_metadata=datastore._ref_doc_info["metadata"],
             )
             vectorstore.add_texts(
                 texts=[doc.page_content for doc in docs_list],
@@ -365,11 +365,11 @@ class VectorIndex:
     def save(self):
         self.config.vectorindex_dir.mkdir(parents=True, exist_ok=True)
         # dump the datastore
-        datastore_dict = self.datastore.serialize_to_dict()
+        datastore_dict = self.datastore.to_dict()
         with open(self.config.vectorindex_dir / "datastore.json", "w") as f:
             json.dump(datastore_dict, f)
         with open(self.config.vectorindex_dir / "metadata.json", "w") as f:
-            json.dump(self.datastore.ref_doc_info["metadata"], f)
+            json.dump(self.datastore._ref_doc_info["metadata"], f)
 
         # dump the sparse retriever
         sparse_retriever_dir = self.config.vectorindex_dir / "sparse_retriever"
@@ -433,7 +433,7 @@ class VectorIndex:
         # load the datastore
         with open(artifact_dir / "datastore.json", "r") as f:
             datastore_dict = json.load(f)
-        self.datastore = LlamaDocumentStore.load_from_dict(datastore_dict)
+        self.datastore = LlamaDocumentStore.from_dict(datastore_dict)
 
         # load the metadata
         with open(artifact_dir / "metadata.json", "r") as f:

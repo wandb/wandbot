@@ -19,29 +19,30 @@ openai = "^0.27.2"
 tiktoken = "^0.3.3"
 pandas = "^2.0.0"
 unstructured = "^0.5.8"
-replit = {version="^3.2.4", optional=true}
-Flask = {version="^2.2.0", optional=true}
-urllib3 = {version="^1.26.12", optional=true}
-slack-bolt = {version="^1.16.1", optional=true}
-slack-sdk = {version="^3.12.0", optional=true}
-discord = {version="^2.2.2", optional=true}
-fastapi = {extras = ["all"], version = "^0.95.0", optional=true}
-uvicorn = {version = "^0.21.1", optional=true}
+replit = { version = "^3.2.4", optional = true }
+Flask = { version = "^2.2.0", optional = true }
+urllib3 = { version = "^1.26.12", optional = true }
+slack-bolt = { version = "^1.16.1", optional = true }
+slack-sdk = { version = "^3.12.0", optional = true }
+discord = { version = "^2.2.2", optional = true }
+fastapi = { extras = ["all"], version = "^0.95.0", optional = true }
+uvicorn = { version = "^0.21.1", optional = true }
 python-dotenv = "^1.0.0"
 chromadb = "^0.3.21"
-jsonargparse = {extras = ["signatures"], version = "^4.20.1"}
-llama-index = "^0.5.11"
+jsonargparse = { extras = ["signatures"], version = "^4.20.1" }
+llama-index = "^0.5.10"
 jupyter = "^1.0.0"
+giturlparse = "^0.10.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.6.2"
-replit-python-lsp-server = {extras = ["yapf", "rope", "pyflakes"], version = "^1.5.9"}
+replit-python-lsp-server = { extras = ["yapf", "rope", "pyflakes"], version = "^1.5.9" }
 
 [tool.poetry.extras]
 slack = ["slack-bolt", "slack-sdk"]
 replit = ["replit", "Flask", "urllib3"]
 discord = ["discord"]
-api = ["fastapi", "uvicorn",]
+api = ["fastapi", "uvicorn", ]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

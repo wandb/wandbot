@@ -170,17 +170,27 @@ class Chat:
             try:
                 query = self.validate_and_format_question(question)
             except ValueError as e:
-                return {
+                result = {
                     "question": question,
-                    "response": str(e),
-                    "time_taken": timer.elapsed,
+                    "answer": None,
+                    "status": "error",
+                    "status_message": str(e),
                 }
             response = self.get_answer(query, chat_history=chat_history)
-            return {
+            result = {
                 "question": question,
-                "response": response,
-                "time_taken": timer.elapsed,
+                "answer": response,
+                "status": "success",
+                "status_message": None,
             }
+        result.update(
+            {
+                "time_taken": timer.elapsed,
+                "start_time": timer.start,
+                "end_time": timer.stop,
+            }
+        )
+        return result
 
 
 def main():
@@ -197,7 +207,3 @@ def main():
             print(f"WandBot: {response['response']}")
             print(f"Time taken: {response['time_taken']}")
             print("")
-
-
-if __name__ == "__main__":
-    main()
