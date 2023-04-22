@@ -8,6 +8,7 @@ class QuestionAnswerBase(BaseModel):
     thread_id: str
     question: str
     answer: str | None
+    sources: str | None
     feedback: str | None
     start_time: datetime.datetime | None
     end_time: datetime.datetime | None

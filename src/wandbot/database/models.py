@@ -10,6 +10,7 @@ class QuestionAnswers(Base):
     thread_id = Column(String, primary_key=True, index=True)
     question = Column(String)
     answer = Column(String)
+    sources = Column(String)
     feedback = Column(String)
     start_time = Column(DateTime)
     end_time = Column(DateTime)

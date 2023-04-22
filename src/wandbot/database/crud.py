@@ -20,6 +20,7 @@ def create_question_answer(db: Session, question_answer: schemas.QuestionAnswerC
         thread_id=question_answer.thread_id,
         question=question_answer.question,
         answer=question_answer.answer,
+        sources=question_answer.sources,
         start_time=question_answer.start_time,
         end_time=question_answer.end_time,
         time_taken=question_answer.time_taken,

@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Optional
 
@@ -7,6 +8,9 @@ from sqlalchemy.orm import Session
 from wandbot.chat_new import Chat, ChatConfig
 from wandbot.database import crud, models, schemas
 from wandbot.database.database import SessionLocal, engine
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
 chat: Optional[Chat] = None
@@ -37,6 +41,7 @@ class QueryResponse(BaseModel):
     answer: str
     thread_id: str
     question_answer_id: str
+    sources: Optional[str] = None
 
 
 def get_chat_history(db: Session, thread_id: str):
@@ -52,12 +57,14 @@ async def query(request: QueryRequest, db: Session = Depends(get_db)):
     question_answer_id = str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     chat_history = get_chat_history(db, thread_id)
+    logger.info(f"chat_history: {chat_history}")
     result = chat(question=request.question, chat_history=chat_history)
     question_answer = schemas.QuestionAnswerCreate(
         question_answer_id=question_answer_id,
         thread_id=thread_id,
         question=request.question,
         answer=result["answer"],
+        sources=result["sources"],
         start_time=result["start_time"],
         end_time=result["end_time"],
         time_taken=result["time_taken"],
@@ -65,6 +72,7 @@ async def query(request: QueryRequest, db: Session = Depends(get_db)):
     db_response = crud.create_question_answer(db=db, question_answer=question_answer)
     return QueryResponse(
         answer=db_response.answer,
+        sources=db_response.sources,
         thread_id=db_response.thread_id,
         question_answer_id=db_response.question_answer_id,
     )

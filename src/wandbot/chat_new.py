@@ -83,7 +83,6 @@ class Chat:
             retriever=self.retriever,
             qa_prompt=self.chat_prompt,
             return_source_documents=True,
-            verbose=True,
         )
         return chain
 
@@ -114,6 +113,31 @@ class Chat:
             )
         return question
 
+    def format_response(self, result, used_fallback: bool):
+        response = {}
+        sources = "\n".join(
+            {
+                doc.metadata["source"]
+                for doc in result["source_documents"]
+                # if doc.metadata["score"] <= self.config.source_score_threshold
+            }
+        ).strip()
+
+        if len(sources) and self.config.respond_with_sources:
+            response["answer"] = result["answer"]
+            response["sources"] = sources
+        else:
+            response["answer"] = result["answer"]
+            response["sources"] = ""
+        if used_fallback:
+            response["answer"] = (
+                f"**Warning: Falling back to {self.config.fallback_model_name}.** "
+                f"These results are sometimes not as good as {self.config.model_name} \n\n"
+                + response
+            )
+
+        return response
+
     def get_answer(
         self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
     ):
@@ -137,31 +161,8 @@ class Chat:
                 return_only_outputs=True,
             )
             used_fallback = True
-
-        return self.format_response(result, used_fallback)
-
-    def format_response(self, result, used_fallback: bool):
-        sources = list(
-            {
-                "- " + doc.metadata["source"]
-                for doc in result["source_documents"]
-                # if doc.metadata["score"] <= self.config.source_score_threshold
-            }
-        )
-
-        if len(sources) and self.config.respond_with_sources:
-            response = result["answer"] + "\n\n*References*:\n\n" + "\n".join(sources)
-        else:
-            response = result["answer"]
-
-        if used_fallback:
-            response = (
-                f"**Warning: Falling back to {self.config.fallback_model_name}.** "
-                f"These results are sometimes not as good as {self.config.model_name} \n\n"
-                + response
-            )
-
-        return response
+        result = self.format_response(result, used_fallback)
+        return result
 
     def __call__(
         self, question: str, chat_history: Optional[List[Tuple[str, str]]] = None
@@ -171,20 +172,14 @@ class Chat:
                 query = self.validate_and_format_question(question)
             except ValueError as e:
                 result = {
-                    "question": question,
-                    "answer": None,
-                    "status": "error",
-                    "status_message": str(e),
+                    "answer": str(e),
+                    "sources": "",
                 }
-            response = self.get_answer(query, chat_history=chat_history)
-            result = {
-                "question": question,
-                "answer": response,
-                "status": "success",
-                "status_message": None,
-            }
+            else:
+                result = self.get_answer(query, chat_history=chat_history)
         result.update(
             {
+                "question": question,
                 "time_taken": timer.elapsed,
                 "start_time": timer.start,
                 "end_time": timer.stop,
@@ -205,5 +200,4 @@ def main():
             response = chat(question, chat_history=chat_history)
             chat_history.append((question, response["response"]))
             print(f"WandBot: {response['response']}")
-            print(f"Time taken: {response['time_taken']}")
-            print("")
+            print(f"Time taken: {response['time_taken']} seconds")
