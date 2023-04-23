@@ -3,11 +3,11 @@ import uuid
 from typing import Optional
 
 from fastapi import Depends, FastAPI
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from wandbot.api import crud, models, schemas
+from wandbot.api.database import SessionLocal, engine
+from wandbot.api.schemas import APIQueryRequest, APIQueryResponse
 from wandbot.chat_new import Chat, ChatConfig
-from wandbot.database import crud, models, schemas
-from wandbot.database.database import SessionLocal, engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,19 +32,6 @@ def startup_event():
     chat = Chat(ChatConfig())
 
 
-class QueryRequest(BaseModel):
-    question: str
-    thread_id: Optional[str] = None
-    application: Optional[str] = None
-
-
-class QueryResponse(BaseModel):
-    answer: str
-    thread_id: str
-    question_answer_id: str
-    sources: Optional[str] = None
-
-
 def get_chat_history(db: Session, thread_id: str):
     chat_thread = crud.get_thread(db=db, thread_id=thread_id)
     if chat_thread is not None:
@@ -60,8 +47,8 @@ def get_chat_history(db: Session, thread_id: str):
     return result
 
 
-@app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest, db: Session = Depends(get_db)):
+@app.post("/query", response_model=APIQueryResponse)
+async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
     question_answer_id = str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     chat_history = get_chat_history(db, thread_id)
@@ -82,7 +69,7 @@ async def query(request: QueryRequest, db: Session = Depends(get_db)):
         time_taken=result["time_taken"],
     )
     db_response = crud.create_question_answer(db=db, question_answer=question_answer)
-    return QueryResponse(
+    return APIQueryResponse(
         answer=db_response.answer,
         sources=db_response.sources,
         thread_id=db_response.thread_id,

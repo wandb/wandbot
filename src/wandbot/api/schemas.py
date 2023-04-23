@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -38,3 +39,16 @@ class ChatThread(ChatThreadBase):
 
     class Config:
         orm_mode = True
+
+
+class APIQueryRequest(BaseModel):
+    question: str
+    thread_id: Optional[str] = None
+    application: Optional[str] = None
+
+
+class APIQueryResponse(BaseModel):
+    answer: str
+    thread_id: str
+    question_answer_id: str
+    sources: Optional[str] = None

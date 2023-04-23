@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
-
-from . import models, schemas
+from wandbot.api import models, schemas
 
 
 def create_chat_thread(db: Session, thread_id: str, application: str):
