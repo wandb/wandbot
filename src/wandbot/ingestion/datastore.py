@@ -25,6 +25,7 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
+from wandbot.apps.prompts import load_hyde_prompt
 from wandbot.customization.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
@@ -32,7 +33,6 @@ from wandbot.customization.langchain import (
 )
 from wandbot.ingestion.settings import DataStoreConfig, VectorIndexConfig
 from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
-from wandbot.prompts import load_hyde_prompt
 
 logger = logging.getLogger(__name__)
 

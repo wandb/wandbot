@@ -2,8 +2,7 @@ import os
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-
-from src.wandbot.chat import Chat
+from wandbot.apps.chat import Chat
 
 app = App(token=os.environ.get("SLACK_APP_TOKEN"))
 

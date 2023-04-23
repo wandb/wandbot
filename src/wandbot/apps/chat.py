@@ -1,4 +1,3 @@
-import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
 import tiktoken
@@ -8,35 +7,13 @@ from langchain.chains.conversational_retrieval.base import (
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
-from pydantic import BaseModel
 from src.wandbot.customization.langchain import (
     ConversationalRetrievalQAWithSourcesChainWithScore,
 )
 from src.wandbot.ingestion.utils import Timer
-from src.wandbot.prompts import load_chat_prompt
+from wandbot.apps.config import ChatConfig
+from wandbot.apps.prompts import load_chat_prompt
 from wandbot.ingestion.datastore import VectorIndex
-from wandbot.ingestion.settings import VectorIndexConfig
-
-
-class ChatConfig(BaseModel):
-    model_name: str = "gpt-4"
-    max_retries: int = 1
-    fallback_model_name: str = "gpt-3.5-turbo"
-    max_fallback_retries: int = 6
-    chat_temperature: float = 0.0
-    chain_type: str = "stuff"
-    chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.txt")
-    vector_index_config: VectorIndexConfig = VectorIndexConfig(
-        wandb_project="wandb_docs_bot_dev"
-    )
-    vector_index_artifact: str = (
-        "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
-    )
-    wandb_project: str = "wandb_docs_bot_dev"
-    wandb_entity: str = "wandb"
-    respond_with_sources: bool = True
-    source_score_threshold: float = 1.0
-    query_tokens_threshold: int = 1024
 
 
 class Chat:
@@ -123,7 +100,7 @@ class Chat:
             }
         ).strip()
 
-        if len(sources) and self.config.respond_with_sources:
+        if len(sources) and self.config.include_sources:
             response["answer"] = result["answer"]
             response["sources"] = sources
         else:
