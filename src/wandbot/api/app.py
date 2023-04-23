@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from wandbot.api import crud, models, schemas
 from wandbot.api.database import SessionLocal, engine
 from wandbot.api.schemas import APIQueryRequest, APIQueryResponse
-from wandbot.chat_new import Chat, ChatConfig
+from wandbot.chat import Chat, ChatConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
