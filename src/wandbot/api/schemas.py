@@ -1,7 +1,13 @@
 import datetime
-from typing import Optional
+from enum import Enum
 
 from pydantic import BaseModel
+
+
+class Feedback(str, Enum):
+    positive = "positive"
+    negative = "negative"
+    neutral = "neutral"
 
 
 class QuestionAnswerBase(BaseModel):
@@ -10,10 +16,13 @@ class QuestionAnswerBase(BaseModel):
     question: str
     answer: str | None
     sources: str | None
-    feedback: str | None
+    feedback: Feedback | None
     start_time: datetime.datetime | None
     end_time: datetime.datetime | None
     time_taken: float | None
+
+    class Config:
+        use_enum_values = True
 
 
 class QuestionAnswerCreate(QuestionAnswerBase):
@@ -43,12 +52,29 @@ class ChatThread(ChatThreadBase):
 
 class APIQueryRequest(BaseModel):
     question: str
-    thread_id: Optional[str] = None
-    application: Optional[str] = None
+    question_answer_id: str | None = None
+    thread_id: str | None = None
+    application: str | None = None
 
 
 class APIQueryResponse(BaseModel):
     answer: str
     thread_id: str
     question_answer_id: str
-    sources: Optional[str] = None
+    sources: str | None = None
+
+
+class FeedbackBase(BaseModel):
+    feedback: Feedback
+    question_answer_id: str
+    thread_id: str
+
+    class Config:
+        use_enum_values = True
+
+
+class APIFeedbackRequest(FeedbackBase):
+    pass
+
+    class Config:
+        use_enum_values = True

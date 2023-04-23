@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 models.Base.metadata.create_all(bind=engine)
 chat: Optional[Chat] = None
-app = FastAPI()
+app = FastAPI(name="wandbot", version="0.0.1")
 
 
 # Dependency
@@ -50,7 +50,7 @@ def get_chat_history(db: Session, thread_id: str):
 
 @app.post("/query", response_model=APIQueryResponse)
 async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
-    question_answer_id = str(uuid.uuid4())
+    question_answer_id = request.question_answer_id or str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     chat_history = get_chat_history(db, thread_id)
     if not chat_history:
@@ -76,6 +76,12 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
         thread_id=db_response.thread_id,
         question_answer_id=db_response.question_answer_id,
     )
+
+
+@app.post("/feedback")
+async def feedback(request: schemas.APIFeedbackRequest, db: Session = Depends(get_db)):
+    crud.update_feedback(db=db, feedback=request)
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

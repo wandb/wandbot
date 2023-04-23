@@ -46,17 +46,18 @@ def get_question_answer(db: Session, question_answer_id: str, thread_id: str):
     )
 
 
-def update_feedback(db: Session, question_answer: schemas.QuestionAnswer):
+def update_feedback(db: Session, feedback: schemas.FeedbackBase):
     db_question_answer = (
         db.query(models.QuestionAnswers)
         .filter(
-            models.QuestionAnswers.question_answer_id
-            == question_answer.question_answer_id,
-            models.QuestionAnswers.thread_id == question_answer.thread_id,
+            models.QuestionAnswers.question_answer_id == feedback.question_answer_id,
+            models.QuestionAnswers.thread_id == feedback.thread_id,
         )
         .first()
     )
-    db_question_answer.feedback = question_answer.feedback
+    if db_question_answer is None:
+        raise ValueError("Question Answer ID not found")
+    db_question_answer.feedback = feedback.feedback
     db.commit()
     db.refresh(db_question_answer)
     return db_question_answer
