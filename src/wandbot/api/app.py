@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, status
 from sqlalchemy.orm import Session
 from wandbot.api import crud, models, schemas
 from wandbot.api.database import SessionLocal, engine
@@ -48,7 +48,7 @@ def get_chat_history(db: Session, thread_id: str):
     return result
 
 
-@app.post("/query", response_model=APIQueryResponse)
+@app.post("/query", response_model=APIQueryResponse, status_code=status.HTTP_200_OK)
 async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
     question_answer_id = request.question_answer_id or str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
@@ -78,7 +78,7 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
     )
 
 
-@app.post("/feedback")
+@app.post("/feedback", status_code=status.HTTP_201_CREATED)
 async def feedback(request: schemas.APIFeedbackRequest, db: Session = Depends(get_db)):
     crud.update_feedback(db=db, feedback=request)
     return {"status": "ok"}

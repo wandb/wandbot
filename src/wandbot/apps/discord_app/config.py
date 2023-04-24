@@ -15,10 +15,11 @@ OUTRO_MESSAGE = (
 ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
 
 
-class SlackAppConfig(BaseSettings):
-    SLACK_APP_TOKEN: str = Field(..., env="SLACK_APP_TOKEN")
-    SLACK_BOT_TOKEN: str = Field(..., env="SLACK_BOT_TOKEN")
-    SLACK_SIGNING_SECRET: str = Field(..., env="SLACK_SIGNING_SECRET")
+class DiscordAppConfig(BaseSettings):
+    WAIT_TIME: float = 300.0
+    PROD_DISCORD_CHANNEL_ID: int = 1090739438310654023
+    TEST_DISCORD_CHANNEL_ID: int = 1088892013321142484
+    DISCORD_BOT_TOKEN: str = Field(..., env="DISCORD_BOT_TOKEN")
     WANDB_API_KEY: str = Field(..., env="WANDB_API_KEY")
     INTRO_MESSAGE: str = Field(INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(OUTRO_MESSAGE)

@@ -1,20 +1,11 @@
 import asyncio
-import functools
 import logging
-import os
-import sqlite3
-import typing
 
 import discord
-import wandb
-from chat import Chat
-from config import default_config, TEAM, PROJECT, JOB_TYPE
 from discord.ext import commands
-from stream_table import StreamTable
-
-WAIT_TIME = 300.0
-PROD_DISCORD_CHANNEL_ID = 1090739438310654023
-TEST_DISCORD_CHANNEL_ID = 1088892013321142484
+from wandbot.api.client import AsyncAPIClient
+from wandbot.api.schemas import APIFeedbackRequest, APIQueryRequest, APIQueryResponse
+from wandbot.apps.discord_app.config import DiscordAppConfig
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -26,88 +17,64 @@ intents.messages = True
 intents.reactions = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-wandb_run = wandb.init(
-    entity=TEAM, project=PROJECT, job_type=JOB_TYPE, config=default_config, resume=True
-)
-
-cols = [
-    "discord_id",
-    "wandb_run_id",
-    "query",
-    "response",
-    "feedback",
-    "elapsed_time",
-    "start_time",
-]
-wandb_table = StreamTable("wandbot-results", cols)
-
-chat = Chat(model_name=default_config.model_name, wandb_run=wandb_run)
-
-# Create and connect to the SQLite database
-conn = sqlite3.connect("responses2.db")
-cursor = conn.cursor()
-
-# Create a table in the database for storing user questions, bot responses, and reactions
-cursor.execute(
-    """CREATE TABLE IF NOT EXISTS responses (
-                    discord_id INTEGER,
-                    wandb_run_id TEXT,
-                    query TEXT,
-                    response TEXT,
-                    feedback TEXT,
-                    elapsed_time REAL,
-                    start_time REAL
-                  )"""
-)
+config = DiscordAppConfig()
+api_client = AsyncAPIClient()
 
 
-async def run_chat(blocking_func: typing.Callable, *args, **kwargs) -> typing.Any:
-    """Runs a blocking function in a non-blocking way"""
-    func = functools.partial(
-        blocking_func, *args, **kwargs
-    )  # `run_in_executor` doesn't support kwargs, `functools.partial` does
-    return await bot.loop.run_in_executor(None, func)
+def format_response(response: APIQueryResponse | None):
+    if response is not None:
+        if config.include_sources:
+            result = (
+                response.answer
+                + "\n\n**References**\n\n"
+                + "- ".join(response.sources.splitlines())
+            )
+        else:
+            result = response.answer
+    else:
+        result = config.ERROR_MESSAGE
+    return result
 
 
-INTRO_MESSAGE = f"""Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\nPlease do not share any private or sensitive information in your query at this time.\n\nGenerating response...\n\n"""
+async def run_api_query(query: str, thread_id: str, event_id: str) -> APIQueryResponse:
+    request = APIQueryRequest(question=query, thread_id=thread_id, event_id=event_id)
+    response = await api_client.query(request)
+    return response
 
-OUTRO_MESSAGE = f"""🤖 If you still need help please try re-phrase your question, or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n Was this response helpful? Please react below to let us know"""
 
-
-@bot.event
-async def on_ready():
-    logger.info(f"We have logged in as {bot.user}")
-    # print(f"We have logged in as {bot.user}")
-    logger.info(
-        f"Connected to {len(bot.guilds)} Discord servers"
-    )  # Add this line to see the number of servers the bot is connected to
-    # print(f"Servers connected: {len(bot.guilds)}")
+async def send_api_feedback(feedback: str, thread_id: str, question_answer_id: str):
+    request = APIFeedbackRequest(
+        feedback=feedback, thread_id=thread_id, question_answer_id=question_answer_id
+    )
+    response = await api_client.feedback(request)
+    return response
 
 
 @bot.event
 async def on_message(message: discord.Message):
-    logger.info("Mentioned in message")
     if message.author == bot.user:
         return
     if (
         bot.user is not None
         and bot.user.mentioned_in(message)
         and (
-            message.channel.id == PROD_DISCORD_CHANNEL_ID
-            or message.channel.id == TEST_DISCORD_CHANNEL_ID
+            message.channel.id == config.PROD_DISCORD_CHANNEL_ID
+            or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
         )
     ):
         mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
             name=f"Thread", type=discord.ChannelType.public_thread
         )  # currently calling it "Thread" because W&B Support makes it sound too official.
-        await thread.send(f"🤖 Hi {mention}: {INTRO_MESSAGE}", mention_author=True)
-        query, response, timings = await run_chat(chat, message.clean_content)
-        print("Response generated")
-        start_time, end_time, elapsed_time = timings
-        sent_message = await thread.send(f"🤖 {response}")
-        sent_message = await thread.send(OUTRO_MESSAGE)
+        await thread.send(
+            f"🤖 Hi {mention}: {config.INTRO_MESSAGE}", mention_author=True
+        )
+        response = await run_api_query(
+            str(message.clean_content), str(thread.id), str(message.id)
+        )
+        await thread.send(f"🤖 {format_response(response)}")
+
+        sent_message = await thread.send(config.OUTRO_MESSAGE)
 
         # # Add reactions for feedback
         await sent_message.add_reaction("👍")
@@ -119,12 +86,12 @@ async def on_message(message: discord.Message):
 
         try:
             reaction, user = await bot.wait_for(
-                "reaction_add", timeout=WAIT_TIME, check=check
+                "reaction_add", timeout=config.WAIT_TIME, check=check
             )
 
         except asyncio.TimeoutError:
             await thread.send("🤖")
-            feedback = "none"
+            feedback = "neutral"
 
         else:
             # Get the feedback value
@@ -133,39 +100,13 @@ async def on_message(message: discord.Message):
             elif str(reaction.emoji) == "👎":
                 feedback = "negative"
             else:
-                feedback = "none"
-        logger.info(f"Feedback: {feedback}")
+                feedback = "neutral"
 
-        # lot to wandb stream table
-        try:
-            wandb_table.add_data(
-                message.author.id,
-                chat.wandb_run.id,
-                query,
-                response,
-                feedback,
-                elapsed_time,
-                start_time,
-            )
-        except Exception as e:
-            logger.error(e)
-
-        cursor.execute(
-            f"INSERT INTO responses (discord_id, wandb_run_id, query, response, feedback, elapsed_time, start_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                message.author.id,
-                chat.wandb_run.id,
-                query,
-                response,
-                feedback,
-                elapsed_time,
-                start_time,
-            ),
-        )
-        conn.commit()
+        # Send feedback to API
+        await send_api_feedback(feedback, str(thread.id), str(message.id))
 
     await bot.process_commands(message)
 
 
 if __name__ == "__main__":
-    bot.run(os.getenv("DISCORD_BOT_TOKEN"))
+    bot.run(config.DISCORD_BOT_TOKEN)

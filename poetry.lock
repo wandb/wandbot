@@ -1300,14 +1300,14 @@ files = [
 
 [[package]]
 name = "gptcache"
-version = "0.1.17"
+version = "0.1.18"
 description = "GPTCache, a powerful caching library that can be used to speed up and lower the cost of chat applications that rely on the LLM service. GPTCache works as a memcache for AIGC applications, similar to how Redis works for traditional applications."
 category = "main"
 optional = false
 python-versions = ">=3.8.1"
 files = [
-    {file = "gptcache-0.1.17-py3-none-any.whl", hash = "sha256:3f5b4c434980c4ed854f567f720f15e17d845a4d83ce9a5e2b129f360ce44ed7"},
-    {file = "gptcache-0.1.17.tar.gz", hash = "sha256:4acb7059da8647679d4cfc4e7a909a03001f8c556ada2f8d3a34fd3c9d171509"},
+    {file = "gptcache-0.1.18-py3-none-any.whl", hash = "sha256:0f6a4820812df68c85fb34a74d8501ad7ee039a595c1eb2bc573e352dfea81c3"},
+    {file = "gptcache-0.1.18.tar.gz", hash = "sha256:86a80865d72822f202e824f6ee8b1fa716bd3f592e9d14faa8cdf30d7cf642aa"},
 ]
 
 [package.dependencies]
@@ -2090,13 +2090,13 @@ files = [
 
 [[package]]
 name = "llama-index"
-version = "0.5.21"
+version = "0.5.23"
 description = "Interface between LLMs and your data."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "llama_index-0.5.21.tar.gz", hash = "sha256:33347f47dc079b84ac306cca14ed6ee9c02bc7d5d37bbd18d26a2288502e814b"},
+    {file = "llama_index-0.5.23.tar.gz", hash = "sha256:8926b497cc8dc35d8fc6f7e9a10b6c9a502ca26fc38b52ba62a2f8eb7f7f171d"},
 ]
 
 [package.dependencies]
@@ -6035,4 +6035,4 @@ slack = ["slack-bolt", "slack-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "ddc1f8e25bf9279d91128f704ce4f59394639b8b53a6af540eefd4dc9dd3409a"
+content-hash = "c3299853a50d253e691d67e652bde1d21a63c2e6bdc16757042739832d897dd0"

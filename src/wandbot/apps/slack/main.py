@@ -1,60 +1,44 @@
 import os
 from functools import partial
 
-import requests
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from wandbot.api.client import APIClient
+from wandbot.api.schemas import APIFeedbackRequest, APIQueryRequest, APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig
 
 config = SlackAppConfig()
 app = App(token=config.SLACK_APP_TOKEN)
+api_client = APIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(user: str, response):
+def format_response(response: APIQueryResponse | None):
     if response is not None:
         if config.include_sources:
             result = (
-                response["answer"]
+                response.answer
                 + "\n\n**References**\n\n"
-                + "- ".join(response["sources"].splitlines())
+                + "- ".join(response.sources.splitlines())
             )
         else:
-            result = response["answer"]
-
-        output = f"Hi <@{user}>:\n\n{result}"
+            result = response.answer
     else:
-        output = f"Hi <@{user}>:\n\n {config.ERROR_MESSAGE}"
-    return output
+        result = config.ERROR_MESSAGE
+    return result
 
 
-def run_api_query(query: str, thread_id: str, event_id: str):
-    try:
-        query = {
-            "question": query,
-            "question_answer_id": event_id,
-            "thread_id": thread_id,
-            "application": "slack",
-        }
-        query_url = f"{config.WANDBOT_API_URL}/query"
-
-        response = requests.post(query_url, json=query)
-        if response.status_code == 200:
-            response = response.json()
-            return response
-    except:
-        return None
+def run_api_query(query: str, thread_id: str, event_id: str) -> APIQueryResponse:
+    request = APIQueryRequest(question=query, thread_id=thread_id, event_id=event_id)
+    response = api_client.query(request)
+    return response
 
 
-def send_api_feedback(feedback: str, thread_id: str, question_answer_id: str):
-    feedback_url: config.WANDBOT_API_URL + "/feedback"
-    feedback_obj = {
-        "feedback": feedback,
-        "question_answer_id": question_answer_id,
-        "thread_id": thread_id,
-    }
-    response = requests.post(feedback_url, json=feedback_obj)
-    if response.status_code == 200:
-        return response.json()
+def send_api_feedback(feedback: str, thread_id: str, question_answer_id: str) -> bool:
+    request = APIFeedbackRequest(
+        feedback=feedback, thread_id=thread_id, question_answer_id=question_answer_id
+    )
+    response = api_client.feedback(request)
+    return response
 
 
 def send_message(say, message, thread=None):
@@ -83,7 +67,7 @@ def command_handler(body, say, logger):
 
         # process the query through the api
         api_response = run_api_query(query, thread_id, event_id)
-        response = format_response(user, api_response)
+        response = format_response(api_response)
 
         # send the response
         send_message(say=say, message=response, thread=thread_id)

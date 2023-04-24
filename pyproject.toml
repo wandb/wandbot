@@ -30,7 +30,7 @@ uvicorn = { version = "^0.21.1", optional = true }
 python-dotenv = "^1.0.0"
 chromadb = "^0.3.21"
 jsonargparse = { extras = ["signatures"], version = "^4.20.1" }
-llama-index = "^0.5.21"
+llama-index = "^0.5.23"
 jupyter = "^1.0.0"
 giturlparse = "^0.10.0"
 
