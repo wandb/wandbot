@@ -1,4 +1,4 @@
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
@@ -69,7 +69,7 @@ class TFIDFRetrieverWithScore(TFIDFRetriever):
 
 
 class HybridRetriever(BaseRetriever, BaseModel):
-    dense: VectorStoreRetriever
+    dense: VectorStoreRetrieverWithScore
     sparse: TFIDFRetriever
 
     class Config:

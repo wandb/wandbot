@@ -8,6 +8,9 @@ import joblib
 import scipy.sparse
 import tiktoken
 import wandb
+from langchain import LLMChain
+from langchain.chains import HypotheticalDocumentEmbedder
+from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import (
     NotebookLoader,
     TextLoader,
@@ -248,18 +251,23 @@ class VectorIndex:
         self.config = config
 
         self.hyde_prompt = load_hyde_prompt(self.config.hyde_prompt)
-        # self.embedding_fn = HypotheticalDocumentEmbedder(
-        #     llm_chain=LLMChain(
-        #         llm=ChatOpenAI(temperature=self.config.hyde_temperature),
-        #         prompt=self.hyde_prompt,
-        #     ),
-        #     base_embeddings=OpenAIEmbeddings(),
-        # )
-        self.embedding_fn = OpenAIEmbeddings()
-
-        self.datastore: LlamaDocumentStore = None
-        self.retriever: HybridRetriever = None
+        self.embedding_fn = self.load_embedding_fn(self.config.hyde_prompt)
+        self.datastore: LlamaDocumentStore | None = None
+        self.retriever: HybridRetriever | None = None
         self.wandb_run = None
+
+    def load_embedding_fn(self, hyde_prompt: str | pathlib.Path | None = None):
+        if hyde_prompt is None:
+            return OpenAIEmbeddings()
+        else:
+            self.hyde_prompt = load_hyde_prompt(hyde_prompt)
+            return HypotheticalDocumentEmbedder(
+                llm_chain=LLMChain(
+                    llm=ChatOpenAI(temperature=self.config.hyde_temperature),
+                    prompt=self.hyde_prompt,
+                ),
+                base_embeddings=OpenAIEmbeddings(),
+            )
 
     def load_datastore(self, sources: List[DataStore]):
         datastore = {"metadata": {}, "docs": {}}
@@ -286,7 +294,7 @@ class VectorIndex:
     def create_dense_retriever(self, datastore: LlamaDocumentStore):
         if self.config.vectorindex_dir.is_dir():
             logger.debug(
-                f"{self.config.vectorstore_dir} was found, loading existing vector store"
+                f"{self.config.vectorindex_dir} was found, loading existing vector store"
             )
             vectorstore = ChromaWithEmbeddingsAndScores(
                 persist_directory=str(self.config.vectorindex_dir),
@@ -427,8 +435,7 @@ class VectorIndex:
 
         # load the hyde prompt
         self.hyde_prompt = load_hyde_prompt(artifact_dir / "hyde_prompt.txt")
-
-        # TODO: load the embedding_fn from the hyde prompt
+        self.embedding_fn = self.load_embedding_fn(artifact_dir / "hyde_prompt.txt")
 
         # load the datastore
         with open(artifact_dir / "datastore.json", "r") as f:
