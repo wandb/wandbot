@@ -1,12 +1,26 @@
-from types import SimpleNamespace
+import pathlib
 
-TEAM = "wandbot"
-PROJECT = "wandbbot"
-JOB_TYPE = "production"
+from pydantic import BaseModel
+from wandbot.ingestion.settings import VectorIndexConfig
 
-default_config = SimpleNamespace(
-    faiss_artifact="parambharat/wandb_docs_bot/faiss_store:latest",
-    hyde_prompt_artifact="parambharat/wandb_docs_bot/hyde_prompt:latest",
-    chat_prompt_artifact="parambharat/wandb_docs_bot/system_prompt:latest",
-    model_name="gpt-4",
-)
+
+class ChatConfig(BaseModel):
+    model_name: str = "gpt-4"
+    max_retries: int = 1
+    fallback_model_name: str = "gpt-3.5-turbo"
+    max_fallback_retries: int = 6
+    chat_temperature: float = 0.0
+    chain_type: str = "stuff"
+    chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.txt")
+    vector_index_config: VectorIndexConfig = VectorIndexConfig(
+        wandb_project="wandb_docs_bot_dev", hyde_prompt=None
+    )
+    vector_index_artifact: str = (
+        "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
+    )
+    wandb_project: str = "wandb_docs_bot_dev"
+    wandb_entity: str = "wandb"
+    wandb_job_type: str = "production"
+    include_sources: bool = True
+    source_score_threshold: float = 1.0
+    query_tokens_threshold: int = 1024

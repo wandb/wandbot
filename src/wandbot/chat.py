@@ -1,223 +1,194 @@
-import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
-import wandb
-from langchain import LLMChain
-from langchain.chains import HypotheticalDocumentEmbedder, RetrievalQAWithSourcesChain
-from langchain.chat_models import ChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.prompts.chat import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    SystemMessagePromptTemplate,
+import tiktoken
+from langchain import LLMChain, OpenAI
+from langchain.chains.conversational_retrieval.base import (
+    BaseConversationalRetrievalChain,
 )
-from langchain.schema import Document
-from langchain.vectorstores import FAISS
-from langchain.vectorstores.base import VectorStoreRetriever
-
-
-class VectorStoreRetrieverWithScore(VectorStoreRetriever):
-    def get_relevant_documents(self, query: str) -> List[Document]:
-        if self.search_type == "similarity":
-            docs_and_scores = self.vectorstore.similarity_search_with_score(
-                query, **self.search_kwargs
-            )
-            docs = []
-            for doc, score in docs_and_scores:
-                doc.metadata["score"] = score
-                docs.append(doc)
-        elif self.search_type == "mmr":
-            docs = self.vectorstore.max_marginal_relevance_search(
-                query, **self.search_kwargs
-            )
-        else:
-            raise ValueError(f"search_type of {self.search_type} not allowed.")
-        return docs
-
-
-class FAISSWithScore(FAISS):
-    def as_retriever(self) -> VectorStoreRetrieverWithScore:
-        return VectorStoreRetrieverWithScore(
-            vectorstore=self,
-            search_type="similarity",
-            search_kwargs={"k": 10},
-        )
-
-
-class RetrievalQAWithSourcesChainWithScore(RetrievalQAWithSourcesChain):
-    reduce_k_below_max_tokens: bool = True
-    max_tokens_limit: int = 2816
-
-    def _get_docs(self, inputs: Dict[str, Any]) -> List[Document]:
-        question = inputs[self.question_key]
-        docs = self.retriever.get_relevant_documents(question)
-        return self._reduce_tokens_below_limit(docs)
-
-
-def load_artifacts(config):
-    faiss_artifact = wandb.use_artifact(config.faiss_artifact, type="search_index")
-    faiss_artifact_dir = faiss_artifact.download()
-
-    hyde_prompt_artifact = wandb.use_artifact(
-        config.hyde_prompt_artifact, type="prompt"
-    )
-    hyde_artifact_dir = hyde_prompt_artifact.download()
-    hyde_prompt_file = f"{hyde_artifact_dir}/hyde_prompt.txt"
-
-    chat_prompt_artifact = wandb.use_artifact(
-        config.chat_prompt_artifact, type="prompt"
-    )
-    chat_artifact_dir = chat_prompt_artifact.download()
-    chat_prompt_file = f"{chat_artifact_dir}/chat_prompt.txt"
-
-    return {
-        "faiss": faiss_artifact_dir,
-        "hyde_prompt": hyde_prompt_file,
-        "chat_prompt": chat_prompt_file,
-    }
-
-
-def load_hyde_prompt(f_name):
-    prompt_template = open(f_name).read()
-    messages = [
-        SystemMessagePromptTemplate.from_template(prompt_template),
-        HumanMessagePromptTemplate.from_template("{question}"),
-    ]
-    prompt = ChatPromptTemplate.from_messages(messages)
-    return prompt
-
-
-def load_hyde_embeddings(prompt_file, temperature=0.3):
-    prompt = load_hyde_prompt(prompt_file)
-    base_embeddings = OpenAIEmbeddings()
-    embeddings = HypotheticalDocumentEmbedder(
-        llm_chain=LLMChain(llm=ChatOpenAI(temperature=temperature), prompt=prompt),
-        base_embeddings=base_embeddings,
-    )
-    return embeddings
-
-
-def load_faiss_store(store_dir, prompt_file, temperature=0.3):
-    embeddings = load_hyde_embeddings(prompt_file, temperature)
-    faiss_store = FAISSWithScore.load_local(store_dir, embeddings)
-    return faiss_store
-
-
-def load_chat_prompt(f_name):
-    prompt_template = open(f_name).read()
-
-    messages = [
-        SystemMessagePromptTemplate.from_template(prompt_template),
-        HumanMessagePromptTemplate.from_template("{question}"),
-    ]
-    prompt = ChatPromptTemplate.from_messages(messages)
-    return prompt
-
-
-def load_vector_store_and_prompt(config):
-    artifacts = load_artifacts(config)
-    vector_store = load_faiss_store(
-        artifacts["faiss"],
-        artifacts["hyde_prompt"],
-    )
-    chat_prompt = load_chat_prompt(artifacts["chat_prompt"])
-
-    return vector_store, chat_prompt
-
-
-def load_qa_chain(model_name="gpt-4", vector_store=None, chat_prompt=None):
-    chain = RetrievalQAWithSourcesChainWithScore.from_chain_type(
-        ChatOpenAI(
-            model_name=model_name,
-            temperature=0,
-        ),
-        chain_type="stuff",
-        retriever=vector_store.as_retriever(),
-        chain_type_kwargs={"prompt": chat_prompt},
-        return_source_documents=True,
-    )
-    return chain
-
-
-def get_answer(chain, question):
-    query = " ".join(question.strip().split())
-    result = chain(
-        {
-            "question": query,
-        },
-        return_only_outputs=True,
-    )
-    sources = list(
-        {
-            "- " + doc.metadata["source"]
-            for doc in result["source_documents"]
-            if doc.metadata["score"] <= 0.4
-        }
-    )
-
-    if len(sources):
-        response = result["answer"]  # + "\n\n*References*:\n\n" + "\n".join(sources)
-    else:
-        response = result["answer"]
-    return response
+from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
+from langchain.chains.qa_with_sources import load_qa_with_sources_chain
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema import BaseRetriever
+from src.wandbot.ingestion.utils import Timer
+from wandbot.config import ChatConfig
+from wandbot.ingestion.datastore import VectorIndex
+from wandbot.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
+from wandbot.prompts import load_chat_prompt
 
 
 class Chat:
-    def __init__(
-        self,
-        model_name="gpt-4",
-        wandb_run=None,
-    ):
-        self.model_name = model_name
-        self.wandb_run = wandb_run
+    config: ChatConfig
 
-        self.settings = ""
-        for k, v in wandb_run.config.as_dict().items():
-            self.settings + f"{k}:{v}\n"
-
-        self.vector_store, self.chat_prompt = load_vector_store_and_prompt(
-            config=wandb_run.config
+    def __init__(self, config: Optional[ChatConfig] = None):
+        if config is not None:
+            self.config: ChatConfig = config
+        self.vector_index: VectorIndex = VectorIndex(
+            config=self.config.vector_index_config
         )
-        self.qa_chain = load_qa_chain(
-            model_name="gpt-4",
-            vector_store=self.vector_store,
-            chat_prompt=self.chat_prompt,
+        self.chat_prompt: ChatPromptTemplate = load_chat_prompt(self.config.chat_prompt)
+        self._retriever: BaseRetriever = self._load_retriever()
+        self._chain: BaseConversationalRetrievalChain = self._load_chain(
+            self.config.model_name, self.config.max_retries
+        )
+        self._fallback_chain: BaseConversationalRetrievalChain = self._load_chain(
+            self.config.fallback_model_name, self.config.max_fallback_retries
+        )
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
+
+    def _load_retriever(self) -> BaseRetriever:
+        self.vector_index = self.vector_index.load_from_artifact(
+            self.config.vector_index_artifact
+        )
+        return self.vector_index.retriever
+
+    @property
+    def retriever(self):
+        if self._retriever is None:
+            self._retriever = self._load_retriever()
+        return self._retriever
+
+    def _load_chain(
+        self, model_name: str = None, max_retries: int = 1
+    ) -> BaseConversationalRetrievalChain:
+        map_llm = OpenAI(batch_size=10)
+        reduce_llm = ChatOpenAI(
+            model_name=model_name,
+            temperature=self.config.chat_temperature,
+            max_retries=max_retries,
+        )
+        question_generator = LLMChain(llm=map_llm, prompt=CONDENSE_QUESTION_PROMPT)
+        doc_chain = load_qa_with_sources_chain(
+            map_llm,
+            chain_type="map_reduce",
+            combine_prompt=self.chat_prompt,
+            verbose=True,
+            reduce_llm=reduce_llm,
         )
 
-    def __call__(self, query):
-        start_time = time.time()
-        # Try call GPT-4, if not fall back to 3.5 turbo
-        try:
-            response = get_answer(self.qa_chain, query)
-        except:
-            print("Falling back to gpt-3.5-turbo")
-            self.qa_chain = load_qa_chain(
-                model_name="gpt-3.5-turbo",
-                vector_store=self.vector_store,
-                chat_prompt=self.chat_prompt,
+        chain = ConversationalRetrievalQAWithSourcesandScoresChain(
+            retriever=self.retriever,
+            question_generator=question_generator,
+            combine_docs_chain=doc_chain,
+            return_source_documents=True,
+        )
+
+        return chain
+
+    @property
+    def chain(self):
+        if self._chain is None:
+            self._chain = self._load_chain(
+                model_name=self.config.model_name,
+                max_retries=self.config.max_retries,
             )
-            response = get_answer(self.qa_chain, query)
-            fallback_warning = "**Warning: Falling back to gpt-3.5.** These results are sometimes not as good as gpt-4"
-            response = fallback_warning + "\n\n" + response
+        return self._chain
 
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        timings = (start_time, end_time, elapsed_time)
-        # To consider, add verbose mode
-        # if "--v" or "--verbose" in query:
-        #     return query, response + "\n\n" + self.settings, timings
-        return query, response + "\n\n", timings
+    @property
+    def fallback_chain(self):
+        if self._fallback_chain is None:
+            self._fallback_chain = self._load_chain(
+                model_name=self.config.fallback_model_name,
+                max_retries=self.config.max_fallback_retries,
+            )
+        return self._fallback_chain
+
+    def validate_and_format_question(self, question: str) -> str:
+        question = " ".join(question.strip().split())
+
+        if len(self.tokenizer.encode(question)) > 1024:
+            raise ValueError(
+                f"Question is too long. Please rephrase your question to be shorter than {1024 * 3 // 4} words."
+            )
+        return question
+
+    def format_response(self, result, used_fallback: bool):
+        response = {}
+        source_documents = "\n".join(
+            {
+                doc.metadata["source"]
+                for doc in result["source_documents"]
+                # if doc.metadata["score"] <= self.config.source_score_threshold
+            }
+        ).strip()
+
+        if used_fallback:
+            response["answer"] = (
+                f"**Warning: Falling back to {self.config.fallback_model_name}.** "
+                f"These results are sometimes not as good as {self.config.model_name} \n\n"
+                + result["answer"]
+            )
+        else:
+            response["answer"] = result["answer"]
+
+        if len(source_documents) and self.config.include_sources:
+            response["source_documents"] = source_documents
+        else:
+            response["source_documents"] = ""
+        response["sources"] = result["sources"]
+
+        return response
+
+    def get_answer(
+        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
+    ):
+        used_fallback = False
+        if chat_history is None:
+            chat_history = []
+        try:
+            result = self.chain(
+                {
+                    "question": query,
+                    "chat_history": chat_history,
+                },
+                return_only_outputs=True,
+            )
+        except Exception as e:
+            result = self.fallback_chain(
+                {
+                    "question": query,
+                    "chat_history": chat_history,
+                },
+                return_only_outputs=True,
+            )
+            used_fallback = True
+        result = self.format_response(result, used_fallback)
+        return result
+
+    def __call__(
+        self, question: str, chat_history: Optional[List[Tuple[str, str]]] = None
+    ) -> Dict[str, Any]:
+        with Timer() as timer:
+            try:
+                query = self.validate_and_format_question(question)
+            except ValueError as e:
+                result = {
+                    "answer": str(e),
+                    "sources": "",
+                }
+            else:
+                result = self.get_answer(query, chat_history=chat_history)
+        result.update(
+            {
+                "question": question,
+                "time_taken": timer.elapsed,
+                "start_time": timer.start,
+                "end_time": timer.stop,
+            }
+        )
+        return result
 
 
 def main():
-    from wandbot.config import default_config
-
-    run.config.update(default_config.__dict__)
-    chat = Chat(model_name="gpt-4", wandb_run=run)
-    user_query = input("Enter your question:")
-    response = chat(user_query)
-    print(response)
-
-
-if __name__ == "__main__":
-    main()
+    config = ChatConfig()
+    chat = Chat(config=config)
+    chat_history = []
+    while True:
+        question = input("You: ")
+        if question.lower() == "quit":
+            break
+        else:
+            response = chat(question, chat_history=chat_history)
+            chat_history.append((question, response["response"]))
+            print(f"WandBot: {response['response']}")
+            print(f"Time taken: {response['time_taken']} seconds")
