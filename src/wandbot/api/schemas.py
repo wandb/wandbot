@@ -1,7 +1,16 @@
 import datetime
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, BaseSettings, Field
+
+
+class DataBaseConfig(BaseSettings):
+    SQLALCHEMY_DATABASE_URL: str = Field(
+        "sqlite:///./app.db", env="SQLALCHEMY_DATABASE_URL"
+    )
+
+    class Config:
+        env_file = ".env"
 
 
 class Feedback(str, Enum):
