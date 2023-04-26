@@ -65,6 +65,7 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
         question=request.question,
         answer=result["answer"],
         sources=result["sources"],
+        source_documents=result["source_documents"],
         start_time=result["start_time"],
         end_time=result["end_time"],
         time_taken=result["time_taken"],
@@ -73,6 +74,7 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
     return APIQueryResponse(
         answer=db_response.answer,
         sources=db_response.sources,
+        source_documents=result["source_documents"],
         thread_id=db_response.thread_id,
         question_answer_id=db_response.question_answer_id,
     )

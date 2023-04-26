@@ -3,9 +3,9 @@ import pathlib
 from typing import Union
 
 from langchain.prompts import (
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
     ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,14 +49,17 @@ def load_chat_prompt(f_name: Union[pathlib.Path, str] = None) -> ChatPromptTempl
             f"No chat prompt provided. Using default chat prompt from {__name__}"
         )
         chat_template = (
-            "Your task is to serve as an AI assistant for the open source library wandb. You should answer questions "
-            "based on the given extracted parts of a long document and the question. You should provide a "
-            "conversational answer with a hyperlink to the documentation only if it is explicitly listed as a source "
-            "in the context. When possible, provide code blocks and HTTP links directly from the documentation, but "
-            "ensure that they are not fabricated. If you cannot answer the question or generate valid code or links, "
-            "simply respond with 'Hmm, I'm not sure.' If the question is not related to wandb or Weights & Biases, "
-            "politely inform the user that you can only answer questions related to wandb. The documentation for wandb "
-            "is available at https://docs.wandb.ai."
+            "You are wandbot, an expert documentation and developer assistant for the developer-first MLOps platform "
+            "Weights & Biases and its python sdk wandb. Always provide helpful conversational answers to questions "
+            "based only on the context information provided and not prior knowledge. When possible, "
+            "provide code blocks and HTTP links directly from the documentation, "
+            "but ensure that they are not fabricated and are only derived from the context provided."
+            "The documentation for wandb is available at https://docs.wandb.ai. "
+            "If you are unable to answer a question or generate valid code or links, respond with "
+            "Hmm, I'm not sure and direct the user to post the question on the community forums "
+            "at https://community.wandb.ai/ or reach out to wandb support via support@wandb.ai."
+            "If the question is not related to wandb or Weights & Biases, "
+            "politely inform the user that you can only answer questions related to wandb."
             """
 Begin:
 == == == == == == == ==
@@ -64,6 +67,7 @@ Context: {context}
 == == == == == == == ==
 Question: {question}
 == == == == == == == ==
+Given the context information and not prior knowledge, answer the question.
 Final Answer in Markdown:"""
         )
     messages = [

@@ -1,14 +1,17 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import tiktoken
+from langchain import LLMChain, OpenAI
 from langchain.chains.conversational_retrieval.base import (
     BaseConversationalRetrievalChain,
 )
+from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
+from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
 from src.wandbot.customization.langchain import (
-    ConversationalRetrievalQAWithSourcesChainWithScore,
+    ConversationalRetrievalQAWithSourcesandScoresChain,
 )
 from src.wandbot.ingestion.utils import Timer
 from wandbot.apps.config import ChatConfig
@@ -50,17 +53,28 @@ class Chat:
     def _load_chain(
         self, model_name: str = None, max_retries: int = 1
     ) -> BaseConversationalRetrievalChain:
-        chain = ConversationalRetrievalQAWithSourcesChainWithScore.from_llm(
-            ChatOpenAI(
-                model_name=model_name,
-                temperature=self.config.chat_temperature,
-                max_retries=max_retries,
-            ),
-            chain_type="stuff",
+        map_llm = OpenAI(batch_size=10)
+        reduce_llm = ChatOpenAI(
+            model_name=model_name,
+            temperature=self.config.chat_temperature,
+            max_retries=max_retries,
+        )
+        question_generator = LLMChain(llm=map_llm, prompt=CONDENSE_QUESTION_PROMPT)
+        doc_chain = load_qa_with_sources_chain(
+            map_llm,
+            chain_type="map_reduce",
+            combine_prompt=self.chat_prompt,
+            verbose=True,
+            reduce_llm=reduce_llm,
+        )
+
+        chain = ConversationalRetrievalQAWithSourcesandScoresChain(
             retriever=self.retriever,
-            qa_prompt=self.chat_prompt,
+            question_generator=question_generator,
+            combine_docs_chain=doc_chain,
             return_source_documents=True,
         )
+
         return chain
 
     @property
@@ -92,7 +106,7 @@ class Chat:
 
     def format_response(self, result, used_fallback: bool):
         response = {}
-        sources = "\n".join(
+        source_documents = "\n".join(
             {
                 doc.metadata["source"]
                 for doc in result["source_documents"]
@@ -100,18 +114,20 @@ class Chat:
             }
         ).strip()
 
-        if len(sources) and self.config.include_sources:
-            response["answer"] = result["answer"]
-            response["sources"] = sources
-        else:
-            response["answer"] = result["answer"]
-            response["sources"] = ""
         if used_fallback:
             response["answer"] = (
                 f"**Warning: Falling back to {self.config.fallback_model_name}.** "
                 f"These results are sometimes not as good as {self.config.model_name} \n\n"
-                + response
+                + result["answer"]
             )
+        else:
+            response["answer"] = result["answer"]
+
+        if len(source_documents) and self.config.include_sources:
+            response["source_documents"] = source_documents
+        else:
+            response["source_documents"] = ""
+        response["sources"] = result["sources"]
 
         return response
 

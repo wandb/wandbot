@@ -4,6 +4,9 @@ from typing import Any, Dict, Optional, Union
 
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, root_validator
 
+logging.basicConfig(
+    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG
+)
 logger = logging.getLogger(__name__)
 
 
@@ -115,15 +118,15 @@ class ExtraDataStoreConfig(DataStoreConfig):
 class VectorIndexConfig(BaseModel):
     name: str = "wandbot_vectorindex"
     cache_dir: pathlib.Path = Field(
-        pathlib.Path.home() / ".cache" / "wandbot", env="WANDBOT_CACHE_DIR"
+        pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR"
     )
     hyde_temperature: float = 0.3
-    hyde_prompt: pathlib.Path = pathlib.Path("data/prompts/hyde_prompt.txt")
+    hyde_prompt: pathlib.Path | None = pathlib.Path("data/prompts/hyde_prompt.txt")
 
     vectorindex_dir: pathlib.Path = Field("vectorindex", env="WANDBOT_VECTORINDEX_DIR")
     sparse_vectorizer_kwargs: Dict[str, Any] = {
         "max_df": 0.9,
-        "min_df": 0.1,
+        # "min_df": 0.1,
         "ngram_range": (1, 3),
     }
     wandb_project: str = "wandb_docs_bot"

@@ -1,9 +1,16 @@
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional
 
+from langchain import BasePromptTemplate, LLMChain
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
+from langchain.chains.conversational_retrieval.base import (
+    BaseConversationalRetrievalChain,
+)
+from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
+from langchain.chains.question_answering import load_qa_chain
 from langchain.retrievers import TFIDFRetriever
-from langchain.schema import BaseRetriever, Document
+from langchain.schema import BaseLanguageModel, BaseRetriever, Document
 from langchain.vectorstores import Chroma
 from langchain.vectorstores.base import VectorStoreRetriever
 from pydantic import BaseModel
@@ -43,7 +50,7 @@ class ChromaWithEmbeddingsAndScores(Chroma):
         return VectorStoreRetrieverWithScore(
             vectorstore=self,
             search_type="similarity",
-            search_kwargs={"k": 4},
+            search_kwargs={"k": 3},
         )
 
 
@@ -68,6 +75,17 @@ class TFIDFRetrieverWithScore(TFIDFRetriever):
         raise NotImplementedError("This method is not implemented for this retriever.")
 
 
+def deduplicate_docs_with_order(docs: List[Document]) -> List[Document]:
+    deduplicated = []
+    seen_ids = {}
+    for doc in docs:
+        doc_id = doc.metadata.get("doc_id")
+        if doc_id not in seen_ids:
+            deduplicated.append(doc)
+            seen_ids[doc_id] = True
+    return deduplicated
+
+
 class HybridRetriever(BaseRetriever, BaseModel):
     dense: VectorStoreRetrieverWithScore
     sparse: TFIDFRetriever
@@ -80,13 +98,14 @@ class HybridRetriever(BaseRetriever, BaseModel):
     def get_relevant_documents(self, query: str) -> List[Document]:
         chroma_results = self.dense.get_relevant_documents(query)
         tfidf_results = self.sparse.get_relevant_documents(query)
-        return chroma_results + tfidf_results
+        results = deduplicate_docs_with_order(chroma_results + tfidf_results)
+        return results
 
     async def aget_relevant_documents(self, query: str) -> List[Document]:
         raise NotImplementedError("This method is not implemented for this retriever.")
 
 
-class ConversationalRetrievalQAWithSourcesChainWithScore(ConversationalRetrievalChain):
+class ConversationalRetrievalQAWithSourcesandScoresChain(ConversationalRetrievalChain):
     reduce_k_below_max_tokens: bool = True
     max_tokens_limit: int = 2816
 
@@ -110,3 +129,61 @@ class ConversationalRetrievalQAWithSourcesChainWithScore(ConversationalRetrieval
     def _get_docs(self, question: str, inputs: Dict[str, Any]) -> List[Document]:
         docs = self.retriever.get_relevant_documents(question)
         return self._reduce_tokens_below_limit(docs)
+
+    @classmethod
+    def from_llm(
+        cls,
+        llm: BaseLanguageModel,
+        retriever: BaseRetriever,
+        condense_question_prompt: BasePromptTemplate = CONDENSE_QUESTION_PROMPT,
+        qa_prompt: Optional[BasePromptTemplate] = None,
+        chain_type: str = "stuff",
+        **kwargs: Any,
+    ) -> BaseConversationalRetrievalChain:
+        """Load chain from LLM."""
+        if chain_type == "map_reduce":
+            doc_chain = load_qa_chain(
+                llm,
+                chain_type=chain_type,
+                question_prompt=qa_prompt,
+            )
+        else:
+            doc_chain = load_qa_chain(
+                llm,
+                chain_type=chain_type,
+                prompt=qa_prompt,
+            )
+        condense_question_chain = LLMChain(llm=llm, prompt=condense_question_prompt)
+        return cls(
+            retriever=retriever,
+            combine_docs_chain=doc_chain,
+            question_generator=condense_question_chain,
+            **kwargs,
+        )
+
+    @property
+    def output_keys(self) -> List[str]:
+        """Return the output keys.
+
+        :meta private:
+        """
+        _output_keys = [self.output_key]
+        if self.return_source_documents:
+            _output_keys = _output_keys + ["source_documents"] + ["sources"]
+        return _output_keys
+
+    def _call(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        results = super()._call(inputs)
+        answer = results["answer"]
+        if re.search(r"Sources:\s", answer, flags=re.IGNORECASE):
+            answers_and_sources = re.split(r"Sources:\s", answer, flags=re.IGNORECASE)
+            if len(answers_and_sources) > 1:
+                answer = answers_and_sources[0]
+                sources = answers_and_sources[1]
+            else:
+                sources = ""
+        else:
+            sources = ""
+        results["answer"] = answer
+        results["sources"] = sources
+        return results

@@ -16,6 +16,7 @@ class QuestionAnswerBase(BaseModel):
     question: str
     answer: str | None
     sources: str | None
+    source_documents: str | None = None
     feedback: Feedback | None
     start_time: datetime.datetime | None
     end_time: datetime.datetime | None
@@ -62,6 +63,7 @@ class APIQueryResponse(BaseModel):
     thread_id: str
     question_answer_id: str
     sources: str | None = None
+    source_documents: str | None = None
 
 
 class FeedbackBase(BaseModel):

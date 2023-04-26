@@ -20,6 +20,7 @@ class QuestionAnswers(Base):
     question = Column(String)
     answer = Column(String)
     sources = Column(String)
+    source_documents = Column(String)
     feedback = Column(String)
     start_time = Column(DateTime)
     end_time = Column(DateTime)

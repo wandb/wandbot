@@ -25,6 +25,7 @@ def create_question_answer(db: Session, question_answer: schemas.QuestionAnswerC
         question=question_answer.question,
         answer=question_answer.answer,
         sources=question_answer.sources,
+        source_documents=question_answer.source_documents,
         start_time=question_answer.start_time,
         end_time=question_answer.end_time,
         time_taken=question_answer.time_taken,

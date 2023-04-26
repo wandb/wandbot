@@ -303,23 +303,19 @@ class VectorIndex:
                 collection_metadata=datastore._ref_doc_info["metadata"],
             )
             logger.debug("Validating the vector store")
-            collection_ids = vectorstore._collection.get()["ids"]
+            collection_ids = vectorstore._collection.get(include=[])["ids"]
 
             if not sorted(collection_ids) == sorted(datastore.docs.keys()):
                 logger.warning(
                     "The document ids in the vector store do not match the document ids loaded from files"
                 )
-                collection_docs_to_delete = set(collection_ids) - set(
-                    datastore.docs.keys()
-                )
-                if collection_docs_to_delete:
-                    logger.warning(
-                        f"Deleting {len(collection_docs_to_delete)} documents from the vector store"
-                    )
-                    vectorstore._collection.delete(ids=list(collection_docs_to_delete))
                 collection_docs_to_add = set(datastore.docs.keys()) - set(
                     collection_ids
                 )
+                collection_docs_to_delete = set(collection_ids) - set(
+                    datastore.docs.keys()
+                )
+
                 if collection_docs_to_add:
                     logger.debug(
                         f"Adding {len(collection_docs_to_add)} documents to the vector store"
@@ -331,6 +327,12 @@ class VectorIndex:
                         ],
                         ids=list(collection_docs_to_add),
                     )
+                if collection_docs_to_delete:
+                    logger.warning(
+                        f"Deleting {len(collection_docs_to_delete)} documents from the vector store"
+                    )
+                    vectorstore._collection.delete(ids=list(collection_docs_to_delete))
+
         else:
             logger.debug(
                 f"{self.config.vectorindex_dir} was not found, creating a fresh vector store"
@@ -359,7 +361,7 @@ class VectorIndex:
             vectorizer=sparse_vectorizer,
             docs=docs_list,
             tfidf_array=sparse_vectors,
-            k=4,
+            k=3,
         )
 
         dense_retriever = self.create_dense_retriever(datastore)
@@ -460,7 +462,7 @@ class VectorIndex:
             vectorizer=sparse_vectorizer,
             docs=docs_list,
             tfidf_array=tfidf_array,
-            k=4,
+            k=3,
         )
 
         # load the dense retriever

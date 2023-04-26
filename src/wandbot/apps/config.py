@@ -13,7 +13,7 @@ class ChatConfig(BaseModel):
     chain_type: str = "stuff"
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.txt")
     vector_index_config: VectorIndexConfig = VectorIndexConfig(
-        wandb_project="wandb_docs_bot_dev"
+        wandb_project="wandb_docs_bot_dev", hyde_prompt=None
     )
     vector_index_artifact: str = (
         "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
