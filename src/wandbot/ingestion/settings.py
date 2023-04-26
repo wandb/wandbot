@@ -109,7 +109,7 @@ class SDKCodeStoreConfig(DataStoreConfig):
 class ExtraDataStoreConfig(DataStoreConfig):
     name: str = "extra_data_store"
     data_source: DataSource = DataSource(
-        local_path=pathlib.Path("data/raw_dataset/extra_data").resolve(),
+        local_path=pathlib.Path("data/raw_dataset/extra_data"),
         file_pattern="*.jsonl",
         is_git_repo=False,
     )

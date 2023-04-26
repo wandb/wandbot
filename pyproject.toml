@@ -14,10 +14,9 @@ python = ">=3.10.0,<3.11"
 numpy = "^1.24.2"
 wandb = "^0.15.0"
 langchain = "^0.0.142"
-faiss-cpu = "^1.7.3"
 openai = "^0.27.2"
 tiktoken = "^0.3.3"
-pandas = "^2.0.0"
+pandas = "^2.0.1"
 unstructured = "^0.6.1"
 replit = { version = "^3.2.4", optional = true }
 Flask = { version = "^2.2.0", optional = true }
@@ -31,7 +30,6 @@ python-dotenv = "^1.0.0"
 chromadb = "^0.3.21"
 jsonargparse = { extras = ["signatures"], version = "^4.20.1" }
 llama-index = "^0.5.23"
-jupyter = "^1.0.0"
 giturlparse = "^0.10.0"
 
 [tool.poetry.dev-dependencies]

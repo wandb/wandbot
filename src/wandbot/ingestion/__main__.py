@@ -6,6 +6,7 @@ from wandbot.ingestion.datastore import (
     ExtraDataStore,
     VectorIndex,
 )
+from wandbot.ingestion.report import create_ingestion_report
 from wandbot.ingestion.settings import (
     DocumentationStoreConfig,
     ExampleCodeStoreConfig,
@@ -30,6 +31,7 @@ def main():
     vector_index = VectorIndex(vectorindex_config)
     vector_index = vector_index.load(data_sources)
     vector_index.save()
+    create_ingestion_report(vector_index)
 
 
 if __name__ == "__main__":

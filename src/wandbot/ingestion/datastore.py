@@ -17,6 +17,8 @@ from langchain.document_loaders import (
     UnstructuredMarkdownLoader,
 )
 from langchain.embeddings import OpenAIEmbeddings
+from langchain.embeddings.base import Embeddings
+from langchain.prompts import ChatPromptTemplate
 from langchain.schema import Document
 from langchain.text_splitter import (
     MarkdownTextSplitter,
@@ -28,14 +30,14 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
-from wandbot.apps.prompts import load_hyde_prompt
-from wandbot.customization.langchain import (
+from wandbot.ingestion.settings import DataStoreConfig, VectorIndexConfig
+from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
+from wandbot.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
     TFIDFRetrieverWithScore,
 )
-from wandbot.ingestion.settings import DataStoreConfig, VectorIndexConfig
-from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
+from wandbot.prompts import load_hyde_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +107,7 @@ class DataStore:
             )
         if metadata is None:
             metadata = {}
+        metadata["num_docs"] = len(llama_documents)
         return LlamaDocumentStore(
             docs=llama_documents, ref_doc_info={"metadata": metadata}
         )
@@ -250,11 +253,12 @@ class VectorIndex:
     def __init__(self, config: VectorIndexConfig):
         self.config = config
 
-        self.hyde_prompt = load_hyde_prompt(self.config.hyde_prompt)
-        self.embedding_fn = self.load_embedding_fn(self.config.hyde_prompt)
+        self.hyde_prompt: ChatPromptTemplate = load_hyde_prompt(self.config.hyde_prompt)
+        self.embedding_fn: Embeddings = self.load_embedding_fn(self.config.hyde_prompt)
         self.datastore: LlamaDocumentStore | None = None
         self.retriever: HybridRetriever | None = None
-        self.wandb_run = None
+        self.wandb_run: wandb.sdk.wandb_run.Run | None = None
+        self.saved_artifact: wandb.Artifact | None = None
 
     def load_embedding_fn(self, hyde_prompt: str | pathlib.Path | None = None):
         if hyde_prompt is None:
@@ -276,7 +280,14 @@ class VectorIndex:
             datastore["docs"] = dict(**datastore.get("docs", {}), **data_dict.docs)
             datastore["metadata"][
                 data_dict._ref_doc_info["metadata"]["source_name"]
-            ] = data_dict._ref_doc_info["metadata"]
+            ] = dict(
+                **data_dict._ref_doc_info["metadata"],
+                **{
+                    "config": json.loads(
+                        source.config.json(exclude={"data_source": {"git_id_file"}})
+                    )
+                },
+            )
         datastore = LlamaDocumentStore(
             docs=datastore["docs"], ref_doc_info={"metadata": datastore["metadata"]}
         )
@@ -407,13 +418,16 @@ class VectorIndex:
         # dump the config
         with open(self.config.vectorindex_dir / "config.json", "w") as f:
             f.write(self.config.json())
-
+        artifact_metadata = dict(
+            **self.config.dict(),
+            **{"docs_metadata": self.datastore._ref_doc_info["metadata"]},
+        )
         artifact = wandb.Artifact(
-            name=self.config.name, type="vectorindex", metadata=self.config.dict()
+            name=self.config.name, type="vectorindex", metadata=artifact_metadata
         )
 
         artifact.add_dir(str(self.config.vectorindex_dir))
-        self.wandb_run.log_artifact(artifact)
+        self.saved_artifact = self.wandb_run.log_artifact(artifact)
         return self
 
     def load_from_artifact(

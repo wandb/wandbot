@@ -10,13 +10,11 @@ from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
-from src.wandbot.customization.langchain import (
-    ConversationalRetrievalQAWithSourcesandScoresChain,
-)
 from src.wandbot.ingestion.utils import Timer
-from wandbot.apps.config import ChatConfig
-from wandbot.apps.prompts import load_chat_prompt
+from wandbot.config import ChatConfig
 from wandbot.ingestion.datastore import VectorIndex
+from wandbot.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
+from wandbot.prompts import load_chat_prompt
 
 
 class Chat:
