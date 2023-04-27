@@ -97,7 +97,7 @@ class HybridRetriever(BaseRetriever, BaseModel):
         arbitrary_types_allowed = True
 
     def get_relevant_documents(self, query: str) -> List[Document]:
-        self.dense.search_kwargs = {self.k // 2}
+        self.dense.search_kwargs = {"k": self.k // 2}
         self.sparse.k = self.k // 2
 
         chroma_results = self.dense.get_relevant_documents(query)

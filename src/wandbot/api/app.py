@@ -2,13 +2,13 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import Depends, FastAPI, status
+from fastapi import Depends, FastAPI, Request, Response, status
 from sqlalchemy.orm import Session
 from wandbot.api import crud, models, schemas
 from wandbot.api.database import SessionLocal, engine
 from wandbot.api.schemas import APIQueryRequest, APIQueryResponse
 from wandbot.chat import Chat
-from wandbot.config import ChatConfig
+from wandbot.config import ChatConfig, ChatRequest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,12 +19,20 @@ app = FastAPI(name="wandbot", version="0.0.1")
 
 
 # Dependency
-def get_db():
-    db = SessionLocal()
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next):
+    response = Response("Internal server error", status_code=500)
     try:
-        yield db
+        request.state.db = SessionLocal()
+        response = await call_next(request)
     finally:
-        db.close()
+        request.state.db.close()
+    return response
+
+
+# Dependency
+def get_db(request: Request):
+    return request.state.db
 
 
 @app.on_event("startup")
@@ -57,29 +65,25 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
         crud.create_chat_thread(
             db=db, thread_id=thread_id, application=request.application
         )
-    logger.info(f"chat_history: {chat_history}")
-    result = chat(question=request.question, chat_history=chat_history)
+    result = chat(ChatRequest(question=request.question, chat_history=chat_history))
     question_answer = schemas.QuestionAnswerCreate(
         question_answer_id=question_answer_id,
         thread_id=thread_id,
-        question=request.question,
-        answer=result["answer"],
-        sources=result["sources"],
-        source_documents=result["source_documents"],
-        start_time=result["start_time"],
-        end_time=result["end_time"],
-        time_taken=result["time_taken"],
-        total_tokens=result["total_tokens"],
-        prompt_tokens=result["prompt_tokens"],
-        completion_tokens=result["completion_tokens"],
-        successful_requests=result["successful_requests"],
-        total_cost=result["total_cost"],
+        **result.dict(),
     )
     db_response = crud.create_question_answer(db=db, question_answer=question_answer)
+    if result.model != chat.config.model_name:
+        answer = (
+            f"**Warning: Falling back to {chat.config.fallback_model_name}.** These results are "
+            f"sometimes not as good as {chat.config.model_name} \n\n"
+            + db_response.answer
+        )
+    else:
+        answer = db_response.answer
     return APIQueryResponse(
-        answer=db_response.answer,
+        answer=answer,
         sources=db_response.sources,
-        source_documents=result["source_documents"],
+        source_documents=db_response.source_documents,
         thread_id=db_response.thread_id,
         question_answer_id=db_response.question_answer_id,
     )

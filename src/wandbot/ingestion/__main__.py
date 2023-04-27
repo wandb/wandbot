@@ -1,13 +1,6 @@
 import logging
 
-from wandbot.ingestion.datastore import (
-    CodeDataStore,
-    DocumentationDataStore,
-    ExtraDataStore,
-    VectorIndex,
-)
-from wandbot.ingestion.report import create_ingestion_report
-from wandbot.ingestion.settings import (
+from wandbot.ingestion.config import (
     DocumentationStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
@@ -15,6 +8,13 @@ from wandbot.ingestion.settings import (
     SDKCodeStoreConfig,
     VectorIndexConfig,
 )
+from wandbot.ingestion.datastore import (
+    CodeDataStore,
+    DocumentationDataStore,
+    ExtraDataStore,
+    VectorIndex,
+)
+from wandbot.ingestion.report import create_ingestion_report
 
 logger = logging.getLogger(__name__)
 

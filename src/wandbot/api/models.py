@@ -19,6 +19,7 @@ class QuestionAnswers(Base):
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
     question = Column(String)
     answer = Column(String)
+    model = Column(String)
     sources = Column(String)
     source_documents = Column(String)
     feedback = Column(String)

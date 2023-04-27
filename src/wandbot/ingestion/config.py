@@ -120,6 +120,7 @@ class VectorIndexConfig(BaseSettings):
     cache_dir: pathlib.Path = Field(
         pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR"
     )
+    use_hyde = False
     hyde_temperature: float = 0.3
     hyde_prompt: pathlib.Path | None = pathlib.Path("data/prompts/hyde_prompt.txt")
 

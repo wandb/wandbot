@@ -2,6 +2,7 @@ import datetime
 from enum import Enum
 
 from pydantic import BaseModel, BaseSettings, Field
+from wandbot.config import ChatRepsonse
 
 
 class DataBaseConfig(BaseSettings):
@@ -19,22 +20,9 @@ class Feedback(str, Enum):
     neutral = "neutral"
 
 
-class QuestionAnswerBase(BaseModel):
+class QuestionAnswerBase(ChatRepsonse):
     question_answer_id: str
     thread_id: str
-    question: str
-    answer: str | None
-    sources: str | None
-    source_documents: str | None = None
-    feedback: Feedback | None
-    start_time: datetime.datetime | None
-    end_time: datetime.datetime | None
-    time_taken: float | None
-    total_tokens: int | None
-    prompt_tokens: int | None
-    completion_tokens: int | None
-    successful_requests: int | None
-    total_cost: float | None
 
     class Config:
         use_enum_values = True

@@ -1,7 +1,9 @@
 import pathlib
+from datetime import datetime
+from typing import List, Tuple
 
-from pydantic import BaseSettings, Field, root_validator
-from wandbot.ingestion.settings import VectorIndexConfig
+from pydantic import BaseModel, BaseSettings, Field, root_validator
+from wandbot.ingestion.config import VectorIndexConfig
 
 
 class ChatConfig(BaseSettings):
@@ -19,6 +21,7 @@ class ChatConfig(BaseSettings):
     vectorindex_artifact: str = (
         "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
     )
+    verbose: bool = False
     wandb_project: str | None = Field(None, env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
     wandb_job_type: str | None = "chat"
@@ -38,3 +41,24 @@ class ChatConfig(BaseSettings):
         if values["wandb_entity"] is None:
             values["wandb_entity"] = values["vectorindex_config"].wandb_entity
         return values
+
+
+class ChatRequest(BaseModel):
+    question: str
+    chat_history: List[Tuple[str, str]] | None = None
+
+
+class ChatRepsonse(BaseModel):
+    question: str
+    answer: str
+    model: str
+    sources: str
+    source_documents: str
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    successful_requests: int
+    total_cost: float
+    time_taken: float
+    start_time: datetime
+    end_time: datetime

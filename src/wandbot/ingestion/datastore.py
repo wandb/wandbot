@@ -30,7 +30,7 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
-from wandbot.ingestion.settings import DataStoreConfig, VectorIndexConfig
+from wandbot.ingestion.config import DataStoreConfig, VectorIndexConfig
 from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
 from wandbot.langchain import (
     ChromaWithEmbeddingsAndScores,
@@ -261,7 +261,7 @@ class VectorIndex:
         self.saved_artifact: wandb.Artifact | None = None
 
     def load_embedding_fn(self, hyde_prompt: str | pathlib.Path | None = None):
-        if hyde_prompt is None:
+        if hyde_prompt is None or self.config.use_hyde is False:
             return OpenAIEmbeddings()
         else:
             self.hyde_prompt = load_hyde_prompt(hyde_prompt)

@@ -1,6 +1,8 @@
+import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
+import openai
 import tiktoken
 from langchain import LLMChain, OpenAI
 from langchain.callbacks import get_openai_callback
@@ -15,7 +17,7 @@ from langchain.schema import BaseRetriever
 from src.wandbot.ingestion.utils import Timer
 from wandb.integration.langchain import WandbTracer
 from wandb.integration.langchain.wandb_tracer import WandbRunArgs
-from wandbot.config import ChatConfig
+from wandbot.config import ChatConfig, ChatRepsonse, ChatRequest
 from wandbot.ingestion.datastore import VectorIndex
 from wandbot.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
 from wandbot.prompts import load_chat_prompt
@@ -77,7 +79,7 @@ class Chat:
             map_llm,
             chain_type="map_reduce",
             combine_prompt=self.chat_prompt,
-            verbose=True,
+            verbose=self.config.verbose,
             reduce_llm=reduce_llm,
         )
 
@@ -117,27 +119,18 @@ class Chat:
             )
         return question
 
-    def format_response(self, result, used_fallback: bool):
+    def format_response(self, result):
         response = {}
-        source_documents = "\n".join(
-            {
-                doc.metadata["source"]
-                for doc in result["source_documents"]
-                # if doc.metadata["score"] <= self.config.source_score_threshold
-            }
-        ).strip()
-
-        if used_fallback:
-            response["answer"] = (
-                f"**Warning: Falling back to {self.config.fallback_model_name}.** "
-                f"These results are sometimes not as good as {self.config.model_name} \n\n"
-                + result["answer"]
-            )
-        else:
-            response["answer"] = result["answer"]
+        source_documents = [
+            {"source": doc.metadata["source"], "score": doc.metadata["score"]}
+            for doc in result["source_documents"]
+            # if doc.metadata["score"] <= self.config.source_score_threshold
+        ]
+        response["answer"] = result["answer"]
+        response["model"] = result["model"]
 
         if len(source_documents) and self.config.include_sources:
-            response["source_documents"] = source_documents
+            response["source_documents"] = json.dumps(source_documents)
         else:
             response["source_documents"] = ""
         response["sources"] = result["sources"]
@@ -147,7 +140,6 @@ class Chat:
     def get_answer(
         self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
     ):
-        used_fallback = False
         if chat_history is None:
             chat_history = []
         try:
@@ -158,8 +150,9 @@ class Chat:
                 },
                 return_only_outputs=True,
             )
-        except Exception as e:
-            logger.exception(e)
+            result["model"] = self.config.model_name
+        except openai.error.Timeout as e:
+            logger.debug(e)
             result = self.fallback_chain(
                 {
                     "question": query,
@@ -167,16 +160,13 @@ class Chat:
                 },
                 return_only_outputs=True,
             )
-            used_fallback = True
-        result = self.format_response(result, used_fallback)
-        return result
+            result["model"] = self.config.fallback_model_name
+        return self.format_response(result)
 
-    def __call__(
-        self, question: str, chat_history: Optional[List[Tuple[str, str]]] = None
-    ) -> Dict[str, Any]:
+    def __call__(self, chat_request: ChatRequest) -> ChatRepsonse:
         with Timer() as timer:
             try:
-                query = self.validate_and_format_question(question)
+                query = self.validate_and_format_question(chat_request.question)
             except ValueError as e:
                 result = {
                     "answer": str(e),
@@ -184,7 +174,9 @@ class Chat:
                 }
             else:
                 with get_openai_callback() as callback:
-                    result = self.get_answer(query, chat_history=chat_history)
+                    result = self.get_answer(
+                        query, chat_history=chat_request.chat_history
+                    )
                     usage_stats = {
                         "total_tokens": callback.total_tokens,
                         "prompt_tokens": callback.prompt_tokens,
@@ -196,7 +188,7 @@ class Chat:
         result.update(
             dict(
                 **{
-                    "question": question,
+                    "question": chat_request.question,
                     "time_taken": timer.elapsed,
                     "start_time": timer.start,
                     "end_time": timer.stop,
@@ -204,7 +196,7 @@ class Chat:
                 **usage_stats,
             )
         )
-        return result
+        return ChatRepsonse(**result)
 
 
 def main():
@@ -216,7 +208,7 @@ def main():
         if question.lower() == "quit":
             break
         else:
-            response = chat(question, chat_history=chat_history)
-            chat_history.append((question, response["response"]))
-            print(f"WandBot: {response['response']}")
-            print(f"Time taken: {response['time_taken']}")
+            response = chat(ChatRequest(question=question, chat_history=chat_history))
+            chat_history.append((question, response.answer))
+            print(f"WandBot: {response.answer}")
+            print(f"Time taken: {response.time_taken}")

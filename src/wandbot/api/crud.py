@@ -19,22 +19,7 @@ def get_thread(db: Session, thread_id: str):
 
 
 def create_question_answer(db: Session, question_answer: schemas.QuestionAnswerCreate):
-    db_question_answer = models.QuestionAnswers(
-        question_answer_id=question_answer.question_answer_id,
-        thread_id=question_answer.thread_id,
-        question=question_answer.question,
-        answer=question_answer.answer,
-        sources=question_answer.sources,
-        source_documents=question_answer.source_documents,
-        start_time=question_answer.start_time,
-        end_time=question_answer.end_time,
-        time_taken=question_answer.time_taken,
-        total_tokens=question_answer.total_tokens,
-        prompt_tokens=question_answer.prompt_tokens,
-        completion_tokens=question_answer.completion_tokens,
-        successful_requests=question_answer.successful_requests,
-        total_cost=question_answer.total_cost,
-    )
+    db_question_answer = models.QuestionAnswers(**question_answer.dict())
     db.add(db_question_answer)
     db.commit()
     db.refresh(db_question_answer)
