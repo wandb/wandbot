@@ -89,6 +89,7 @@ def deduplicate_docs_with_order(docs: List[Document]) -> List[Document]:
 class HybridRetriever(BaseRetriever, BaseModel):
     dense: VectorStoreRetrieverWithScore
     sparse: TFIDFRetriever
+    k: int = 4
 
     class Config:
         """Configuration for this pydantic object."""
@@ -96,6 +97,9 @@ class HybridRetriever(BaseRetriever, BaseModel):
         arbitrary_types_allowed = True
 
     def get_relevant_documents(self, query: str) -> List[Document]:
+        self.dense.search_kwargs = {self.k // 2}
+        self.sparse.k = self.k // 2
+
         chroma_results = self.dense.get_relevant_documents(query)
         tfidf_results = self.sparse.get_relevant_documents(query)
         results = deduplicate_docs_with_order(chroma_results + tfidf_results)

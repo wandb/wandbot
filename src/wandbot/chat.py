@@ -1,7 +1,9 @@
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import tiktoken
 from langchain import LLMChain, OpenAI
+from langchain.callbacks import get_openai_callback
 from langchain.chains.conversational_retrieval.base import (
     BaseConversationalRetrievalChain,
 )
@@ -11,10 +13,15 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
 from src.wandbot.ingestion.utils import Timer
+from wandb.integration.langchain import WandbTracer
+from wandb.integration.langchain.wandb_tracer import WandbRunArgs
 from wandbot.config import ChatConfig
 from wandbot.ingestion.datastore import VectorIndex
 from wandbot.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
 from wandbot.prompts import load_chat_prompt
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Chat:
@@ -24,7 +31,7 @@ class Chat:
         if config is not None:
             self.config: ChatConfig = config
         self.vector_index: VectorIndex = VectorIndex(
-            config=self.config.vector_index_config
+            config=self.config.vectorindex_config
         )
         self.chat_prompt: ChatPromptTemplate = load_chat_prompt(self.config.chat_prompt)
         self._retriever: BaseRetriever = self._load_retriever()
@@ -35,10 +42,18 @@ class Chat:
             self.config.fallback_model_name, self.config.max_fallback_retries
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        WandbTracer().init(
+            run_args=WandbRunArgs(
+                project=self.config.wandb_project,
+                entity=self.config.wandb_entity,
+                config=self.config.dict(),
+                job_type=self.config.wandb_job_type,
+            )
+        )
 
     def _load_retriever(self) -> BaseRetriever:
         self.vector_index = self.vector_index.load_from_artifact(
-            self.config.vector_index_artifact
+            self.config.vectorindex_artifact
         )
         return self.vector_index.retriever
 
@@ -144,6 +159,7 @@ class Chat:
                 return_only_outputs=True,
             )
         except Exception as e:
+            logger.exception(e)
             result = self.fallback_chain(
                 {
                     "question": query,
@@ -167,14 +183,26 @@ class Chat:
                     "sources": "",
                 }
             else:
-                result = self.get_answer(query, chat_history=chat_history)
+                with get_openai_callback() as callback:
+                    result = self.get_answer(query, chat_history=chat_history)
+                    usage_stats = {
+                        "total_tokens": callback.total_tokens,
+                        "prompt_tokens": callback.prompt_tokens,
+                        "completion_tokens": callback.completion_tokens,
+                        "successful_requests": callback.successful_requests,
+                        "total_cost": callback.total_cost,
+                    }
+
         result.update(
-            {
-                "question": question,
-                "time_taken": timer.elapsed,
-                "start_time": timer.start,
-                "end_time": timer.stop,
-            }
+            dict(
+                **{
+                    "question": question,
+                    "time_taken": timer.elapsed,
+                    "start_time": timer.start,
+                    "end_time": timer.stop,
+                },
+                **usage_stats,
+            )
         )
         return result
 
@@ -191,4 +219,4 @@ def main():
             response = chat(question, chat_history=chat_history)
             chat_history.append((question, response["response"]))
             print(f"WandBot: {response['response']}")
-            print(f"Time taken: {response['time_taken']} seconds")
+            print(f"Time taken: {response['time_taken']}")

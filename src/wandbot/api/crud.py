@@ -29,6 +29,11 @@ def create_question_answer(db: Session, question_answer: schemas.QuestionAnswerC
         start_time=question_answer.start_time,
         end_time=question_answer.end_time,
         time_taken=question_answer.time_taken,
+        total_tokens=question_answer.total_tokens,
+        prompt_tokens=question_answer.prompt_tokens,
+        completion_tokens=question_answer.completion_tokens,
+        successful_requests=question_answer.successful_requests,
+        total_cost=question_answer.total_cost,
     )
     db.add(db_question_answer)
     db.commit()

@@ -6,18 +6,12 @@ import wandb.apis.reports as wr
 from wandbot.ingestion.datastore import VectorIndex
 
 
-def log_datasource_plot(metadata: dict, wandb_run: wandb.sdk.wandb_run.Run):
-    data = []
+def log_datasource_counts(metadata: dict, wandb_run: wandb.sdk.wandb_run.Run):
+    data = {}
     for source, info in metadata.items():
-        data.append((source, info["num_docs"]))
-    table = wandb.Table(data=data, columns=["Source", "Document count"])
-    wandb_run.log(
-        {
-            "Source_Counts": wandb.plot.bar(
-                table, "Source", "Document count", title="Total Documents per Source"
-            )
-        }
-    )
+        data[source] = info["num_docs"]
+    wandb_run.log(data)
+    return list(data.keys())
 
 
 def create_ingestion_report(vectorindex: VectorIndex):
@@ -32,12 +26,13 @@ def create_ingestion_report(vectorindex: VectorIndex):
     docstore_metadata = vectorindex.datastore._ref_doc_info
     saved_artifact = vectorindex.saved_artifact.wait()
     wandb_run = vectorindex.wandb_run
-    log_datasource_plot(docstore_metadata["metadata"], wandb_run)
+    metrics = log_datasource_counts(docstore_metadata["metadata"], wandb_run)
 
     pg = wr.PanelGrid(
         runsets=[
-            wr.Runset(wandb_run.entity, wandb_run.project, wandb_run.name),
+            wr.Runset(wandb_run.entity, wandb_run.project, query=wandb_run.name),
         ],
+        panels=[wr.BarPlot(title="Data Sources", metrics=metrics)],
     )
 
     report.blocks = [

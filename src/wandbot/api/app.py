@@ -69,6 +69,11 @@ async def query(request: APIQueryRequest, db: Session = Depends(get_db)):
         start_time=result["start_time"],
         end_time=result["end_time"],
         time_taken=result["time_taken"],
+        total_tokens=result["total_tokens"],
+        prompt_tokens=result["prompt_tokens"],
+        completion_tokens=result["completion_tokens"],
+        successful_requests=result["successful_requests"],
+        total_cost=result["total_cost"],
     )
     db_response = crud.create_question_answer(db=db, question_answer=question_answer)
     return APIQueryResponse(

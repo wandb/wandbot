@@ -115,7 +115,7 @@ class ExtraDataStoreConfig(DataStoreConfig):
     )
 
 
-class VectorIndexConfig(BaseModel):
+class VectorIndexConfig(BaseSettings):
     name: str = "wandbot_vectorindex"
     cache_dir: pathlib.Path = Field(
         pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR"
@@ -129,8 +129,9 @@ class VectorIndexConfig(BaseModel):
         # "min_df": 0.1,
         "ngram_range": (1, 3),
     }
-    wandb_project: str = "wandb_docs_bot"
-    wandb_entity: Optional[str] = None
+    retrieval_size: int = 4
+    wandb_project: str | None = Field(..., env="WANDBOT_WANDB_PROJECT")
+    wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
 
     class Config:
         env_prefix = "WANDBOT_"

@@ -30,6 +30,11 @@ class QuestionAnswerBase(BaseModel):
     start_time: datetime.datetime | None
     end_time: datetime.datetime | None
     time_taken: float | None
+    total_tokens: int | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    successful_requests: int | None
+    total_cost: float | None
 
     class Config:
         use_enum_values = True

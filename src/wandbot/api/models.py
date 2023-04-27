@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -25,4 +25,10 @@ class QuestionAnswers(Base):
     start_time = Column(DateTime)
     end_time = Column(DateTime)
     time_taken = Column(Float)
+    total_tokens = Column(Integer)
+    prompt_tokens = Column(Integer)
+    completion_tokens = Column(Integer)
+    successful_requests = Column(Integer)
+    total_cost = Column(Float)
+
     chat_thread = relationship("ChatThread", back_populates="question_answers")
