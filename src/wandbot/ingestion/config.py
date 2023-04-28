@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Union
 from pydantic import AnyHttpUrl, BaseModel, BaseSettings, Field, root_validator
 
 logging.basicConfig(
-    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.DEBUG
+    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.WARNING
 )
 logger = logging.getLogger(__name__)
 

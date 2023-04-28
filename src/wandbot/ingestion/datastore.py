@@ -308,7 +308,7 @@ class VectorIndex:
                 f"{self.config.vectorindex_dir} was found, loading existing vector store"
             )
             vectorstore = ChromaWithEmbeddingsAndScores(
-                persist_directory=str(self.config.vectorindex_dir),
+                persist_directory=str(self.config.vectorindex_dir / "dense_retriever"),
                 embedding_function=self.embedding_fn,
                 collection_name=self.config.name,
                 collection_metadata=datastore._ref_doc_info["metadata"],
@@ -396,7 +396,7 @@ class VectorIndex:
         sparse_retriever_dir = self.config.vectorindex_dir / "sparse_retriever"
         sparse_retriever_dir.mkdir(parents=True, exist_ok=True)
         with open(sparse_retriever_dir / "sparse_vectorizer.pkl", "wb") as f:
-            joblib.dump(self.retriever.sparse.vectorizer, f)
+            joblib.dump(self.retriever.sparse.vectorizer, f, compress=3)
         scipy.sparse.save_npz(
             str(sparse_retriever_dir / "tfidf_array.npz"),
             self.retriever.sparse.tfidf_array,
