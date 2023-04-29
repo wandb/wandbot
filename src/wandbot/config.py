@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Tuple
 
 from pydantic import BaseModel, BaseSettings, Field, root_validator
+
 from wandbot.ingestion.config import VectorIndexConfig
 
 
@@ -48,8 +49,7 @@ class ChatRequest(BaseModel):
     chat_history: List[Tuple[str, str]] | None = None
 
 
-class ChatRepsonse(BaseModel):
-    question: str
+class ChatRepsonse(ChatRequest):
     answer: str
     model: str
     sources: str

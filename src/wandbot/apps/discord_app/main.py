@@ -4,8 +4,12 @@ import logging
 import discord
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
-from wandbot.api.schemas import APIFeedbackRequest, APIQueryRequest, APIQueryResponse
 from wandbot.apps.discord_app.config import DiscordAppConfig
+from wandbot.database.schemas import (
+    APIFeedbackRequest,
+    APIQueryRequest,
+    APIQueryResponse,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

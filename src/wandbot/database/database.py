@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from wandbot.api.schemas import DataBaseConfig
+from wandbot.database.config import DataBaseConfig
 
 db_config = DataBaseConfig()
 

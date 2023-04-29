@@ -1,44 +1,38 @@
-import os
+import logging
 from functools import partial
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from wandbot.api.client import APIClient
-from wandbot.api.schemas import APIFeedbackRequest, APIQueryRequest, APIQueryResponse
+from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig
+from wandbot.database.schemas import QuestionAnswer
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 config = SlackAppConfig()
 app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(response: APIQueryResponse | None):
+def format_response(response: APIQueryResponse | None, outro_message: str = "") -> str:
     if response is not None:
-        if config.include_sources:
-            result = (
-                response.answer
-                + "\n\n**References**\n\n"
-                + "- ".join(response.sources.splitlines())
+        result = response.answer
+        if response.model != "gpt-4":
+            warning_message = f"""**Warning: Falling back to {response.model}**, These results may nor be as good as **gpt-4**\n\n"""
+            result = warning_message + response.answer
+
+        if config.include_sources and response.sources:
+            result = f"{result}\n\n**References**\n\n" + "- ".join(
+                response.sources.splitlines()
             )
-        else:
-            result = response.answer
+        if outro_message:
+            result = f"{result}\n\n{outro_message}"
+
     else:
         result = config.ERROR_MESSAGE
     return result
-
-
-def run_api_query(query: str, thread_id: str, event_id: str) -> APIQueryResponse:
-    request = APIQueryRequest(question=query, thread_id=thread_id, event_id=event_id)
-    response = api_client.query(request)
-    return response
-
-
-def send_api_feedback(feedback: str, thread_id: str, question_answer_id: str) -> bool:
-    request = APIFeedbackRequest(
-        feedback=feedback, thread_id=thread_id, question_answer_id=question_answer_id
-    )
-    response = api_client.feedback(request)
-    return response
 
 
 def send_message(say, message, thread=None):
@@ -56,54 +50,63 @@ def command_handler(body, say, logger):
         thread_id = body["event"].get("thread_ts", None) or body["event"].get(
             "ts", None
         )
-        event_id = body["event"].get("event_id", None)
-        say = (partial(say, token=config.SLACK_BOT_TOKEN),)
-        # send out the intro message
-        send_message(
-            say=say,
-            message=f"Hi <@{user}>:\n\n{config.INTRO_MESSAGE}",
-            thread=thread_id,
-        )
+        say = partial(say, token=config.SLACK_BOT_TOKEN)
 
+        chat_history = api_client.get_chat_history(thread_id)
+
+        if not chat_history:
+            # send out the intro message
+            send_message(
+                say=say,
+                message=f"Hi <@{user}>:\n\n{config.INTRO_MESSAGE}",
+                thread=thread_id,
+            )
         # process the query through the api
-        api_response = run_api_query(query, thread_id, event_id)
-        response = format_response(api_response)
+        api_response = api_client.query(query, thread_id, chat_history=chat_history)
+        response = format_response(api_response, config.OUTRO_MESSAGE)
 
         # send the response
-        send_message(say=say, message=response, thread=thread_id)
-
-        # send the outro message
-        outro_sent = send_message(
-            say=say, message=config.OUTRO_MESSAGE, thread=thread_id
-        )
+        sent_message = send_message(say=say, message=response, thread=thread_id)
 
         app.client.reactions_add(
             channel=body["event"]["channel"],
-            timestamp=outro_sent["ts"],
+            timestamp=sent_message["ts"],
             name="thumbsup",
             token=config.SLACK_BOT_TOKEN,
         )
         app.client.reactions_add(
             channel=body["event"]["channel"],
-            timestamp=outro_sent["ts"],
+            timestamp=sent_message["ts"],
             name="thumbsdown",
             token=config.SLACK_BOT_TOKEN,
         )
+
+        #  save the question answer to the database
+        api_client.save_chat_history(
+            [
+                QuestionAnswer(
+                    **api_response.dict(), question_answer_id=sent_message["ts"]
+                )
+            ]
+        )
+
     except Exception as e:
         logger.error(f"Error posting message: {e}")
 
 
 @app.event("reaction_added")
 def handle_reaction_added(event, say):
+    print(event)
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
     result = app.client.conversations_history(
         channel=channel_id,
         latest=message_ts,
-        limit=1,
+        limit=-1,
         inclusive=True,
         token=config.SLACK_BOT_TOKEN,
     )
+    print(result)
 
     # TODO: Add feedback handling
 
@@ -132,5 +135,5 @@ def handle_reaction_added(event, say):
 
 
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
+    handler = SocketModeHandler(app, config.SLACK_APP_TOKEN)
     handler.start()

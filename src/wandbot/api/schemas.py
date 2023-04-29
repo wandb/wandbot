@@ -1,84 +1,40 @@
-import datetime
-from enum import Enum
+from typing import List
 
-from pydantic import BaseModel, BaseSettings, Field
+from pydantic import BaseModel
 from wandbot.config import ChatRepsonse
+from wandbot.database.schemas import ChatThread, Feedback, QuestionAnswer
 
 
-class DataBaseConfig(BaseSettings):
-    SQLALCHEMY_DATABASE_URL: str = Field(
-        "sqlite:///./app.db", env="SQLALCHEMY_DATABASE_URL"
-    )
-
-    class Config:
-        env_file = ".env"
-
-
-class Feedback(str, Enum):
-    positive = "positive"
-    negative = "negative"
-    neutral = "neutral"
-
-
-class QuestionAnswerBase(ChatRepsonse):
-    question_answer_id: str
+class APIGetChatThreadRequest(BaseModel):
     thread_id: str
 
-    class Config:
-        use_enum_values = True
 
-
-class QuestionAnswerCreate(QuestionAnswerBase):
+class APIGetChatThreadResponse(ChatThread):
     pass
 
 
-class QuestionAnswer(QuestionAnswerBase):
-    class Config:
-        orm_mode = True
-
-
-class ChatThreadBase(BaseModel):
-    thread_id: str
-    application: str
-
-
-class ChatThreadCreate(ChatThreadBase):
+class APIPostChatThreadRequest(ChatThread):
     pass
 
 
-class ChatThread(ChatThreadBase):
-    question_answers: list[QuestionAnswer] = []
-
-    class Config:
-        orm_mode = True
+class APIPostChatThreadResponse(ChatThread):
+    pass
 
 
 class APIQueryRequest(BaseModel):
+    thread_id: str
     question: str
-    question_answer_id: str | None = None
-    thread_id: str | None = None
-    application: str | None = None
+    chat_history: List[QuestionAnswer] | None = []
 
 
-class APIQueryResponse(BaseModel):
-    answer: str
+class APIQueryResponse(ChatRepsonse):
     thread_id: str
-    question_answer_id: str
-    sources: str | None = None
-    source_documents: str | None = None
+    question: str
 
 
-class FeedbackBase(BaseModel):
-    feedback: Feedback
-    question_answer_id: str
-    thread_id: str
-
-    class Config:
-        use_enum_values = True
-
-
-class APIFeedbackRequest(FeedbackBase):
+class APIFeedbackRequest(Feedback):
     pass
 
-    class Config:
-        use_enum_values = True
+
+class APIFeedbackResponse(QuestionAnswer):
+    pass

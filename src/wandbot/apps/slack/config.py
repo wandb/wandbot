@@ -16,6 +16,7 @@ ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
 
 
 class SlackAppConfig(BaseSettings):
+    APPLICATION: str = Field("Slack")
     SLACK_APP_TOKEN: str = Field(..., env="SLACK_APP_TOKEN")
     SLACK_BOT_TOKEN: str = Field(..., env="SLACK_BOT_TOKEN")
     SLACK_SIGNING_SECRET: str = Field(..., env="SLACK_SIGNING_SECRET")

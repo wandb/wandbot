@@ -9,10 +9,10 @@ class ChatThread(Base):
 
     thread_id = Column(String, primary_key=True, index=True)
     application = Column(String)
-    question_answers = relationship("QuestionAnswers", back_populates="chat_thread")
+    question_answers = relationship("QuestionAnswer", back_populates="chat_thread")
 
 
-class QuestionAnswers(Base):
+class QuestionAnswer(Base):
     __tablename__ = "question_answers"
 
     question_answer_id = Column(String, primary_key=True, index=True)
