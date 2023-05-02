@@ -8,9 +8,6 @@ import joblib
 import scipy.sparse
 import tiktoken
 import wandb
-from langchain import LLMChain
-from langchain.chains import HypotheticalDocumentEmbedder
-from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import (
     NotebookLoader,
     TextLoader,
@@ -18,7 +15,6 @@ from langchain.document_loaders import (
 )
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.embeddings.base import Embeddings
-from langchain.prompts import ChatPromptTemplate
 from langchain.schema import Document
 from langchain.text_splitter import (
     MarkdownTextSplitter,
@@ -30,14 +26,13 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
-from wandbot.ingestion.config import DataStoreConfig, VectorIndexConfig
-from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
-from wandbot.langchain import (
+from wandbot.chat.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
     TFIDFRetrieverWithScore,
 )
-from wandbot.prompts import load_hyde_prompt
+from wandbot.ingestion.config import DataStoreConfig, VectorIndexConfig
+from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
 
 logger = logging.getLogger(__name__)
 
@@ -253,25 +248,11 @@ class VectorIndex:
     def __init__(self, config: VectorIndexConfig):
         self.config = config
 
-        self.hyde_prompt: ChatPromptTemplate = load_hyde_prompt(self.config.hyde_prompt)
-        self.embedding_fn: Embeddings = self.load_embedding_fn(self.config.hyde_prompt)
+        self.embedding_fn: Embeddings = OpenAIEmbeddings()
         self.datastore: LlamaDocumentStore | None = None
         self.retriever: HybridRetriever | None = None
         self.wandb_run: wandb.sdk.wandb_run.Run | None = None
         self.saved_artifact: wandb.Artifact | None = None
-
-    def load_embedding_fn(self, hyde_prompt: str | pathlib.Path | None = None):
-        if hyde_prompt is None or self.config.use_hyde is False:
-            return OpenAIEmbeddings()
-        else:
-            self.hyde_prompt = load_hyde_prompt(hyde_prompt)
-            return HypotheticalDocumentEmbedder(
-                llm_chain=LLMChain(
-                    llm=ChatOpenAI(temperature=self.config.hyde_temperature),
-                    prompt=self.hyde_prompt,
-                ),
-                base_embeddings=OpenAIEmbeddings(),
-            )
 
     def load_datastore(self, sources: List[DataStore]):
         datastore = {"metadata": {}, "docs": {}}
@@ -376,7 +357,9 @@ class VectorIndex:
         )
 
         dense_retriever = self.create_dense_retriever(datastore)
-        return HybridRetriever(dense=dense_retriever, sparse=sparse_retriever)
+        return HybridRetriever(
+            dense=dense_retriever, sparse=sparse_retriever, k=self.config.retrieval_size
+        )
 
     def load(self, data_sources: List[DataStore]) -> "VectorIndex":
         self.datastore = self.load_datastore(data_sources)
@@ -401,10 +384,6 @@ class VectorIndex:
             str(sparse_retriever_dir / "tfidf_array.npz"),
             self.retriever.sparse.tfidf_array,
         )
-
-        # dump the hyde prompt
-        with open(self.config.vectorindex_dir / "hyde_prompt.txt", "w") as f:
-            f.write(self.config.hyde_prompt.open("r").read())
 
         # dump the dense retriever
         self.retriever.dense.vectorstore.persist()
@@ -449,10 +428,6 @@ class VectorIndex:
             config_dict = json.load(f)
         self.config = VectorIndexConfig(**config_dict)
 
-        # load the hyde prompt
-        self.hyde_prompt = load_hyde_prompt(artifact_dir / "hyde_prompt.txt")
-        self.embedding_fn = self.load_embedding_fn(artifact_dir / "hyde_prompt.txt")
-
         # load the datastore
         with open(artifact_dir / "datastore.json", "r") as f:
             datastore_dict = json.load(f)
@@ -476,7 +451,6 @@ class VectorIndex:
             vectorizer=sparse_vectorizer,
             docs=docs_list,
             tfidf_array=tfidf_array,
-            k=3,
         )
 
         # load the dense retriever
@@ -488,6 +462,8 @@ class VectorIndex:
             collection_metadata=metadata,
         )
         self.retriever = HybridRetriever(
-            sparse=sparse_retriever, dense=dense_vectorstore.as_retriever()
+            sparse=sparse_retriever,
+            dense=dense_vectorstore.as_retriever(),
+            k=self.config.retrieval_size,
         )
         return self

@@ -120,17 +120,12 @@ class VectorIndexConfig(BaseSettings):
     cache_dir: pathlib.Path = Field(
         pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR"
     )
-    use_hyde = False
-    hyde_temperature: float = 0.3
-    hyde_prompt: pathlib.Path | None = pathlib.Path("data/prompts/hyde_prompt.txt")
-
     vectorindex_dir: pathlib.Path = Field("vectorindex", env="WANDBOT_VECTORINDEX_DIR")
     sparse_vectorizer_kwargs: Dict[str, Any] = {
         "max_df": 0.9,
-        # "min_df": 0.1,
         "ngram_range": (1, 3),
     }
-    retrieval_size: int = 4
+    retrieval_size: int = 6
     wandb_project: str | None = Field(..., env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
 
