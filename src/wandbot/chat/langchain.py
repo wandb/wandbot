@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langchain import BasePromptTemplate, LLMChain
@@ -9,6 +11,8 @@ from langchain.chains.conversational_retrieval.base import (
 )
 from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
 from langchain.chains.question_answering import load_qa_chain
+from langchain.document_loaders import NotebookLoader
+from langchain.document_loaders.notebook import remove_newlines
 from langchain.retrievers import TFIDFRetriever
 from langchain.schema import BaseLanguageModel, BaseRetriever, Document
 from langchain.vectorstores import Chroma
@@ -185,6 +189,9 @@ class ConversationalRetrievalQAWithSourcesandScoresChain(ConversationalRetrieval
             if len(answers_and_sources) > 1:
                 answer = answers_and_sources[0]
                 sources = answers_and_sources[1]
+            elif len(answers_and_sources) == 1:
+                answer = answers_and_sources[0]
+                sources = ""
             else:
                 sources = ""
         else:
@@ -192,3 +199,81 @@ class ConversationalRetrievalQAWithSourcesandScoresChain(ConversationalRetrieval
         results["answer"] = answer
         results["sources"] = sources
         return results
+
+
+def concatenate_cells(
+    cell: dict, include_outputs: bool, max_output_length: int, traceback: bool
+) -> str:
+    """Combine cells information in a readable format ready to be used."""
+    cell_type = cell["cell_type"]
+    source = cell["source"]
+    output = cell["outputs"]
+
+    if include_outputs and cell_type == "code" and output:
+        if "ename" in output[0].keys():
+            error_name = output[0]["ename"]
+            error_value = output[0]["evalue"]
+            if traceback:
+                traceback = output[0]["traceback"]
+                return (
+                    f"'{cell_type}' cell: '{source}'\n, gives error '{error_name}',"
+                    f" with description '{error_value}'\n"
+                    f"and traceback '{traceback}'\n\n"
+                )
+            else:
+                return (
+                    f"'{cell_type}' cell: '{source}'\n, gives error '{error_name}',"
+                    f"with description '{error_value}'\n\n"
+                )
+        elif output[0]["output_type"] == "stream":
+            output = output[0]["text"]
+            min_output = min(max_output_length, len(output))
+            return (
+                f"'{cell_type}' cell: '{source}'\n with "
+                f"output: '{output[:min_output]}'\n\n"
+            )
+    else:
+        if cell_type == "markdown":
+            source = re.sub(r"!\[.*?\]\((.*?)\)", "", f"{source}").strip()
+            if source and len(source) > 5:
+                return f"'{cell_type}' cell: '{source}'\n\n"
+        else:
+            return f"'{cell_type}' cell: '{source}'\n\n"
+
+    return ""
+
+
+class WandbNotebookLoader(NotebookLoader):
+    """Loader that loads .ipynb notebook files in wandb examples."""
+
+    def load(
+        self,
+    ) -> List[Document]:
+        """Load documents."""
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ValueError(
+                "pandas is needed for Notebook Loader, "
+                "please install with `pip install pandas`"
+            )
+        p = Path(self.file_path)
+
+        with open(p, encoding="utf8") as f:
+            d = json.load(f)
+
+        data = pd.json_normalize(d["cells"])
+        filtered_data = data[["cell_type", "source", "outputs"]]
+        if self.remove_newline:
+            filtered_data = filtered_data.applymap(remove_newlines)
+
+        text = filtered_data.apply(
+            lambda x: concatenate_cells(
+                x, self.include_outputs, self.max_output_length, self.traceback
+            ),
+            axis=1,
+        ).str.cat(sep=" ")
+
+        metadata = {"source": str(p)}
+
+        return [Document(page_content=text, metadata=metadata)]

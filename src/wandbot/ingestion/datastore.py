@@ -8,11 +8,7 @@ import joblib
 import scipy.sparse
 import tiktoken
 import wandb
-from langchain.document_loaders import (
-    NotebookLoader,
-    TextLoader,
-    UnstructuredMarkdownLoader,
-)
+from langchain.document_loaders import TextLoader, UnstructuredMarkdownLoader
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.embeddings.base import Embeddings
 from langchain.schema import Document
@@ -30,6 +26,7 @@ from wandbot.chat.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
     TFIDFRetrieverWithScore,
+    WandbNotebookLoader,
 )
 from wandbot.ingestion.config import DataStoreConfig, VectorIndexConfig
 from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
@@ -203,7 +200,7 @@ class CodeDataStore(DataStore):
             try:
                 if self.config.data_source.file_pattern == "*.ipynb":
                     documents.extend(
-                        NotebookLoader(
+                        WandbNotebookLoader(
                             f_name,
                             include_outputs=False,
                             max_output_length=0,
