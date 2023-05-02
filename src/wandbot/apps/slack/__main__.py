@@ -6,7 +6,6 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig
-from wandbot.database.schemas import QuestionAnswer
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -20,12 +19,15 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
     if response is not None:
         result = response.answer
         if response.model != "gpt-4":
-            warning_message = f"""**Warning: Falling back to {response.model}**, These results may nor be as good as **gpt-4**\n\n"""
+            warning_message = f"*Warning: Falling back to {response.model}*, These results may nor be as good as *gpt-4*\n\n"
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            result = f"{result}\n\n**References**\n\n" + "- ".join(
-                response.sources.splitlines()
+            result = (
+                f"{result}\n\n*References*\n\n"
+                + ">"
+                + "\n".join(response.sources.split(","))
+                + "\n\n"
             )
         if outro_message:
             result = f"{result}\n\n{outro_message}"
@@ -52,7 +54,9 @@ def command_handler(body, say, logger):
         )
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = api_client.get_chat_history(thread_id)
+        chat_history = api_client.get_chat_history(
+            application=config.APPLICATION, thread_id=thread_id
+        )
 
         if not chat_history:
             # send out the intro message
@@ -62,7 +66,7 @@ def command_handler(body, say, logger):
                 thread=thread_id,
             )
         # process the query through the api
-        api_response = api_client.query(query, thread_id, chat_history=chat_history)
+        api_response = api_client.query(question=query, chat_history=chat_history)
         response = format_response(api_response, config.OUTRO_MESSAGE)
 
         # send the response
@@ -82,56 +86,45 @@ def command_handler(body, say, logger):
         )
 
         #  save the question answer to the database
-        api_client.save_chat_history(
-            [
-                QuestionAnswer(
-                    **api_response.dict(), question_answer_id=sent_message["ts"]
-                )
-            ]
+        api_client.create_question_answer(
+            thread_id=thread_id,
+            question_answer_id=sent_message["ts"],
+            **api_response.dict(),
         )
 
     except Exception as e:
         logger.error(f"Error posting message: {e}")
 
 
+def parse_reaction(reaction: str):
+    if reaction == "thumbsup":
+        return 1
+    elif reaction == "thumbsdown":
+        return -1
+    else:
+        return 0
+
+
 @app.event("reaction_added")
 def handle_reaction_added(event, say):
-    print(event)
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
-    result = app.client.conversations_history(
-        channel=channel_id,
-        latest=message_ts,
-        limit=-1,
-        inclusive=True,
-        token=config.SLACK_BOT_TOKEN,
+
+    conversation = app.client.conversations_replies(
+        channel=channel_id, ts=message_ts, inclusive=True, limit=1
     )
-    print(result)
-
-    # TODO: Add feedback handling
-
-    # if result["ok"] and len(result["messages"]) > 0:
-    #     # TODO: More robust way to handle feedback. This will base it on the first message in the thread
-    #     # BUG: Message also returns the user info so stripping that before update
-    #     query = result["messages"][0]["text"]
-    #     if query is not None and isinstance(query, str):
-    #         query = remove_angle_brackets_and_whitespace(query)
-    #     user = event["user"]
-    #     feedback = None
-    #     print(str(event["reaction"]))
-    #     if "+1" in str(event["reaction"]):
-    #         feedback = "positive"
-    #     if "-1" in str(event["reaction"]):
-    #         feedback = "negative"
-    #     if feedback:
-    #         print("added feedback")
-    #         slack_adapter.update_feedback_in_db(user, query, feedback)
-    #     else:
-    #         print(f"Unhandled reaction: {event['reaction']} in channel {channel_id}")
-    # else:
-    #     print(
-    #         f"Unable to retrieve message for reaction {event['reaction']} in channel {channel_id}"
-    #     )
+    messages = conversation.get(
+        "messages",
+    )
+    if messages and len(messages):
+        thread_ts = messages[0].get("thread_ts")
+        if thread_ts and event["item_user"] != messages[0]["user"]:
+            rating = parse_reaction(event["reaction"])
+            api_client.create_feedback(
+                feedback_id=event["event_ts"],
+                question_answer_id=message_ts,
+                rating=rating,
+            )
 
 
 if __name__ == "__main__":
