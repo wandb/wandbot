@@ -1,7 +1,7 @@
 import pathlib
 
 from pydantic import BaseSettings, Field
-from wandbot.config import ChatConfig
+from wandbot.chat.config import ChatConfig
 from wandbot.ingestion.config import VectorIndexConfig
 
 
