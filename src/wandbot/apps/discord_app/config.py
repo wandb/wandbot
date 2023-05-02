@@ -16,6 +16,7 @@ ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
 
 
 class DiscordAppConfig(BaseSettings):
+    APPLICATION: str = "Discord"
     WAIT_TIME: float = 300.0
     PROD_DISCORD_CHANNEL_ID: int = 1090739438310654023
     TEST_DISCORD_CHANNEL_ID: int = 1088892013321142484

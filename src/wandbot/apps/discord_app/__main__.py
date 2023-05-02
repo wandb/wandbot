@@ -1,15 +1,12 @@
 import asyncio
 import logging
+import uuid
 
 import discord
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
+from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.discord_app.config import DiscordAppConfig
-from wandbot.database.schemas import (
-    APIFeedbackRequest,
-    APIQueryRequest,
-    APIQueryResponse,
-)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,36 +19,32 @@ intents.reactions = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 config = DiscordAppConfig()
-api_client = AsyncAPIClient()
+api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(response: APIQueryResponse | None):
+def format_response(response: APIQueryResponse | None, outro_message: str = "") -> str:
     if response is not None:
-        if config.include_sources:
-            result = (
-                response.answer
-                + "\n\n**References**\n\n"
-                + "- ".join(response.sources.splitlines())
+        result = response.answer
+        if response.model != "gpt-4":
+            warning_message = (
+                f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
+                f"*gpt-4*\n\n"
             )
-        else:
-            result = response.answer
+            result = warning_message + response.answer
+
+        if config.include_sources and response.sources:
+            result = (
+                f"{result}\n\n*References*\n\n"
+                + ">"
+                + "\n".join(response.sources.split(","))
+                + "\n\n"
+            )
+        if outro_message:
+            result = f"{result}\n\n{outro_message}"
+
     else:
         result = config.ERROR_MESSAGE
     return result
-
-
-async def run_api_query(query: str, thread_id: str, event_id: str) -> APIQueryResponse:
-    request = APIQueryRequest(question=query, thread_id=thread_id, event_id=event_id)
-    response = await api_client.query(request)
-    return response
-
-
-async def send_api_feedback(feedback: str, thread_id: str, question_answer_id: str):
-    request = APIFeedbackRequest(
-        feedback=feedback, thread_id=thread_id, question_answer_id=question_answer_id
-    )
-    response = await api_client.feedback(request)
-    return response
 
 
 @bot.event
@@ -70,16 +63,28 @@ async def on_message(message: discord.Message):
         thread = await message.channel.create_thread(
             name=f"Thread", type=discord.ChannelType.public_thread
         )  # currently calling it "Thread" because W&B Support makes it sound too official.
-        await thread.send(
-            f"🤖 Hi {mention}: {config.INTRO_MESSAGE}", mention_author=True
-        )
-        response = await run_api_query(
-            str(message.clean_content), str(thread.id), str(message.id)
-        )
-        await thread.send(f"🤖 {format_response(response)}")
 
-        sent_message = await thread.send(config.OUTRO_MESSAGE)
+        chat_history = await api_client.get_chat_history(
+            application=config.APPLICATION, thread_id=str(thread.id)
+        )
+        if not chat_history:
+            await thread.send(
+                f"🤖 Hi {mention}: {config.INTRO_MESSAGE}", mention_author=True
+            )
 
+        response = await api_client.query(
+            question=str(message.clean_content),
+            chat_history=chat_history,
+        )
+        sent_message = await thread.send(
+            f"🤖 {format_response(response, config.OUTRO_MESSAGE)}"
+        )
+
+        await api_client.create_question_answer(
+            thread_id=str(thread.id),
+            question_answer_id=str(sent_message.id),
+            **response.dict(),
+        )
         # # Add reactions for feedback
         await sent_message.add_reaction("👍")
         await sent_message.add_reaction("👎")
@@ -95,19 +100,23 @@ async def on_message(message: discord.Message):
 
         except asyncio.TimeoutError:
             await thread.send("🤖")
-            feedback = "neutral"
+            rating = 0
 
         else:
             # Get the feedback value
             if str(reaction.emoji) == "👍":
-                feedback = "positive"
+                rating = 1
             elif str(reaction.emoji) == "👎":
-                feedback = "negative"
+                rating = -1
             else:
-                feedback = "neutral"
+                rating = 0
 
         # Send feedback to API
-        await send_api_feedback(feedback, str(thread.id), str(message.id))
+        await api_client.create_feedback(
+            feedback_id=str(uuid.uuid4()),
+            question_answer_id=str(sent_message.id),
+            rating=rating,
+        )
 
     await bot.process_commands(message)
 
