@@ -1,39 +1,28 @@
 from datetime import datetime
-from enum import Enum
+from enum import IntEnum
 
 from pydantic import BaseModel
 
-#####################
-# 1. Feedback
-#####################
 
-
-class Rating(str, Enum):
-    positive = "positive"
-    negative = "negative"
-    neutral = "neutral"
+class Rating(IntEnum):
+    positive = 1
+    negative = -1
+    neutral = 0
 
 
 class FeedbackBase(BaseModel):
-    feedback: Rating
+    rating: Rating | None = None
 
+
+class Feedback(FeedbackBase):
     class Config:
         use_enum_values = True
+        orm_mode = True
 
 
-class FeedbackCreate(FeedbackBase):
+class FeedbackCreate(Feedback):
+    feedback_id: str
     question_answer_id: str
-    thread_id: str
-
-
-class Feedback(FeedbackCreate):
-    class Config:
-        use_enum_values = True
-
-
-#####################
-# Question Answer
-#####################
 
 
 class QuestionAnswerBase(BaseModel):
@@ -50,39 +39,31 @@ class QuestionAnswerBase(BaseModel):
     time_taken: float | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
-    feedback: Rating | None = None
+    feedback: list[Feedback] | None = []
 
+
+class QuestionAnswer(QuestionAnswerBase):
     class Config:
         use_enum_values = True
-
-
-class QuestionAnswerCreate(QuestionAnswerBase):
-    question_answer_id: str
-    thread_id: str
-
-
-class QuestionAnswer(QuestionAnswerCreate):
-    class Config:
         orm_mode = True
 
 
-#####################
-# Chat Thread
-#####################
+class QuestionAnswerCreate(QuestionAnswer):
+    question_answer_id: str
+    thread_id: str
 
 
 class ChatThreadBase(BaseModel):
     question_answers: list[QuestionAnswer] | None = []
 
 
-class ChatThreadCreate(ChatThreadBase):
-    thread_id: str
+class ChatThread(ChatThreadBase):
     application: str
 
     class Config:
         use_enum_values = True
-
-
-class ChatThread(ChatThreadCreate):
-    class Config:
         orm_mode = True
+
+
+class ChatThreadCreate(ChatThread):
+    thread_id: str
