@@ -19,14 +19,16 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
     if response is not None:
         result = response.answer
         if response.model != "gpt-4":
-            warning_message = f"*Warning: Falling back to {response.model}*, These results may nor be as good as *gpt-4*\n\n"
+            warning_message = (
+                f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
+                f"*gpt-4*\n\n"
+            )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
             result = (
                 f"{result}\n\n*References*\n\n"
-                + ">"
-                + "\n".join(response.sources.split(","))
+                + ">\n".join(response.sources.split(","))
                 + "\n\n"
             )
         if outro_message:
