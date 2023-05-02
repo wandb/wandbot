@@ -2,9 +2,11 @@ from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
+from wandbot.database.models import FeedBack as FeedBackModel
 from wandbot.database.models import QuestionAnswer as QuestionAnswerModel
-from wandbot.database.schemas import ChatThread as ChatThreadSchema
+from wandbot.database.schemas import ChatThreadCreate as ChatThreadCreateSchema
 from wandbot.database.schemas import Feedback as FeedbackSchema
+from wandbot.database.schemas import QuestionAnswerCreate as QuestionAnswerCreateSchema
 
 
 class Database:
@@ -41,60 +43,79 @@ class DatabaseClient:
         if database is not None:
             self.database = Database(database=database)
 
-    def get_chat_thread(self, thread_id: str) -> ChatThreadModel | None:
+    def get_chat_thread(
+        self, application: str, thread_id: str
+    ) -> ChatThreadModel | None:
         chat_thread = (
             self.database.query(ChatThreadModel)
-            .filter(ChatThreadModel.thread_id == thread_id)
-            .first()
-        )
-        return chat_thread
-
-    def create_chat_thread(self, chat_thread: ChatThreadSchema) -> ChatThreadModel:
-        chat_thread = ChatThreadModel(
-            thread_id=chat_thread.thread_id,
-            application=chat_thread.application,
-            question_answers=[
-                QuestionAnswerModel(**question_answer.dict())
-                for question_answer in chat_thread.question_answers
-            ],
-        )
-        self.database.add(chat_thread)
-        self.database.commit()
-        self.database.refresh(chat_thread)
-        return chat_thread
-
-    def update_chat_thread(
-        self, chat_thread: ChatThreadSchema
-    ) -> ChatThreadModel | None:
-        db_chat_thread = self.get_chat_thread(thread_id=chat_thread.thread_id)
-        try:
-            if chat_thread.question_answers and db_chat_thread:
-                question_answers = [
-                    QuestionAnswerModel(**schema_question_answer.dict())
-                    for schema_question_answer in chat_thread.question_answers
-                ]
-                db_chat_thread.question_answers.extend(question_answers)
-                self.database.flush()
-                self.database.commit()
-                self.database.refresh(db_chat_thread)
-                return db_chat_thread
-            else:
-                return self.create_chat_thread(chat_thread=chat_thread)
-        except Exception as e:
-            self.database.rollback()
-            return None
-
-    def update_feedback(self, feedback: FeedbackSchema) -> QuestionAnswerModel:
-        db_question_answer = (
-            self.database.query(QuestionAnswerModel)
             .filter(
-                QuestionAnswerModel.question_answer_id == feedback.question_answer_id,
-                QuestionAnswerModel.thread_id == feedback.thread_id,
+                ChatThreadModel.thread_id == thread_id,
+                ChatThreadModel.application == application,
             )
             .first()
         )
-        db_question_answer.feedback = feedback.feedback
-        self.database.commit()
-        self.database.refresh(db_question_answer)
+        return chat_thread
 
-        return db_question_answer
+    def create_chat_thread(
+        self, chat_thread: ChatThreadCreateSchema
+    ) -> ChatThreadModel:
+        try:
+            chat_thread = ChatThreadModel(
+                thread_id=chat_thread.thread_id, application=chat_thread.application
+            )
+            self.database.add(chat_thread)
+            self.database.flush()
+            self.database.commit()
+            self.database.refresh(chat_thread)
+
+        except Exception as e:
+            self.database.rollback()
+
+        return chat_thread
+
+    def get_question_answer(
+        self, question_answer_id: str, thread_id: str
+    ) -> QuestionAnswerModel | None:
+        question_answer = (
+            self.database.query(QuestionAnswerModel)
+            .filter(
+                QuestionAnswerModel.thread_id == thread_id,
+                QuestionAnswerModel.question_answer_id == question_answer_id,
+            )
+            .first()
+        )
+        return question_answer
+
+    def create_question_answer(
+        self, question_answer: QuestionAnswerCreateSchema
+    ) -> QuestionAnswerModel:
+        try:
+            question_answer = QuestionAnswerModel(**question_answer.dict())
+            self.database.add(question_answer)
+            self.database.flush()
+            self.database.commit()
+            self.database.refresh(question_answer)
+        except Exception as e:
+            self.database.rollback()
+        return question_answer
+
+    def get_feedback(self, question_answer_id: str) -> FeedBackModel | None:
+        feedback = (
+            self.database.query(FeedBackModel)
+            .filter(FeedBackModel.question_answer_id == question_answer_id)
+            .first()
+        )
+        return feedback
+
+    def create_feedback(self, feedback: FeedbackSchema) -> FeedBackModel:
+        if feedback.rating:
+            try:
+                feedback = FeedBackModel(**feedback.dict())
+                self.database.add(feedback)
+                self.database.flush()
+                self.database.commit()
+                self.database.refresh(feedback)
+            except Exception as e:
+                self.database.rollback()
+
+            return feedback
