@@ -1,40 +1,45 @@
-from typing import List
+from wandbot.chat.schemas import ChatRepsonse, ChatRequest
+from wandbot.database.schemas import (
+    ChatThread,
+    ChatThreadCreate,
+    Feedback,
+    FeedbackCreate,
+    QuestionAnswer,
+    QuestionAnswerCreate,
+)
 
-from pydantic import BaseModel
-from wandbot.config import ChatRepsonse
-from wandbot.database.schemas import ChatThread, Feedback, QuestionAnswer
+
+class APIQuestionAnswerRequest(QuestionAnswerCreate):
+    pass
 
 
-class APIGetChatThreadRequest(BaseModel):
-    thread_id: str
+class APIQuestionAnswerResponse(QuestionAnswer):
+    pass
+
+
+class APIGetChatThreadRequest(ChatThreadCreate):
+    pass
 
 
 class APIGetChatThreadResponse(ChatThread):
     pass
 
 
-class APIPostChatThreadRequest(ChatThread):
+class APICreateChatThreadRequest(ChatThreadCreate):
     pass
 
 
-class APIPostChatThreadResponse(ChatThread):
+class APIQueryRequest(ChatRequest):
     pass
-
-
-class APIQueryRequest(BaseModel):
-    thread_id: str
-    question: str
-    chat_history: List[QuestionAnswer] | None = []
 
 
 class APIQueryResponse(ChatRepsonse):
-    thread_id: str
-    question: str
-
-
-class APIFeedbackRequest(Feedback):
     pass
 
 
-class APIFeedbackResponse(QuestionAnswer):
+class APIFeedbackRequest(FeedbackCreate):
+    pass
+
+
+class APIFeedbackResponse(Feedback):
     pass

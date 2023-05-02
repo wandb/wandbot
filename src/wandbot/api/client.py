@@ -1,15 +1,18 @@
 import json
 import uuid
+from datetime import datetime
 from typing import List
 
 import requests
 from wandbot.api.schemas import (
     APIFeedbackRequest,
+    APIFeedbackResponse,
     APIGetChatThreadRequest,
     APIGetChatThreadResponse,
-    APIPostChatThreadRequest,
     APIQueryRequest,
     APIQueryResponse,
+    APIQuestionAnswerRequest,
+    APIQuestionAnswerResponse,
 )
 from wandbot.database.schemas import QuestionAnswer
 
@@ -20,25 +23,25 @@ class APIClient:
         self.query_endpoint = f"{self.url}/query"
         self.feedback_endpoint = f"{self.url}/feedback"
         self.chat_thread_endpoint = f"{self.url}/chat_thread"
+        self.chat_question_answer_endpoint = f"{self.url}/question_answer"
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
     ) -> APIGetChatThreadResponse | None:
         with requests.Session() as session:
             with session.get(
-                f"{self.chat_thread_endpoint}/{request.thread_id}"
+                f"{self.chat_thread_endpoint}/{request.application}/{request.thread_id}"
             ) as response:
-                if response.status_code == 200:
-                    response = response.json()
-                    return APIGetChatThreadResponse(**response)
-                else:
-                    return None
+                if response.status_code in (200, 201):
+                    return APIGetChatThreadResponse(**response.json())
 
     def get_chat_history(
         self,
+        application: str,
         thread_id: str,
     ) -> List[QuestionAnswer] | None:
         request = APIGetChatThreadRequest(
+            application=application,
             thread_id=thread_id,
         )
         response = self._get_chat_thread(request)
@@ -47,28 +50,69 @@ class APIClient:
         else:
             return response.question_answers
 
-    def _create_chat_thread(self, request: APIPostChatThreadRequest) -> bool:
+    def _create_question_answer(
+        self, request: APIQuestionAnswerRequest
+    ) -> APIQuestionAnswerResponse | None:
         with requests.Session() as session:
             with session.post(
-                self.chat_thread_endpoint, json=json.loads(request.json())
+                self.chat_question_answer_endpoint, json=json.loads(request.json())
             ) as response:
                 if response.status_code == 201:
-                    return True
-                else:
-                    return False
+                    return APIQuestionAnswerResponse(**response.json())
 
-    def save_chat_history(
+    def create_question_answer(
         self,
+        question_answer_id: str,
         thread_id: str,
-        application: str | None,
-        chat_history: List[QuestionAnswer],
-    ) -> bool:
-        request = APIPostChatThreadRequest(
+        question: str,
+        answer: str | None = None,
+        model: str | None = None,
+        sources: str | None = None,
+        source_documents: str | None = None,
+        total_tokens: int | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        successful_requests: int | None = None,
+        total_cost: float | None = None,
+        time_taken: float | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> APIQuestionAnswerResponse | None:
+        request = APIQuestionAnswerRequest(
+            question_answer_id=question_answer_id,
             thread_id=thread_id,
-            application=application,
-            question_answers=chat_history,
+            question=question,
+            answer=answer,
+            model=model,
+            sources=sources,
+            source_documents=source_documents,
+            total_tokens=total_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            successful_requests=successful_requests,
+            total_cost=total_cost,
+            time_taken=time_taken,
+            start_time=start_time,
+            end_time=end_time,
         )
-        response = self._create_chat_thread(request)
+        response = self._create_question_answer(request)
+        return response
+
+    def _create_feedback(
+        self, request: APIFeedbackRequest
+    ) -> APIFeedbackResponse | None:
+        with requests.Session() as session:
+            with session.post(self.feedback_endpoint, json=request.dict()) as response:
+                if response.status_code == 201:
+                    return APIFeedbackResponse(**response.json())
+
+    def create_feedback(self, feedback_id: str, question_answer_id: str, rating: int):
+        feedback_request = APIFeedbackRequest(
+            feedback_id=feedback_id,
+            question_answer_id=question_answer_id,
+            rating=rating,
+        )
+        response = self._create_feedback(feedback_request)
         return response
 
     def _query(self, request: APIQueryRequest) -> APIQueryResponse | None:
@@ -76,33 +120,22 @@ class APIClient:
             payload = json.loads(request.json())
             with session.post(self.query_endpoint, json=payload) as response:
                 if response.status_code == 200:
-                    response = response.json()
-                    return APIQueryResponse(**response)
+                    return APIQueryResponse(**response.json())
                 else:
                     return None
 
     def query(
         self,
-        thread_id: str,
-        query: str,
+        question: str,
         chat_history: List[QuestionAnswer],
     ) -> APIQueryResponse:
         request = APIQueryRequest(
-            thread_id=thread_id,
-            question=query,
+            question=question,
             chat_history=chat_history,
         )
         response = self._query(request)
 
         return response
-
-    def feedback(self, request: APIFeedbackRequest) -> bool:
-        with requests.Session() as session:
-            with session.post(self.feedback_endpoint, json=request.dict()) as response:
-                if response.status_code == 201:
-                    return True
-                else:
-                    return False
 
 
 # class AsyncAPIClient(APIClient):
@@ -145,27 +178,53 @@ class APIClient:
 
 
 if __name__ == "__main__":
-    api_client = APIClient(url="http://localhost:8000")
+    from wandbot.ingestion.utils import Timer
 
-    thread_id = "5ff6e13f-0a44-423c-b897-dc171c35c952"
-    query = "Hello, this is a new question"
-    thread = api_client.get_chat_history(thread_id=thread_id)
-    chat_history = api_client.get_chat_history(thread_id=thread_id)
+    with Timer() as timer:
+        api_client = APIClient(url="http://localhost:8000")
 
-    if not chat_history:
-        print("No chat history found")
-    else:
+        application = "test"
+        # thread_id = str(uuid.uuid4())
+        thread_id = "300d9a8c-ea55-4bb1-94e6-d3e3ed2df8bd"
+        chat_history = api_client.get_chat_history(
+            application=application, thread_id=thread_id
+        )
+
+        if not chat_history:
+            print("No chat history found")
+        else:
+            print(
+                json.dumps([json.loads(item.json()) for item in chat_history], indent=2)
+            )
+            # chat_history = [(item.question, item.answer) for item in chat_history]
+
+        # query the api and get the chat response
+        question = "Hi @wandbot, How about openai?"
+        chat_response = api_client.query(question=question, chat_history=chat_history)
+        # save the chat response to the database
+        question_answer_id = str(uuid.uuid4())
+
+        api_client.create_question_answer(
+            question_answer_id=question_answer_id,
+            thread_id=thread_id,
+            **chat_response.dict(),
+        )
+
+        # get the chat history again
+        chat_history = api_client.get_chat_history(
+            application=application, thread_id=thread_id
+        )
         print(json.dumps([json.loads(item.json()) for item in chat_history], indent=2))
 
-    response = api_client.query(
-        thread_id=thread_id, query=query, chat_history=chat_history
-    )
-    print(response.json(indent=2))
-    saved_response = api_client.save_chat_history(
-        thread_id=thread_id,
-        application="test",
-        chat_history=[
-            QuestionAnswer(**response.dict(), question_answer_id=str(uuid.uuid4()))
-        ],
-    )
-    print(saved_response)
+        # add feedback
+        feedback_id = str(uuid.uuid4())
+        api_client.create_feedback(
+            feedback_id=feedback_id, question_answer_id=question_answer_id, rating=1
+        )
+
+        # get the chat history again
+        chat_history = api_client.get_chat_history(
+            application=application, thread_id=thread_id
+        )
+        print(json.dumps([json.loads(item.json()) for item in chat_history], indent=2))
+    print(timer.start, timer.start, timer.elapsed)
