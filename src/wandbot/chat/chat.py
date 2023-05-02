@@ -3,13 +3,14 @@ import logging
 from typing import List, Optional, Tuple
 
 import openai
+import pandas as pd
 import tiktoken
+import wandb
 from langchain import LLMChain, OpenAI
 from langchain.callbacks import get_openai_callback
 from langchain.chains.conversational_retrieval.base import (
     BaseConversationalRetrievalChain,
 )
-from langchain.chains.conversational_retrieval.prompts import CONDENSE_QUESTION_PROMPT
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -17,13 +18,27 @@ from langchain.schema import BaseRetriever
 from src.wandbot.ingestion.utils import Timer
 from wandb.integration.langchain import WandbTracer
 from wandb.integration.langchain.wandb_tracer import WandbRunArgs
-from wandbot.config import ChatConfig, ChatRepsonse, ChatRequest
+from wandbot.chat.config import ChatConfig
+from wandbot.chat.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
+from wandbot.chat.prompts import load_chat_prompt, load_history_prompt
+from wandbot.chat.schemas import ChatRepsonse, ChatRequest
+from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.datastore import VectorIndex
-from wandbot.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
-from wandbot.prompts import load_chat_prompt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def get_chat_history(
+    chat_history: List[QuestionAnswer] | None,
+) -> List[tuple[str, str]]:
+    if not chat_history:
+        return []
+    else:
+        return [
+            (question_answer.question, question_answer.answer)
+            for question_answer in chat_history
+        ]
 
 
 class Chat:
@@ -68,16 +83,28 @@ class Chat:
     def _load_chain(
         self, model_name: str = None, max_retries: int = 1
     ) -> BaseConversationalRetrievalChain:
-        map_llm = OpenAI(batch_size=10)
+        map_llm = OpenAI(
+            batch_size=10,
+            temperature=0.3,
+            max_retries=max_retries,
+        )
         reduce_llm = ChatOpenAI(
             model_name=model_name,
             temperature=self.config.chat_temperature,
             max_retries=max_retries,
         )
-        question_generator = LLMChain(llm=map_llm, prompt=CONDENSE_QUESTION_PROMPT)
+        question_generator = LLMChain(
+            llm=ChatOpenAI(
+                model_name=self.config.fallback_model_name,
+                temperature=self.config.chat_temperature,
+                max_retries=self.config.max_fallback_retries,
+            ),
+            prompt=load_history_prompt(self.config.history_prompt),
+            verbose=self.config.verbose,
+        )
         doc_chain = load_qa_with_sources_chain(
             map_llm,
-            chain_type="map_reduce",
+            chain_type=self.config.chain_type,
             combine_prompt=self.chat_prompt,
             verbose=self.config.verbose,
             reduce_llm=reduce_llm,
@@ -175,7 +202,7 @@ class Chat:
             else:
                 with get_openai_callback() as callback:
                     result = self.get_answer(
-                        query, chat_history=chat_request.chat_history
+                        query, chat_history=get_chat_history(chat_request.chat_history)
                     )
                     usage_stats = {
                         "total_tokens": callback.total_tokens,
@@ -196,6 +223,14 @@ class Chat:
                 **usage_stats,
             )
         )
+        wandb.run.log(
+            {
+                "chat": wandb.Table(
+                    dataframe=pd.DataFrame({k: [v] for k, v in result.items()})
+                )
+            }
+        )
+        wandb.run.log(usage_stats)
         return ChatRepsonse(**result)
 
 
