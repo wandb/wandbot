@@ -115,6 +115,15 @@ class ExtraDataStoreConfig(DataStoreConfig):
     )
 
 
+class GTMDataStoreConfig(DataStoreConfig):
+    name: str = "gtm_data_store"
+    data_source: DataSource = DataSource(
+        local_path=pathlib.Path("data/raw_dataset/gtm_data"),
+        file_pattern="*.*x",
+        is_git_repo=False,
+    )
+
+
 class VectorIndexConfig(BaseSettings):
     name: str = "wandbot_vectorindex"
     cache_dir: pathlib.Path = Field(

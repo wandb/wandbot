@@ -3,6 +3,7 @@ from datetime import datetime
 
 import wandb
 import wandb.apis.reports as wr
+
 from wandbot.ingestion.datastore import VectorIndex
 
 
@@ -58,3 +59,4 @@ def create_ingestion_report(vectorindex: VectorIndex):
         ),
     ]
     report.save()
+    print(f"Report saved to {report.url}")

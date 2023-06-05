@@ -5,6 +5,7 @@ from wandbot.ingestion.config import (
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     ExtraDataStoreConfig,
+    GTMDataStoreConfig,
     SDKCodeStoreConfig,
     VectorIndexConfig,
 )
@@ -12,6 +13,7 @@ from wandbot.ingestion.datastore import (
     CodeDataStore,
     DocumentationDataStore,
     ExtraDataStore,
+    GTMDataStore,
     VectorIndex,
 )
 from wandbot.ingestion.report import create_ingestion_report
@@ -26,6 +28,7 @@ def main():
         CodeDataStore(ExampleNotebookStoreConfig()),
         CodeDataStore(SDKCodeStoreConfig()),
         ExtraDataStore(ExtraDataStoreConfig()),
+        GTMDataStore(GTMDataStoreConfig()),
     ]
     vectorindex_config = VectorIndexConfig(wandb_project="wandb_docs_bot_dev")
     vector_index = VectorIndex(vectorindex_config)

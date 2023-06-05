@@ -8,7 +8,12 @@ import joblib
 import scipy.sparse
 import tiktoken
 import wandb
-from langchain.document_loaders import TextLoader, UnstructuredMarkdownLoader
+from langchain.document_loaders import (
+    TextLoader,
+    UnstructuredMarkdownLoader,
+    UnstructuredPowerPointLoader,
+    UnstructuredWordDocumentLoader,
+)
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.embeddings.base import Embeddings
 from langchain.schema import Document
@@ -22,6 +27,7 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
+
 from wandbot.chat.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
@@ -235,6 +241,33 @@ class ExtraDataStore(DataStore):
                 )
                 all_documents.append(document)
         document_sections = self.md_text_splitter.split_documents(all_documents)
+        document_store = self.create_docstore_from_documents(
+            document_sections, None, metadata
+        )
+        return document_store
+
+
+class GTMDataStore(DataStore):
+    def load_docstore(
+        self,
+    ):
+        metadata = self.load_docstore_metadata()
+
+        document_paths = (
+            self.config.data_source.local_path / self.config.data_source.base_path
+        ).rglob(self.config.data_source.file_pattern)
+        document_paths = list(document_paths)
+        document_paths = list(map(lambda x: str(x), document_paths))
+        all_documents = []
+        for path in document_paths:
+            if path.endswith(".docx"):
+                document = UnstructuredWordDocumentLoader(path).load()[0]
+            elif path.endswith(".pptx"):
+                document = UnstructuredPowerPointLoader(path).load()[0]
+            else:
+                raise ValueError(f"Unsupported file type {path}")
+            all_documents.append(document)
+        document_sections = self.token_splitter.split_documents(all_documents)
         document_store = self.create_docstore_from_documents(
             document_sections, None, metadata
         )
