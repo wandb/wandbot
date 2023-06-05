@@ -3,7 +3,6 @@ from datetime import datetime
 
 import wandb
 import wandb.apis.reports as wr
-
 from wandbot.ingestion.datastore import VectorIndex
 
 
