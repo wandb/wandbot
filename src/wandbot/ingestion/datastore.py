@@ -27,7 +27,6 @@ from llama_index import Document as LlamaDocument
 from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
-
 from wandbot.chat.langchain import (
     ChromaWithEmbeddingsAndScores,
     HybridRetriever,
