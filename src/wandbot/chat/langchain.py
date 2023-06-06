@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langchain import BasePromptTemplate, LLMChain
+from langchain.base_language import BaseLanguageModel
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.chains.conversational_retrieval.base import (
@@ -14,7 +15,7 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.document_loaders import NotebookLoader
 from langchain.document_loaders.notebook import remove_newlines
 from langchain.retrievers import TFIDFRetriever
-from langchain.schema import BaseLanguageModel, BaseRetriever, Document
+from langchain.schema import BaseRetriever, Document
 from langchain.vectorstores import Chroma
 from langchain.vectorstores.base import VectorStoreRetriever
 from pydantic import BaseModel
