@@ -2,6 +2,7 @@ import abc
 import json
 import logging
 import pathlib
+from collections import defaultdict
 from typing import Dict, List, Optional
 
 import joblib
@@ -19,7 +20,6 @@ from langchain.text_splitter import (
     TokenTextSplitter,
 )
 from llama_index import Document as LlamaDocument
-from llama_index.docstore import DocumentStore as LlamaDocumentStore
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
 from wandbot.chat.langchain import (
@@ -34,8 +34,30 @@ from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, m
 logger = logging.getLogger(__name__)
 
 
+class DocumentStore:
+    docs = {}
+    ref_doc_info = defaultdict(lambda: dict())
+
+    def __init__(self, docs: dict, ref_doc_info: defaultdict[lambda: dict]):
+        self.docs = docs
+        self.ref_doc_info = ref_doc_info
+
+    def to_dict(self):
+        docs = {}
+        for k, v in self.docs.items():
+            docs[k] = v.to_dict()
+        return {"docs": docs, "ref_doc_info": dict(self.ref_doc_info)}
+
+    @classmethod
+    def from_dict(cls, doc_store_dict):
+        docs = {}
+        for k, v in doc_store_dict["docs"].items():
+            docs[k] = LlamaDocument.from_dict(v)
+        return cls(docs=docs, ref_doc_info=doc_store_dict["ref_doc_info"])
+
+
 class DataStore:
-    document_store: LlamaDocumentStore = None
+    document_store: DocumentStore = None
 
     def __init__(self, config: DataStoreConfig):
         self.config = config
@@ -86,7 +108,7 @@ class DataStore:
         documents: List[Document],
         source_map: Optional[Dict[str, str]] = None,
         metadata: Dict[str, str] = None,
-    ) -> LlamaDocumentStore:
+    ) -> DocumentStore:
         documents = self.make_documents_tokenization_safe(documents)
         documents = self.token_splitter.split_documents(documents)
         documents = add_metadata_to_documents(documents, source_map)
@@ -100,15 +122,13 @@ class DataStore:
         if metadata is None:
             metadata = {}
         metadata["num_docs"] = len(llama_documents)
-        return LlamaDocumentStore(
-            docs=llama_documents, ref_doc_info={"metadata": metadata}
-        )
+        return DocumentStore(docs=llama_documents, ref_doc_info={"metadata": metadata})
 
     @abc.abstractmethod
-    def load_docstore(self) -> LlamaDocumentStore:
+    def load_docstore(self) -> DocumentStore:
         raise NotImplementedError("Implement this in the subclass")
 
-    def load(self) -> LlamaDocumentStore:
+    def load(self) -> DocumentStore:
         docstore = self.load_docstore()
         return docstore
 
@@ -116,7 +136,7 @@ class DataStore:
 class DocumentationDataStore(DataStore):
     def load_docstore(
         self,
-    ) -> LlamaDocumentStore:
+    ) -> DocumentStore:
         metadata = self.load_docstore_metadata()
 
         local_paths = (
@@ -162,7 +182,7 @@ class DocumentationDataStore(DataStore):
 
 
 class CodeDataStore(DataStore):
-    def load_docstore(self) -> LlamaDocumentStore:
+    def load_docstore(self) -> DocumentStore:
         metadata = self.load_docstore_metadata()
 
         local_paths = (
@@ -219,7 +239,7 @@ class CodeDataStore(DataStore):
 
 
 class ExtraDataStore(DataStore):
-    def load_docstore(self) -> LlamaDocumentStore:
+    def load_docstore(self) -> DocumentStore:
         metadata = self.load_docstore_metadata()
 
         jsonl_paths = (
@@ -246,7 +266,7 @@ class VectorIndex:
         self.config = config
 
         self.embedding_fn: Embeddings = OpenAIEmbeddings()
-        self.datastore: LlamaDocumentStore | None = None
+        self.datastore: DocumentStore | None = None
         self.retriever: HybridRetriever | None = None
         self.wandb_run: wandb.sdk.wandb_run.Run | None = None
         self.saved_artifact: wandb.Artifact | None = None
@@ -257,16 +277,16 @@ class VectorIndex:
             data_dict = source.load()
             datastore["docs"] = dict(**datastore.get("docs", {}), **data_dict.docs)
             datastore["metadata"][
-                data_dict._ref_doc_info["metadata"]["source_name"]
+                data_dict.ref_doc_info["metadata"]["source_name"]
             ] = dict(
-                **data_dict._ref_doc_info["metadata"],
+                **data_dict.ref_doc_info["metadata"],
                 **{
                     "config": json.loads(
                         source.config.json(exclude={"data_source": {"git_id_file"}})
                     )
                 },
             )
-        datastore = LlamaDocumentStore(
+        datastore = DocumentStore(
             docs=datastore["docs"], ref_doc_info={"metadata": datastore["metadata"]}
         )
         return datastore
@@ -280,7 +300,7 @@ class VectorIndex:
             docs_list.append(document.to_langchain_format())
         return docs_list
 
-    def create_dense_retriever(self, datastore: LlamaDocumentStore):
+    def create_dense_retriever(self, datastore: DocumentStore):
         if self.config.vectorindex_dir.is_dir():
             logger.debug(
                 f"{self.config.vectorindex_dir} was found, loading existing vector store"
@@ -289,7 +309,7 @@ class VectorIndex:
                 persist_directory=str(self.config.vectorindex_dir / "dense_retriever"),
                 embedding_function=self.embedding_fn,
                 collection_name=self.config.name,
-                collection_metadata=datastore._ref_doc_info["metadata"],
+                collection_metadata=datastore.ref_doc_info["metadata"],
             )
             logger.debug("Validating the vector store")
             collection_ids = vectorstore._collection.get(include=[])["ids"]
@@ -306,7 +326,7 @@ class VectorIndex:
                 )
 
                 if collection_docs_to_add:
-                    logger.debug(
+                    logger.warning(
                         f"Adding {len(collection_docs_to_add)} documents to the vector store"
                     )
                     vectorstore.add_documents(
@@ -331,7 +351,7 @@ class VectorIndex:
                 collection_name=self.config.name,
                 persist_directory=str(self.config.vectorindex_dir / "dense_retriever"),
                 embedding_function=self.embedding_fn,
-                collection_metadata=datastore._ref_doc_info["metadata"],
+                collection_metadata=datastore.ref_doc_info["metadata"],
             )
             vectorstore.add_texts(
                 texts=[doc.page_content for doc in docs_list],
@@ -340,7 +360,7 @@ class VectorIndex:
             )
         return vectorstore.as_retriever()
 
-    def create_retriever(self, datastore: LlamaDocumentStore):
+    def create_retriever(self, datastore: DocumentStore):
         docs_list = self.get_docs_list()
         sparse_vectorizer = TfidfVectorizer(**self.config.sparse_vectorizer_kwargs)
         sparse_vectors = sparse_vectorizer.fit_transform(
@@ -365,14 +385,14 @@ class VectorIndex:
 
     def save(self):
         self.config.vectorindex_dir.mkdir(parents=True, exist_ok=True)
-        # dump the datastore
+        # save the datastore
         datastore_dict = self.datastore.to_dict()
         with open(self.config.vectorindex_dir / "datastore.json", "w") as f:
             json.dump(datastore_dict, f)
         with open(self.config.vectorindex_dir / "metadata.json", "w") as f:
-            json.dump(self.datastore._ref_doc_info["metadata"], f)
+            json.dump(self.datastore.ref_doc_info["metadata"], f)
 
-        # dump the sparse retriever
+        # save the sparse retriever
         sparse_retriever_dir = self.config.vectorindex_dir / "sparse_retriever"
         sparse_retriever_dir.mkdir(parents=True, exist_ok=True)
         with open(sparse_retriever_dir / "sparse_vectorizer.pkl", "wb") as f:
@@ -382,7 +402,7 @@ class VectorIndex:
             self.retriever.sparse.tfidf_array,
         )
 
-        # dump the dense retriever
+        # save the dense retriever
         self.retriever.dense.vectorstore.persist()
 
         if self.wandb_run is None:
@@ -391,12 +411,12 @@ class VectorIndex:
                 entity=self.config.wandb_entity,
                 config=self.config.dict(),
             )
-        # dump the config
+        # save the config
         with open(self.config.vectorindex_dir / "config.json", "w") as f:
             f.write(self.config.json())
         artifact_metadata = dict(
             **self.config.dict(),
-            **{"docs_metadata": self.datastore._ref_doc_info["metadata"]},
+            **{"docs_metadata": self.datastore.ref_doc_info["metadata"]},
         )
         artifact = wandb.Artifact(
             name=self.config.name, type="vectorindex", metadata=artifact_metadata
@@ -404,6 +424,7 @@ class VectorIndex:
 
         artifact.add_dir(str(self.config.vectorindex_dir))
         self.saved_artifact = self.wandb_run.log_artifact(artifact)
+
         return self
 
     def load_from_artifact(
@@ -428,7 +449,7 @@ class VectorIndex:
         # load the datastore
         with open(artifact_dir / "datastore.json", "r") as f:
             datastore_dict = json.load(f)
-        self.datastore = LlamaDocumentStore.from_dict(datastore_dict)
+        self.datastore = DocumentStore.from_dict(datastore_dict)
 
         # load the metadata
         with open(artifact_dir / "metadata.json", "r") as f:

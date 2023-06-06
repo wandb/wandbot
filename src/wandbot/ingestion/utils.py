@@ -3,14 +3,17 @@ import hashlib
 import logging
 import pathlib
 import subprocess
+import zipfile
 from typing import Any, Dict, List, Optional, Union
 
 import regex as re
+import wandb
 from git import Repo
 from giturlparse import parse
 from langchain.schema import Document
 from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
+from wandbot.ingestion.datastore import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -168,3 +171,21 @@ class Timer:
     @property
     def elapsed(self) -> float:
         return (self.stop - self.start).total_seconds()
+
+
+def save_dataset(data_sources: List[DataStore]):
+    artifact = wandb.Artifact("raw_dataset", type="dataset")
+    for data_source in data_sources:
+        archive_name = (
+            f"{data_source.config.data_source.cache_dir}/{data_source.config.name}.zip"
+        )
+        with zipfile.ZipFile(archive_name, "w") as f:
+            for file in data_source.config.data_source.local_path.rglob("**/*"):
+                if not file.is_symlink():
+                    f.write(file)
+        artifact.add_file(archive_name)
+
+    wandb.log_artifact(
+        artifact,
+    )
+    return artifact

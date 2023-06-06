@@ -23,7 +23,7 @@ def create_ingestion_report(vectorindex: VectorIndex):
         description=f"This report contains details of the data ingestion process "
         f"for the Wandbot run on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
     )
-    docstore_metadata = vectorindex.datastore._ref_doc_info
+    docstore_metadata = vectorindex.datastore.ref_doc_info
     saved_artifact = vectorindex.saved_artifact.wait()
     wandb_run = vectorindex.wandb_run
     metrics = log_datasource_counts(docstore_metadata["metadata"], wandb_run)
