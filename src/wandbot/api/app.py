@@ -1,5 +1,7 @@
+import asyncio
 import logging
 
+import pandas as pd
 import wandb
 from fastapi import FastAPI, Response, status
 from wandbot.api.schemas import (
@@ -28,11 +30,22 @@ app = FastAPI(name="wandbot", version="0.0.1")
 db_client: DatabaseClient | None = None
 
 
+async def periodic():
+    while True:  # code to run periodically starts here
+        print("Running backup")
+        chat_threads = db_client.get_all_question_answers()
+        if chat_threads is not None:
+            chat_table = pd.DataFrame([chat_thread for chat_thread in chat_threads])
+            wandb.log({"question_answers": wandb.Table(dataframe=chat_table)})
+        await asyncio.sleep(300)
+
+
 @app.on_event("startup")
 def startup_event():
     global chat, db_client
     chat = Chat(ChatConfig())
     db_client = DatabaseClient()
+    asyncio.create_task(periodic())
 
 
 @app.post(
@@ -109,11 +122,16 @@ async def feedback(
     return feedback_response
 
 
+@app.on_event("shutdown")
+def shutdown_event():
+    if wandb.run is not None:
+        wandb.run.finish()
+    global chat, db_client
+    chat = None
+    db_client = None
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(
-        app,
-        host="localhost",
-        port=8000,
-    )
+    uvicorn.run(app, host="localhost", port=8000)
