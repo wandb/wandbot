@@ -178,8 +178,9 @@ class Chat:
                 return_only_outputs=True,
             )
             result["model"] = self.config.model_name
-        except openai.error.Timeout as e:
+        except (openai.error.Timeout or openai.error.RateLimitError) as e:
             logger.debug(e)
+            logger.info(f"Falling back to {self.config.fallback_model_name} model")
             result = self.fallback_chain(
                 {
                     "question": query,

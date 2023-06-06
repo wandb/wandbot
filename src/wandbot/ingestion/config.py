@@ -134,7 +134,7 @@ class VectorIndexConfig(BaseSettings):
         "max_df": 0.9,
         "ngram_range": (1, 3),
     }
-    retrieval_size: int = 6
+    retrieval_size: int = 4
     wandb_project: str | None = Field(..., env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
 

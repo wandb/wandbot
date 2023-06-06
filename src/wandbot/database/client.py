@@ -122,10 +122,13 @@ class DatabaseClient:
 
             return feedback
 
-    def get_all_question_answers(
-        self,
-    ) -> List[dict[str, Any]] | None:
-        question_answers = self.database.query(QuestionAnswerModel).all()
+    def get_all_question_answers(self, time=None) -> List[dict[str, Any]] | None:
+        question_answers = self.database.query(QuestionAnswerModel)
+        if time is not None:
+            question_answers = question_answers.filter(
+                QuestionAnswerModel.end_time >= time
+            )
+        question_answers = question_answers.all()
         if question_answers is not None:
             question_answers = [
                 QuestionAnswerCreateSchema.from_orm(question_answer).dict()

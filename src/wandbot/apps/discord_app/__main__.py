@@ -76,6 +76,11 @@ async def on_message(message: discord.Message):
             question=str(message.clean_content),
             chat_history=chat_history,
         )
+        if response is None:
+            await thread.send(
+                f"🤖 {mention}: {config.ERROR_MESSAGE}", mention_author=True
+            )
+            return
         sent_message = await thread.send(
             f"🤖 {format_response(response, config.OUTRO_MESSAGE)}"
         )
