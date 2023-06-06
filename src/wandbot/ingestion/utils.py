@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import regex as re
 import wandb
-from git import Repo
 from giturlparse import parse
 from langchain.schema import Document
 from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
 
 if TYPE_CHECKING:
+    from git import Repo
     from wandbot.ingestion.datastore import DataStore
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def fetch_git_remote_hash(repo_url=None, id_file=None):
     return sha
 
 
-def fetch_repo_metadata(repo: Repo) -> Dict[str, str]:
+def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
     head_commit = repo.head.commit
 
     return dict(
@@ -61,6 +61,8 @@ def fetch_repo_metadata(repo: Repo) -> Dict[str, str]:
 
 
 def fetch_git_repo(paths, id_file) -> Dict[str, str]:
+    from git import Repo
+
     git_command = get_git_command(id_file)
 
     if paths.local_path.is_dir():
