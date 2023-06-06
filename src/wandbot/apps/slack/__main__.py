@@ -27,8 +27,8 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
 
         if config.include_sources and response.sources:
             result = (
-                f"{result}\n\n*References*\n\n"
-                + ">\n".join(response.sources.split(","))
+                f"{result}\n\n*References*\n\n>"
+                + "\n> ".join(response.sources.split(","))
                 + "\n\n"
             )
         if outro_message:
@@ -99,9 +99,9 @@ def command_handler(body, say, logger):
 
 
 def parse_reaction(reaction: str):
-    if reaction == "thumbsup":
+    if reaction == "+1":
         return 1
-    elif reaction == "thumbsdown":
+    elif reaction == "-1":
         return -1
     else:
         return 0
@@ -113,14 +113,18 @@ def handle_reaction_added(event, say):
     message_ts = event["item"]["ts"]
 
     conversation = app.client.conversations_replies(
-        channel=channel_id, ts=message_ts, inclusive=True, limit=1
+        channel=channel_id,
+        ts=message_ts,
+        inclusive=True,
+        limit=1,
+        token=config.SLACK_BOT_TOKEN,
     )
     messages = conversation.get(
         "messages",
     )
     if messages and len(messages):
         thread_ts = messages[0].get("thread_ts")
-        if thread_ts and event["item_user"] != messages[0]["user"]:
+        if thread_ts:
             rating = parse_reaction(event["reaction"])
             api_client.create_feedback(
                 feedback_id=event["event_ts"],

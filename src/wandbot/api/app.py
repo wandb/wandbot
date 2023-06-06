@@ -1,5 +1,6 @@
 import logging
 
+import wandb
 from fastapi import FastAPI, Response, status
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
@@ -94,7 +95,16 @@ async def feedback(
     request: APIFeedbackRequest, response: Response
 ) -> APIFeedbackResponse:
     feedback_response = db_client.create_feedback(request)
-    if feedback_response is None:
+    if feedback_response is not None:
+        wandb.log(
+            {
+                "feedback": wandb.Table(
+                    columns=list(request.dict().keys()),
+                    data=[list(request.dict().values())],
+                )
+            }
+        )
+    else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
 
