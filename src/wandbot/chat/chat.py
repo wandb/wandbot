@@ -8,6 +8,7 @@ import tiktoken
 import wandb
 from langchain import LLMChain, OpenAI
 from langchain.callbacks import get_openai_callback
+from langchain.callbacks.tracers import WandbTracer
 from langchain.chains.conversational_retrieval.base import (
     BaseConversationalRetrievalChain,
 )
@@ -16,7 +17,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseRetriever
 from src.wandbot.ingestion.utils import Timer
-from wandb.integration.langchain import WandbTracer
 from wandb.integration.langchain.wandb_tracer import WandbRunArgs
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
@@ -59,7 +59,7 @@ class Chat:
             self.config.fallback_model_name, self.config.max_fallback_retries
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        WandbTracer().init(
+        WandbTracer(
             run_args=WandbRunArgs(
                 project=self.config.wandb_project,
                 entity=self.config.wandb_entity,
