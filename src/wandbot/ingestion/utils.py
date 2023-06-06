@@ -4,7 +4,7 @@ import logging
 import pathlib
 import subprocess
 import zipfile
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import regex as re
 import wandb
@@ -13,7 +13,9 @@ from giturlparse import parse
 from langchain.schema import Document
 from llama_index import Document as LlamaDocument
 from pydantic import AnyHttpUrl
-from wandbot.ingestion.datastore import DataStore
+
+if TYPE_CHECKING:
+    from wandbot.ingestion.datastore import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +175,7 @@ class Timer:
         return (self.stop - self.start).total_seconds()
 
 
-def save_dataset(data_sources: List[DataStore]):
+def save_dataset(data_sources: List["DataStore"]):
     artifact = wandb.Artifact("raw_dataset", type="dataset")
     for data_source in data_sources:
         archive_name = (
@@ -188,4 +190,4 @@ def save_dataset(data_sources: List[DataStore]):
     wandb.log_artifact(
         artifact,
     )
-    return artifact
+    return artifact.wait()

@@ -32,8 +32,8 @@ def main():
     vector_index = VectorIndex(vectorindex_config)
     vector_index = vector_index.load(data_sources)
     vector_index.save()
-    save_dataset(data_sources)
-    create_ingestion_report(vector_index)
+    raw_dataset_artifact = save_dataset(data_sources)
+    create_ingestion_report(vector_index, raw_dataset_artifact)
 
 
 if __name__ == "__main__":

@@ -247,7 +247,10 @@ class ExtraDataStore(DataStore):
         ).rglob(self.config.data_source.file_pattern)
 
         all_documents = []
-        for path in jsonl_paths:
+        for path in tqdm(
+            jsonl_paths,
+            desc=f"Loading extra data from {self.config.data_source.local_path}",
+        ):
             for line in path.open("r"):
                 doc = json.loads(line)
                 document = Document(

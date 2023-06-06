@@ -14,7 +14,9 @@ def log_datasource_counts(metadata: dict, wandb_run: wandb.sdk.wandb_run.Run):
     return list(data.keys())
 
 
-def create_ingestion_report(vectorindex: VectorIndex):
+def create_ingestion_report(
+    vectorindex: VectorIndex, raw_dataset_artifact: wandb.Artifact
+):
     config = vectorindex.config
     report = wr.Report(
         project=config.wandb_project,
@@ -49,12 +51,12 @@ def create_ingestion_report(vectorindex: VectorIndex):
             saved_artifact.name.split(":")[0],
             "overview",
         ),
-        wr.H1("Artifact Files"),
+        wr.H1("Raw Dataset Summary"),
         wr.WeaveBlockArtifact(
             entity=vectorindex.wandb_run.entity,
             project=vectorindex.wandb_run.project,
-            artifact=saved_artifact.name.split(":")[0],
-            tab="files",
+            artifact=raw_dataset_artifact.name.split(":")[0],
+            tab="overview",
         ),
     ]
     report.save()
