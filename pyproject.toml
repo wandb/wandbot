@@ -33,19 +33,12 @@ scipy = { version = "^1.10.1", optional = true }
 scikit-learn = { version = "^1.2.2", optional = true }
 tabulate = "^0.9.0"
 
-[tool.poetry.dev-dependencies]
-debugpy = "^1.6.2"
-replit-python-lsp-server = { extras = ["yapf", "rope", "pyflakes"], version = "^1.5.9" }
-
 [tool.poetry.extras]
 slack = ["slack-bolt", "slack-sdk"]
 replit = ["replit", "Flask", "urllib3"]
 discord = ["discord"]
 chat = ["scikit-learn", "scipy", "chromadb", "llama-index", "giturlparse", "unstructured", "pandas", "tiktoken", "openai", "langchain",]
 api = ["fastapi", "uvicorn", ]
-
-[tool.poetry.group.dev.dependencies]
-jupyter = "^1.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
