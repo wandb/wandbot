@@ -2,7 +2,6 @@ import json
 import logging
 from typing import List, Optional, Tuple
 
-import openai
 import pandas as pd
 import tiktoken
 import wandb
@@ -25,7 +24,7 @@ from wandbot.chat.schemas import ChatRepsonse, ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.datastore import VectorIndex
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -148,11 +147,14 @@ class Chat:
 
     def format_response(self, result):
         response = {}
-        source_documents = [
-            {"source": doc.metadata["source"], "score": doc.metadata["score"]}
-            for doc in result["source_documents"]
-            # if doc.metadata["score"] <= self.config.source_score_threshold
-        ]
+        if result["source_documents"]:
+            source_documents = [
+                {"source": doc.metadata["source"], "score": doc.metadata["score"]}
+                for doc in result["source_documents"]
+                # if doc.metadata["score"] <= self.config.source_score_threshold
+            ]
+        else:
+            source_documents = []
         response["answer"] = result["answer"]
         response["model"] = result["model"]
 
@@ -178,17 +180,27 @@ class Chat:
                 return_only_outputs=True,
             )
             result["model"] = self.config.model_name
-        except (openai.error.Timeout or openai.error.RateLimitError) as e:
-            logger.debug(e)
-            logger.info(f"Falling back to {self.config.fallback_model_name} model")
-            result = self.fallback_chain(
-                {
-                    "question": query,
-                    "chat_history": chat_history,
-                },
-                return_only_outputs=True,
-            )
-            result["model"] = self.config.fallback_model_name
+        except Exception as e:
+            logger.warning(f"{self.config.model_name} failed with {e}")
+            logger.warning(f"Falling back to {self.config.fallback_model_name} model")
+            try:
+                result = self.fallback_chain(
+                    {
+                        "question": query,
+                        "chat_history": chat_history,
+                    },
+                    return_only_outputs=True,
+                )
+                result["model"] = self.config.fallback_model_name
+            except Exception as e:
+                logger.warning(f"{self.config.fallback_model_name} failed with {e}")
+                result = {
+                    "answer": "Sorry, there seems to be an issue with our LLM servers. Please try again in "
+                    "some time.",
+                    "sources": "",
+                    "source_documents": None,
+                    "model": self.config.fallback_model_name,
+                }
         return self.format_response(result)
 
     def __call__(self, chat_request: ChatRequest) -> ChatRepsonse:
