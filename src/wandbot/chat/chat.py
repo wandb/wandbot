@@ -203,7 +203,7 @@ class Chat:
                     + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
                     "sources": "",
                     "source_documents": None,
-                    "model": None,
+                    "model": "None",
                 }
         return self.format_response(result)
 

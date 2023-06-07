@@ -26,11 +26,15 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            result = (
-                f"{result}\n\n*References*\n\n>"
-                + "\n> ".join(response.sources.split(","))
-                + "\n\n"
-            )
+            sources_list = [
+                item for item in response.sources.split(",") if item.strip().startswith("http")
+            ]
+            if len(sources_list) > 0:
+                result = (
+                    f"{result}\n\n*References*\n\n>"
+                    + "\n> ".join(sources_list)
+                    + "\n\n"
+                )
         if outro_message:
             result = f"{result}\n\n{outro_message}"
 
