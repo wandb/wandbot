@@ -24,7 +24,7 @@ class ChatConfig(BaseSettings):
     wandb_project: str | None = Field(None, env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
     wandb_job_type: str | None = "chat"
-    include_sources: bool = True
+    include_sources: bool = False
     source_score_threshold: float = 1.0
     query_tokens_threshold: int = 1024
 

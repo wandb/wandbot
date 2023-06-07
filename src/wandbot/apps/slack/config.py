@@ -25,7 +25,7 @@ class SlackAppConfig(BaseSettings):
     OUTRO_MESSAGE: str = Field(OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(ERROR_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(..., env="WANDBOT_API_URL")
-    include_sources: bool = True
+    include_sources: bool = False
 
     class Config:
         env_file = ".env"

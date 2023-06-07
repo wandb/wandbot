@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
-from wandbot.apps.discord_app.config import DiscordAppConfig
+from wandbot.apps.discord.config import DiscordAppConfig
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -163,9 +163,10 @@ class Chat:
 
         if len(source_documents) and self.config.include_sources:
             response["source_documents"] = json.dumps(source_documents)
+            response["sources"] = result["sources"]
         else:
             response["source_documents"] = ""
-        response["sources"] = result["sources"]
+            response["sources"] = ""
 
         return response
 
