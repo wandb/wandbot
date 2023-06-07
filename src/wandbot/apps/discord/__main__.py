@@ -27,8 +27,8 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
         result = response.answer
         if response.model != "gpt-4":
             warning_message = (
-                f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
-                f"*gpt-4*\n\n"
+                f"**Warning: Falling back to {response.model}**, These results may nor be as good as "
+                f"**gpt-4**\n\n"
             )
             result = warning_message + response.answer
 

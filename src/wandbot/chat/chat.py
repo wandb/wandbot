@@ -199,11 +199,11 @@ class Chat:
             except Exception as e:
                 logger.warning(f"{self.config.fallback_model_name} failed with {e}")
                 result = {
-                    "answer": "Sorry, there seems to be an issue with our LLM servers. Please try again in "
-                    "some time.",
+                    "answer": "\uE058"
+                    + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
                     "sources": "",
                     "source_documents": None,
-                    "model": self.config.fallback_model_name,
+                    "model": None,
                 }
         return self.format_response(result)
 

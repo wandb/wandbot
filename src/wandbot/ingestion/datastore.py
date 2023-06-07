@@ -92,6 +92,13 @@ class DataStore:
                 chunk_overlap=self.config.chunk_overlap,
             )
         )
+        self.html_text_splitter: TextSplitter = (
+            RecursiveCharacterTextSplitter.from_language(
+                language=Language.HTML,
+                chunk_size=self.config.chunk_size * 3,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        )
         self.token_splitter: TextSplitter = TokenTextSplitter(
             encoding_name=self.config.encoding_name,
             chunk_size=self.config.chunk_size,
@@ -264,14 +271,18 @@ class CodeDataStore(DataStore):
                     f_name.endswith(".js")
                     or f_name.endswith(".cjs")
                     or f_name.endswith(".ts")
+                    or f_name.endswith(".tsx")
                 ):
                     document = self.js_text_splitter.split_documents(document)
                 elif f_name.endswith(".go"):
                     document = self.go_text_splitter.split_documents(document)
+                elif f_name.endswith(".html"):
+                    document = self.html_text_splitter.split_documents(document)
                 elif f_name.endswith(".sh"):
                     document = self.token_splitter.split_documents(document)
+
                 else:
-                    raise ValueError(f"Unknown file extension {f_name}")
+                    raise ValueError(f"Unknown file extension")
                 documents.extend(document)
             except Exception as e:
                 logger.warning(f"Failed to load code in {f_name} with error {e}")

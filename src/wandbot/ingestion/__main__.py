@@ -4,16 +4,13 @@ from wandbot.ingestion.config import (
     DocumentationStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
-    ExtraDataStoreConfig,
     GTMDataStoreConfig,
     SDKCodeStoreConfig,
     VectorIndexConfig,
-    WeaveCodeStoreConfig,
 )
 from wandbot.ingestion.datastore import (
     CodeDataStore,
     DocumentationDataStore,
-    ExtraDataStore,
     GTMDataStore,
     VectorIndex,
 )
@@ -29,8 +26,8 @@ def main():
         CodeDataStore(ExampleCodeStoreConfig()),
         CodeDataStore(ExampleNotebookStoreConfig()),
         CodeDataStore(SDKCodeStoreConfig()),
-        CodeDataStore(WeaveCodeStoreConfig()),
-        ExtraDataStore(ExtraDataStoreConfig()),
+        # CodeDataStore(WeaveCodeStoreConfig()),
+        # ExtraDataStore(ExtraDataStoreConfig()),
         GTMDataStore(GTMDataStoreConfig()),
     ]
     vectorindex_config = VectorIndexConfig(wandb_project="wandb_docs_bot_dev")
