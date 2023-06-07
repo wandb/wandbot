@@ -19,6 +19,7 @@ class ChatConfig(BaseSettings):
     vectorindex_artifact: str = (
         "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
     )
+    llm_cache_path: pathlib.Path = pathlib.Path("llm_cache.db", env="LLM_CACHE_PATH")
     verbose: bool = False
     wandb_project: str | None = Field(None, env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")

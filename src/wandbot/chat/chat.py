@@ -2,10 +2,12 @@ import json
 import logging
 from typing import List, Optional, Tuple
 
+import langchain
 import pandas as pd
 import tiktoken
 import wandb
 from langchain import LLMChain, OpenAI
+from langchain.cache import SQLiteCache
 from langchain.callbacks import get_openai_callback
 from langchain.callbacks.tracers import WandbTracer
 from langchain.chains.conversational_retrieval.base import (
@@ -46,6 +48,7 @@ class Chat:
     def __init__(self, config: Optional[ChatConfig] = None):
         if config is not None:
             self.config: ChatConfig = config
+        langchain.llm_cache = SQLiteCache(database_path=str(self.config.llm_cache_path))
         self.vector_index: VectorIndex = VectorIndex(
             config=self.config.vectorindex_config
         )
