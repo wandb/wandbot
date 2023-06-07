@@ -8,6 +8,7 @@ from wandbot.ingestion.config import (
     GTMDataStoreConfig,
     SDKCodeStoreConfig,
     VectorIndexConfig,
+    WeaveCodeStoreConfig,
 )
 from wandbot.ingestion.datastore import (
     CodeDataStore,
@@ -28,6 +29,7 @@ def main():
         CodeDataStore(ExampleCodeStoreConfig()),
         CodeDataStore(ExampleNotebookStoreConfig()),
         CodeDataStore(SDKCodeStoreConfig()),
+        CodeDataStore(WeaveCodeStoreConfig()),
         ExtraDataStore(ExtraDataStoreConfig()),
         GTMDataStore(GTMDataStoreConfig()),
     ]

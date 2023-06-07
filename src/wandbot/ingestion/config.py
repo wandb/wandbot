@@ -107,7 +107,7 @@ class SDKCodeStoreConfig(DataStoreConfig):
 
 
 class WeaveCodeStoreConfig(DataStoreConfig):
-    name: str = "sdk_code_store"
+    name: str = "weave_code_store"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/blob/main/",
         repo_path="https://github.com/wandb/weave",

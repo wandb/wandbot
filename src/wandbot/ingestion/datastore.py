@@ -18,12 +18,7 @@ from langchain.document_loaders import (
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.embeddings.base import Embeddings
 from langchain.schema import Document
-from langchain.text_splitter import (
-    MarkdownTextSplitter,
-    PythonCodeTextSplitter,
-    TextSplitter,
-    TokenTextSplitter,
-)
+from langchain.text_splitter import TextSplitter, TokenTextSplitter
 from llama_index import Document as LlamaDocument
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
@@ -37,6 +32,8 @@ from wandbot.ingestion.config import DataStoreConfig, VectorIndexConfig
 from wandbot.ingestion.utils import add_metadata_to_documents, fetch_git_repo, md5_dir
 
 logger = logging.getLogger(__name__)
+
+from langchain.text_splitter import Language, RecursiveCharacterTextSplitter
 
 
 class DocumentStore:
@@ -66,8 +63,35 @@ class DataStore:
 
     def __init__(self, config: DataStoreConfig):
         self.config = config
-        self.md_text_splitter: TextSplitter = MarkdownTextSplitter()
-        self.code_text_splitter: TextSplitter = PythonCodeTextSplitter()
+        self.md_text_splitter: TextSplitter = (
+            RecursiveCharacterTextSplitter.from_language(
+                language=Language.MARKDOWN,
+                chunk_size=self.config.chunk_size * 3,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        )
+        self.python_text_splitter: TextSplitter = (
+            RecursiveCharacterTextSplitter.from_language(
+                language=Language.PYTHON,
+                chunk_size=self.config.chunk_size * 3,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        )
+        self.js_text_splitter: TextSplitter = (
+            RecursiveCharacterTextSplitter.from_language(
+                language=Language.JS,
+                chunk_size=self.config.chunk_size * 3,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        )
+
+        self.go_text_splitter: TextSplitter = (
+            RecursiveCharacterTextSplitter.from_language(
+                language=Language.GO,
+                chunk_size=self.config.chunk_size * 3,
+                chunk_overlap=self.config.chunk_overlap,
+            )
+        )
         self.token_splitter: TextSplitter = TokenTextSplitter(
             encoding_name=self.config.encoding_name,
             chunk_size=self.config.chunk_size,
@@ -224,19 +248,34 @@ class CodeDataStore(DataStore):
         ):
             try:
                 if self.config.data_source.file_pattern == "*.ipynb":
-                    documents.extend(
-                        WandbNotebookLoader(
-                            f_name,
-                            include_outputs=False,
-                            max_output_length=0,
-                            remove_newline=True,
-                        ).load()
-                    )
+                    document = WandbNotebookLoader(
+                        f_name,
+                        include_outputs=False,
+                        max_output_length=0,
+                        remove_newline=True,
+                    ).load()
                 else:
-                    documents.extend(TextLoader(f_name).load())
-            except:
-                logger.warning(f"Failed to load code in {f_name}")
-        document_sections = self.code_text_splitter.split_documents(documents)
+                    document = TextLoader(f_name).load()
+                if f_name.endswith(".py") or f_name.endswith(".ipynb"):
+                    document = self.python_text_splitter.split_documents(document)
+                elif f_name.endswith(".md"):
+                    document = self.md_text_splitter.split_documents(document)
+                elif (
+                    f_name.endswith(".js")
+                    or f_name.endswith(".cjs")
+                    or f_name.endswith(".ts")
+                ):
+                    document = self.js_text_splitter.split_documents(document)
+                elif f_name.endswith(".go"):
+                    document = self.go_text_splitter.split_documents(document)
+                elif f_name.endswith(".sh"):
+                    document = self.token_splitter.split_documents(document)
+                else:
+                    raise ValueError(f"Unknown file extension {f_name}")
+                documents.extend(document)
+            except Exception as e:
+                logger.warning(f"Failed to load code in {f_name} with error {e}")
+        document_sections = self.token_splitter.split_documents(documents)
         document_store = self.create_docstore_from_documents(
             document_sections, document_files, metadata
         )

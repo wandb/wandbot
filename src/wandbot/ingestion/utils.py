@@ -131,13 +131,15 @@ def add_metadata_to_documents(
 ) -> List[Document]:
     out_documents = []
     for document in documents:
-        doc_id = hashlib.md5(document.page_content.encode("UTF-8")).hexdigest()
         if isinstance(source_map, dict):
             source = source_map.get(
                 document.metadata["source"], document.metadata["source"]
             )
         else:
             source = document.metadata["source"]
+        doc_id = hashlib.md5(
+            (source + document.page_content).encode("UTF-8")
+        ).hexdigest()
         metadata = {"source": source, "doc_id": doc_id}
         out_documents.append(
             Document(page_content=document.page_content, metadata=metadata)
