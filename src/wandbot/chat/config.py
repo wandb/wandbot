@@ -6,11 +6,11 @@ from wandbot.ingestion.config import VectorIndexConfig
 
 class ChatConfig(BaseSettings):
     model_name: str = "gpt-4"
-    max_retries: int = 1
+    max_retries: int = 2
     fallback_model_name: str = "gpt-3.5-turbo"
     max_fallback_retries: int = 6
-    chat_temperature: float = 0.0
-    chain_type: str = "map_reduce"
+    chat_temperature: float = 0.3
+    chain_type: str = "stuff"
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")
     history_prompt: pathlib.Path = pathlib.Path("data/prompts/history_prompt.json")
     vectorindex_config: VectorIndexConfig = VectorIndexConfig(
@@ -20,7 +20,7 @@ class ChatConfig(BaseSettings):
         "parambharat/wandb_docs_bot_dev/wandbot_vectorindex:latest"
     )
     llm_cache_path: pathlib.Path = pathlib.Path("llm_cache.db", env="LLM_CACHE_PATH")
-    verbose: bool = False
+    verbose: bool = True
     wandb_project: str | None = Field(None, env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
     wandb_job_type: str | None = "chat"

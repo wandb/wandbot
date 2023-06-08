@@ -27,7 +27,9 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
 
         if config.include_sources and response.sources:
             sources_list = [
-                item for item in response.sources.split(",") if item.strip().startswith("http")
+                item
+                for item in response.sources.split(",")
+                if item.strip().startswith("http")
             ]
             if len(sources_list) > 0:
                 result = (

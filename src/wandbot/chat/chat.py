@@ -16,8 +16,9 @@ from langchain.chains.conversational_retrieval.base import (
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.schema import BaseRetriever
-from src.wandbot.ingestion.utils import Timer
 from wandb.integration.langchain.wandb_tracer import WandbRunArgs
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
@@ -25,6 +26,7 @@ from wandbot.chat.prompts import load_chat_prompt, load_history_prompt
 from wandbot.chat.schemas import ChatRepsonse, ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.datastore import VectorIndex
+from wandbot.ingestion.utils import Timer
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -74,7 +76,14 @@ class Chat:
         self.vector_index = self.vector_index.load_from_artifact(
             self.config.vectorindex_artifact
         )
-        return self.vector_index.retriever
+        llm = OpenAI(
+            temperature=0, batch_size=10, max_retries=self.config.max_fallback_retries
+        )
+        compressor = LLMChainExtractor.from_llm(llm)
+        compression_retriever = ContextualCompressionRetriever(
+            base_compressor=compressor, base_retriever=self.vector_index.retriever
+        )
+        return compression_retriever
 
     @property
     def retriever(self):
@@ -87,8 +96,8 @@ class Chat:
     ) -> BaseConversationalRetrievalChain:
         map_llm = OpenAI(
             batch_size=10,
-            temperature=0.3,
-            max_retries=max_retries,
+            temperature=0.0,
+            max_retries=self.config.max_fallback_retries,
         )
         reduce_llm = ChatOpenAI(
             model_name=model_name,
@@ -104,14 +113,21 @@ class Chat:
             prompt=load_history_prompt(self.config.history_prompt),
             verbose=self.config.verbose,
         )
-        doc_chain = load_qa_with_sources_chain(
-            map_llm,
-            chain_type=self.config.chain_type,
-            combine_prompt=self.chat_prompt,
-            verbose=self.config.verbose,
-            reduce_llm=reduce_llm,
-        )
-
+        if self.config.chain_type == "map_reduce":
+            doc_chain = load_qa_with_sources_chain(
+                map_llm,
+                chain_type=self.config.chain_type,
+                combine_prompt=self.chat_prompt,
+                verbose=self.config.verbose,
+                reduce_llm=reduce_llm,
+            )
+        else:
+            doc_chain = load_qa_with_sources_chain(
+                map_llm,
+                chain_type=self.config.chain_type,
+                prompt=self.chat_prompt,
+                verbose=self.config.verbose,
+            )
         chain = ConversationalRetrievalQAWithSourcesandScoresChain(
             retriever=self.retriever,
             question_generator=question_generator,
