@@ -190,14 +190,17 @@ class Chat:
         try:
             response = get_answer(self.qa_chain, query)
         except:
-            print("Falling back to gpt-3.5-turbo")
+            print("Falling back to gpt-3.5-turbo-16k")
             self.qa_chain = load_qa_chain(
-                model_name="gpt-3.5-turbo",
+                model_name="gpt-3.5-turbo-16k",
                 vector_store=self.vector_store,
                 chat_prompt=self.chat_prompt,
             )
             response = get_answer(self.qa_chain, query)
-            fallback_warning = "**Warning: Falling back to gpt-3.5.** These results are sometimes not as good as gpt-4"
+            fallback_warning = (
+                "**Warning: Falling back to gpt-3.5-turbo-16k.** These results are sometimes not as "
+                "good as gpt-4"
+            )
             response = fallback_warning + "\n\n" + response
 
         end_time = time.time()
