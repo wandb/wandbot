@@ -1,3 +1,5 @@
+from typing import Any, List
+
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
 from wandbot.database.config import DataBaseConfig
@@ -119,3 +121,17 @@ class DatabaseClient:
                 self.database.rollback()
 
             return feedback
+
+    def get_all_question_answers(self, time=None) -> List[dict[str, Any]] | None:
+        question_answers = self.database.query(QuestionAnswerModel)
+        if time is not None:
+            question_answers = question_answers.filter(
+                QuestionAnswerModel.end_time >= time
+            )
+        question_answers = question_answers.all()
+        if question_answers is not None:
+            question_answers = [
+                QuestionAnswerCreateSchema.from_orm(question_answer).dict()
+                for question_answer in question_answers
+            ]
+            return question_answers

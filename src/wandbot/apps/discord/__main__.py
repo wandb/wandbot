@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
-from wandbot.apps.discord_app.config import DiscordAppConfig
+from wandbot.apps.discord.config import DiscordAppConfig
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -27,18 +27,24 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
         result = response.answer
         if response.model != "gpt-4":
             warning_message = (
-                f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
-                f"*gpt-4*\n\n"
+                f"**Warning: Falling back to {response.model}**, These results may nor be as good as "
+                f"**gpt-4**\n\n"
             )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            result = (
-                f"{result}\n\n*References*\n\n"
-                + ">"
-                + "\n".join(response.sources.split(","))
-                + "\n\n"
-            )
+            sources_list = [
+                item
+                for item in response.sources.split(",")
+                if item.strip().startswith("http")
+            ]
+            if len(sources_list) > 0:
+                result = (
+                    f"{result}\n\n*References*\n\n"
+                    + ">"
+                    + "\n".join(sources_list)
+                    + "\n\n"
+                )
         if outro_message:
             result = f"{result}\n\n{outro_message}"
 
@@ -76,6 +82,11 @@ async def on_message(message: discord.Message):
             question=str(message.clean_content),
             chat_history=chat_history,
         )
+        if response is None:
+            await thread.send(
+                f"🤖 {mention}: {config.ERROR_MESSAGE}", mention_author=True
+            )
+            return
         sent_message = await thread.send(
             f"🤖 {format_response(response, config.OUTRO_MESSAGE)}"
         )

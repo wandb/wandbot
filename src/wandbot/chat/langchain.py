@@ -94,7 +94,7 @@ def deduplicate_docs_with_order(docs: List[Document]) -> List[Document]:
 class HybridRetriever(BaseRetriever, BaseModel):
     dense: VectorStoreRetrieverWithScore
     sparse: TFIDFRetriever
-    k: int = 6
+    k: int = 8
 
     class Config:
         """Configuration for this pydantic object."""

@@ -63,7 +63,7 @@ To run the Q&A bot, use the provided command:
 
 ```bash
 cd wandbot
-cd discord_app
+cd discord
 # or
 # cd slack_app
 poetry run python -m main

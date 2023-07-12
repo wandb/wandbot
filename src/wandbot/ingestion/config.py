@@ -67,7 +67,7 @@ class DocumentationStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/",
         repo_path="https://github.com/wandb/docodile",
-        base_path="",
+        base_path="docs",
         file_pattern="*.md",
         is_git_repo=True,
     )
@@ -106,11 +106,30 @@ class SDKCodeStoreConfig(DataStoreConfig):
     )
 
 
+class WeaveCodeStoreConfig(DataStoreConfig):
+    name: str = "weave_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave/blob/main/",
+        repo_path="https://github.com/wandb/weave",
+        file_pattern="*.*",
+        is_git_repo=True,
+    )
+
+
 class ExtraDataStoreConfig(DataStoreConfig):
     name: str = "extra_data_store"
     data_source: DataSource = DataSource(
         local_path=pathlib.Path("data/raw_dataset/extra_data"),
         file_pattern="*.jsonl",
+        is_git_repo=False,
+    )
+
+
+class GTMDataStoreConfig(DataStoreConfig):
+    name: str = "gtm_data_store"
+    data_source: DataSource = DataSource(
+        local_path=pathlib.Path("data/raw_dataset/gtm_data"),
+        file_pattern="*.*x",
         is_git_repo=False,
     )
 
@@ -125,7 +144,7 @@ class VectorIndexConfig(BaseSettings):
         "max_df": 0.9,
         "ngram_range": (1, 3),
     }
-    retrieval_size: int = 6
+    retrieval_size: int = 8
     wandb_project: str | None = Field(..., env="WANDBOT_WANDB_PROJECT")
     wandb_entity: str | None = Field(None, env="WANDBOT_WANDB_ENTITY")
 

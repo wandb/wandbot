@@ -60,3 +60,4 @@ def create_ingestion_report(
         ),
     ]
     report.save()
+    print(f"Report saved to {report.url}")

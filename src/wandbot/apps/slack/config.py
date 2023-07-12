@@ -1,7 +1,7 @@
 from pydantic import AnyHttpUrl, BaseSettings, Field
 
 INTRO_MESSAGE = (
-    f"Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\n"
+    f"Please note that *wandbot is currently in alpha testing* and will experience frequent updates.\n\n"
     f"Please do not share any private or sensitive information in your query at this time.\n\n"
     f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
