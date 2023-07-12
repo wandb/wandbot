@@ -67,7 +67,7 @@ class DocumentationStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/",
         repo_path="https://github.com/wandb/docodile",
-        base_path="",
+        base_path="docs",
         file_pattern="*.md",
         is_git_repo=True,
     )
