@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import datetime
 from typing import List
+from urllib.parse import urljoin
 
 import aiohttp
 import requests
@@ -21,10 +22,10 @@ from wandbot.database.schemas import QuestionAnswer
 class APIClient:
     def __init__(self, url: str):
         self.url = url
-        self.query_endpoint = f"{self.url}/query"
-        self.feedback_endpoint = f"{self.url}/feedback"
-        self.chat_thread_endpoint = f"{self.url}/chat_thread"
-        self.chat_question_answer_endpoint = f"{self.url}/question_answer"
+        self.query_endpoint = urljoin(str(self.url), "query")
+        self.feedback_endpoint = urljoin(str(self.url), "feedback")
+        self.chat_thread_endpoint = urljoin(str(self.url), "chat_thread")
+        self.chat_question_answer_endpoint = urljoin(str(self.url), "question_answer")
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
