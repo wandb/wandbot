@@ -17,7 +17,7 @@ class FeedbackBase(BaseModel):
 class Feedback(FeedbackBase):
     class Config:
         use_enum_values = True
-        orm_mode = True
+        from_attributes = True
 
 
 class FeedbackCreate(Feedback):
@@ -45,7 +45,7 @@ class QuestionAnswerBase(BaseModel):
 class QuestionAnswer(QuestionAnswerBase):
     class Config:
         use_enum_values = True
-        orm_mode = True
+        from_attributes = True
 
 
 class QuestionAnswerCreate(QuestionAnswer):
@@ -62,7 +62,7 @@ class ChatThread(ChatThreadBase):
 
     class Config:
         use_enum_values = True
-        orm_mode = True
+        from_attributes = True
 
 
 class ChatThreadCreate(ChatThread):
