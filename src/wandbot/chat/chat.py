@@ -27,7 +27,6 @@ from langchain.retrievers import (
     TFIDFRetriever,
 )
 from langchain.retrievers.document_compressors import DocumentCompressorPipeline
-
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, load_history_prompt
 from wandbot.chat.schemas import ChatRepsonse, ChatRequest
@@ -40,6 +39,7 @@ logger = get_logger(__name__)
 class Chat:
     def __init__(self, config: ChatConfig):
         self.config = config
+        self.config.llm_cache_path.parent.mkdir(parents=True, exist_ok=True)
         langchain.llm_cache = SQLiteCache(database_path=str(self.config.llm_cache_path))
         self.run = wandb.init(
             project=self.config.wandb_project,
