@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains import ConversationalRetrievalChain, StuffDocumentsChain
 from langchain.schema import Document
-
 from wandbot.database.schemas import QuestionAnswer
 
 

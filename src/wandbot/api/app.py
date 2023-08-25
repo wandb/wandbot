@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from datetime import datetime
 
 import pandas as pd
@@ -21,13 +20,13 @@ from wandbot.chat.schemas import ChatRequest
 from wandbot.database.client import DatabaseClient
 from wandbot.database.database import engine
 from wandbot.database.models import Base
+from wandbot.utils import get_logger
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 Base.metadata.create_all(bind=engine)
 chat: Chat | None = None
-app = FastAPI(name="wandbot", version="0.0.1")
+app = FastAPI(name="wandbot", version="0.2.0")
 db_client: DatabaseClient | None = None
 last_backup = datetime.now()
 
@@ -41,7 +40,7 @@ async def backup_db():
             last_backup = datetime.now()
             logger.info(f"Backing up database to Table at {last_backup}")
             wandb.log({"question_answers_db": wandb.Table(dataframe=chat_table)})
-        await asyncio.sleep(10)
+        await asyncio.sleep(600)
 
 
 @app.on_event("startup")
@@ -98,7 +97,7 @@ async def query(
     result = chat(
         ChatRequest(question=request.question, chat_history=request.chat_history),
     )
-    result = APIQueryResponse(**result.dict())
+    result = APIQueryResponse(**result.model_dump())
 
     return result
 
@@ -116,8 +115,8 @@ async def feedback(
         wandb.log(
             {
                 "feedback": wandb.Table(
-                    columns=list(request.dict().keys()),
-                    data=[list(request.dict().values())],
+                    columns=list(request.model_dump().keys()),
+                    data=[list(request.model_dump().values())],
                 )
             }
         )
