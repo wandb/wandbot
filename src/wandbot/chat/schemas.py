@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List
 
 from pydantic import BaseModel
+
 from wandbot.database.schemas import QuestionAnswer
 
 
@@ -19,7 +20,7 @@ class ChatThreadCreate(ChatThreadBase):
 
 class ChatThread(ChatThreadCreate):
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ChatRequest(BaseModel):

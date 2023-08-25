@@ -1,87 +1,103 @@
 import json
-import logging
+import pathlib
 from typing import List, Optional, Tuple
 
 import langchain
 import pandas as pd
 import tiktoken
 import wandb
-from langchain import LLMChain, OpenAI
+from langchain import FAISS, LLMChain, OpenAI
 from langchain.cache import SQLiteCache
 from langchain.callbacks import get_openai_callback
-from langchain.callbacks.tracers import WandbTracer
 from langchain.chains.conversational_retrieval.base import (
     BaseConversationalRetrievalChain,
 )
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import LLMChainExtractor
-from langchain.schema import BaseRetriever
-from wandb.integration.langchain.wandb_tracer import WandbRunArgs
+from langchain.document_transformers import (
+    EmbeddingsClusteringFilter,
+    EmbeddingsRedundantFilter,
+    LongContextReorder,
+)
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.retrievers import (
+    ContextualCompressionRetriever,
+    MergerRetriever,
+    MultiQueryRetriever,
+    TFIDFRetriever,
+)
+from langchain.retrievers.document_compressors import DocumentCompressorPipeline
+
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
 from wandbot.chat.prompts import load_chat_prompt, load_history_prompt
 from wandbot.chat.schemas import ChatRepsonse, ChatRequest
-from wandbot.database.schemas import QuestionAnswer
-from wandbot.ingestion.datastore import VectorIndex
-from wandbot.ingestion.utils import Timer
+from wandbot.chat.utils import ConversationalRetrievalQASourcesChain, get_chat_history
+from wandbot.utils import Timer, get_logger
 
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
-
-
-def get_chat_history(
-    chat_history: List[QuestionAnswer] | None,
-) -> List[tuple[str, str]]:
-    if not chat_history:
-        return []
-    else:
-        return [
-            (question_answer.question, question_answer.answer)
-            for question_answer in chat_history
-        ]
+logger = get_logger(__name__)
 
 
 class Chat:
-    config: ChatConfig
-
-    def __init__(self, config: Optional[ChatConfig] = None):
-        if config is not None:
-            self.config: ChatConfig = config
+    def __init__(self, config: ChatConfig):
+        self.config = config
         langchain.llm_cache = SQLiteCache(database_path=str(self.config.llm_cache_path))
-        self.vector_index: VectorIndex = VectorIndex(
-            config=self.config.vectorindex_config
-        )
-        self.chat_prompt: ChatPromptTemplate = load_chat_prompt(self.config.chat_prompt)
-        self._retriever: BaseRetriever = self._load_retriever()
-        self._chain: BaseConversationalRetrievalChain = self._load_chain(
-            self.config.model_name, self.config.max_retries
-        )
-        self._fallback_chain: BaseConversationalRetrievalChain = self._load_chain(
-            self.config.fallback_model_name, self.config.max_fallback_retries
+        self.run = wandb.init(
+            project=self.config.wandb_project,
+            entity=self.config.wandb_entity,
+            job_type="chat",
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        WandbTracer(
-            run_args=WandbRunArgs(
-                project=self.config.wandb_project,
-                entity=self.config.wandb_entity,
-                config=self.config.dict(),
-                job_type=self.config.wandb_job_type,
-            )
+
+        self.chat_prompt = load_chat_prompt(self.config.chat_prompt)
+        self.history_prompt = load_history_prompt(self.config.history_prompt)
+
+        self._retriever = self._load_retriever()
+        self._chain = self._load_chain(
+            self.config.chat_model_name, self.config.max_retries
+        )
+        self._fallback_chain = self._load_chain(
+            self.config.fallback_model_name, self.config.max_fallback_retries
         )
 
-    def _load_retriever(self) -> BaseRetriever:
-        self.vector_index = self.vector_index.load_from_artifact(
-            self.config.vectorindex_artifact
+    def _load_retriever(
+        self,
+    ):
+        artifact = wandb.run.use_artifact(
+            self.config.retriever_artifact, type="vectorstore"
         )
-        llm = OpenAI(
-            temperature=0, batch_size=10, max_retries=self.config.max_fallback_retries
+        artifact_dir = artifact.download()
+
+        embedding_fn = OpenAIEmbeddings()
+        retrievers = []
+        for docstore_dir in list(pathlib.Path(artifact_dir).glob("*")):
+            faiss_dir = docstore_dir / "faiss"
+            tftdf_dir = docstore_dir / "tfidf"
+            faiss_store = FAISS.load_local(str(faiss_dir), embedding_fn)
+            faiss_retriever = faiss_store.as_retriever()
+            tfidf_retriever = TFIDFRetriever.load_local(str(tftdf_dir))
+            retrievers.extend([faiss_retriever, tfidf_retriever])
+        merger_retriever = MergerRetriever(retrievers=retrievers)
+        query_llm = ChatOpenAI(model=self.config.fallback_model_name, temperature=0.5)
+        retriever_from_llm = MultiQueryRetriever.from_llm(
+            retriever=merger_retriever, llm=query_llm
         )
-        compressor = LLMChainExtractor.from_llm(llm)
+        embedding_filter = EmbeddingsRedundantFilter(embeddings=embedding_fn)
+
+        filter_ordered_cluster = EmbeddingsClusteringFilter(
+            embeddings=embedding_fn,
+            num_clusters=5,
+            num_closest=2,
+        )
+        pipeline = DocumentCompressorPipeline(
+            transformers=[
+                embedding_filter,
+                filter_ordered_cluster,
+                embedding_filter,
+                LongContextReorder(),
+            ]
+        )
         compression_retriever = ContextualCompressionRetriever(
-            base_compressor=compressor, base_retriever=self.vector_index.retriever
+            base_compressor=pipeline, base_retriever=retriever_from_llm
         )
         return compression_retriever
 
@@ -100,7 +116,7 @@ class Chat:
             max_retries=self.config.max_fallback_retries,
         )
         reduce_llm = ChatOpenAI(
-            model_name=model_name,
+            model_name=self.config.fallback_model_name,
             temperature=self.config.chat_temperature,
             max_retries=max_retries,
         )
@@ -110,7 +126,7 @@ class Chat:
                 temperature=self.config.chat_temperature,
                 max_retries=self.config.max_fallback_retries,
             ),
-            prompt=load_history_prompt(self.config.history_prompt),
+            prompt=self.history_prompt,
             verbose=self.config.verbose,
         )
         if self.config.chain_type == "map_reduce":
@@ -123,12 +139,12 @@ class Chat:
             )
         else:
             doc_chain = load_qa_with_sources_chain(
-                map_llm,
+                reduce_llm,
                 chain_type=self.config.chain_type,
                 prompt=self.chat_prompt,
                 verbose=self.config.verbose,
             )
-        chain = ConversationalRetrievalQAWithSourcesandScoresChain(
+        chain = ConversationalRetrievalQASourcesChain(
             retriever=self.retriever,
             question_generator=question_generator,
             combine_docs_chain=doc_chain,
@@ -141,7 +157,7 @@ class Chat:
     def chain(self):
         if self._chain is None:
             self._chain = self._load_chain(
-                model_name=self.config.model_name,
+                model_name=self.config.chat_model_name,
                 max_retries=self.config.max_retries,
             )
         return self._chain
@@ -168,9 +184,11 @@ class Chat:
         response = {}
         if result["source_documents"]:
             source_documents = [
-                {"source": doc.metadata["source"], "score": doc.metadata["score"]}
+                {
+                    "source": doc.metadata["source"],
+                    "text": doc.page_content,
+                }
                 for doc in result["source_documents"]
-                # if doc.metadata["score"] <= self.config.source_score_threshold
             ]
         else:
             source_documents = []
@@ -199,9 +217,9 @@ class Chat:
                 },
                 return_only_outputs=True,
             )
-            result["model"] = self.config.model_name
+            result["model"] = self.config.chat_model_name
         except Exception as e:
-            logger.warning(f"{self.config.model_name} failed with {e}")
+            logger.warning(f"{self.config.chat_model_name} failed with {e}")
             logger.warning(f"Falling back to {self.config.fallback_model_name} model")
             try:
                 result = self.fallback_chain(
