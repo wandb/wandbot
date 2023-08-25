@@ -1,4 +1,5 @@
-from pydantic import AnyHttpUrl, BaseSettings, Field
+from pydantic import AnyHttpUrl, Field
+from pydantic_settings import BaseSettings
 
 EN_INTRO_MESSAGE = (
     f"Please note that *wandbot is currently in alpha testing* and will experience frequent updates.\n\n"
@@ -45,3 +46,4 @@ class SlackAppConfig(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "allow"

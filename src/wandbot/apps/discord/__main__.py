@@ -3,6 +3,7 @@ import logging
 import uuid
 
 import discord
+import langdetect
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
@@ -22,14 +23,19 @@ config = DiscordAppConfig()
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(response: APIQueryResponse | None, outro_message: str = "") -> str:
+def format_response(
+    response: APIQueryResponse | None, outro_message: str = "", lang: str = "en"
+) -> str:
     if response is not None:
         result = response.answer
         if response.model != "gpt-4":
-            warning_message = (
-                f"**Warning: Falling back to {response.model}**, These results may nor be as good as "
-                f"**gpt-4**\n\n"
-            )
+            if lang == "ja":
+                warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
+            else:
+                warning_message = (
+                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
+                    f"*gpt-4*\n\n"
+                )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
@@ -39,12 +45,16 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "") 
                 if item.strip().startswith("http")
             ]
             if len(sources_list) > 0:
-                result = (
-                    f"{result}\n\n*References*\n\n"
-                    + ">"
-                    + "\n".join(sources_list)
-                    + "\n\n"
-                )
+                if lang == "ja":
+                    result = (
+                        f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list) + "\n\n"
+                    )
+                else:
+                    result = (
+                        f"{result}\n\n*References*\n\n>"
+                        + "\n> ".join(sources_list)
+                        + "\n\n"
+                    )
         if outro_message:
             result = f"{result}\n\n{outro_message}"
 
@@ -65,6 +75,7 @@ async def on_message(message: discord.Message):
             or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
         )
     ):
+        lang_code = langdetect.detect(message.clean_content)
         mention = f"<@{message.author.id}>"
         thread = await message.channel.create_thread(
             name=f"Thread", type=discord.ChannelType.public_thread
@@ -74,27 +85,41 @@ async def on_message(message: discord.Message):
             application=config.APPLICATION, thread_id=str(thread.id)
         )
         if not chat_history:
-            await thread.send(
-                f"🤖 Hi {mention}: {config.INTRO_MESSAGE}", mention_author=True
-            )
+            if lang_code == "ja":
+                await thread.send(
+                    f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True
+                )
+            else:
+                await thread.send(
+                    f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}", mention_author=True
+                )
 
         response = await api_client.query(
             question=str(message.clean_content),
             chat_history=chat_history,
         )
         if response is None:
-            await thread.send(
-                f"🤖 {mention}: {config.ERROR_MESSAGE}", mention_author=True
-            )
+            if lang_code == "ja":
+                await thread.send(
+                    f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True
+                )
+            else:
+                await thread.send(
+                    f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True
+                )
             return
+        if lang_code == "ja":
+            outro_message = config.JA_OUTRO_MESSAGE
+        else:
+            outro_message = config.EN_OUTRO_MESSAGE
         sent_message = await thread.send(
-            f"🤖 {format_response(response, config.OUTRO_MESSAGE)}"
+            f"🤖 {format_response(response, outro_message, lang_code)}",
         )
 
         await api_client.create_question_answer(
             thread_id=str(thread.id),
             question_answer_id=str(sent_message.id),
-            **response.dict(),
+            **response.model_dump(),
         )
         # # Add reactions for feedback
         await sent_message.add_reaction("👍")

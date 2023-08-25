@@ -99,7 +99,7 @@ def command_handler(body, say, logger):
         if lang_code == "ja":
             response = format_response(api_response, config.JA_OUTRO_MESSAGE, lang_code)
         else:
-            response = format_response(api_response, config.OUTRO_MESSAGE)
+            response = format_response(api_response, config.EN_OUTRO_MESSAGE)
 
         # send the response
         sent_message = send_message(say=say, message=response, thread=thread_id)
@@ -121,7 +121,7 @@ def command_handler(body, say, logger):
         api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
-            **api_response.dict(),
+            **api_response.model_dump(),
         )
 
     except Exception as e:
