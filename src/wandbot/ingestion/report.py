@@ -3,7 +3,6 @@ from datetime import datetime
 
 import wandb
 import wandb.apis.reports as wr
-from wandbot.ingestion.datastore import VectorIndex
 
 
 def log_datasource_counts(metadata: dict, wandb_run: wandb.sdk.wandb_run.Run):
@@ -15,12 +14,15 @@ def log_datasource_counts(metadata: dict, wandb_run: wandb.sdk.wandb_run.Run):
 
 
 def create_ingestion_report(
-    vectorindex: VectorIndex, raw_dataset_artifact: wandb.Artifact
+    project: str,
+    entity: str,
+    raw_artifact: str,
+    preprocessed_artifact: str,
+    vectorstore_artifact: str,
 ):
-    config = vectorindex.config
     report = wr.Report(
-        project=config.wandb_project,
-        entity=config.wandb_entity,
+        project=project,
+        entity=entity,
         title=f"Wandbot Data Ingestion Report: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         description=f"This report contains details of the data ingestion process "
         f"for the Wandbot run on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
