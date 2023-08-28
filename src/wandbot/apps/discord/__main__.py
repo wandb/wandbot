@@ -67,94 +67,115 @@ def format_response(
 async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
-    if (
-        bot.user is not None
-        and bot.user.mentioned_in(message)
-        and (
-            message.channel.id == config.PROD_DISCORD_CHANNEL_ID
-            or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
-        )
-    ):
+    if bot.user is not None and bot.user.mentioned_in(message):
         lang_code = langdetect.detect(message.clean_content)
         mention = f"<@{message.author.id}>"
-        thread = await message.channel.create_thread(
-            name=f"Thread", type=discord.ChannelType.public_thread
-        )  # currently calling it "Thread" because W&B Support makes it sound too official.
-
-        chat_history = await api_client.get_chat_history(
-            application=config.APPLICATION, thread_id=str(thread.id)
-        )
-        if not chat_history:
-            if lang_code == "ja":
-                await thread.send(
-                    f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True
-                )
-            else:
-                await thread.send(
-                    f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}", mention_author=True
-                )
-
-        response = await api_client.query(
-            question=str(message.clean_content),
-            chat_history=chat_history,
-        )
-        if response is None:
-            if lang_code == "ja":
-                await thread.send(
-                    f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True
-                )
-            else:
-                await thread.send(
-                    f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True
-                )
-            return
-        if lang_code == "ja":
-            outro_message = config.JA_OUTRO_MESSAGE
+        thread = None
+        is_following = None
+        if isinstance(message.channel, discord.Thread):
+            if (
+                message.channel.parent.id == config.PROD_DISCORD_CHANNEL_ID
+                or message.channel.parent.id == config.TEST_DISCORD_CHANNEL_ID
+            ):
+                thread = message.channel
+                is_following = True
         else:
-            outro_message = config.EN_OUTRO_MESSAGE
-        sent_message = await thread.send(
-            f"🤖 {format_response(response, outro_message, lang_code)}",
-        )
+            if (
+                message.channel.id == config.PROD_DISCORD_CHANNEL_ID
+                or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
+            ):
+                thread = await message.channel.create_thread(
+                    name=f"Thread", type=discord.ChannelType.public_thread
+                )  # currently calling it "Thread" because W&B Support makes it sound too official.
+                is_following = False
+        if thread is not None:
+            if is_following:
+                chat_history = await api_client.get_chat_history(
+                    application=config.APPLICATION, thread_id=str(thread.id)
+                )
+            else:
+                chat_history = None
+            if not chat_history:
+                if lang_code == "ja":
+                    await thread.send(
+                        f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True
+                    )
+                else:
+                    await thread.send(
+                        f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}",
+                        mention_author=True,
+                    )
 
-        await api_client.create_question_answer(
-            thread_id=str(thread.id),
-            question_answer_id=str(sent_message.id),
-            **response.model_dump(),
-        )
-        # # Add reactions for feedback
-        await sent_message.add_reaction("👍")
-        await sent_message.add_reaction("👎")
-
-        # # Wait for reactions
-        def check(reaction, user):
-            return user == message.author and str(reaction.emoji) in ["👍", "👎"]
-
-        try:
-            reaction, user = await bot.wait_for(
-                "reaction_add", timeout=config.WAIT_TIME, check=check
+            response = await api_client.query(
+                question=str(message.clean_content),
+                chat_history=chat_history,
             )
-
-        except asyncio.TimeoutError:
-            await thread.send("🤖")
-            rating = 0
-
-        else:
-            # Get the feedback value
-            if str(reaction.emoji) == "👍":
-                rating = 1
-            elif str(reaction.emoji) == "👎":
-                rating = -1
+            if response is None:
+                if lang_code == "ja":
+                    await thread.send(
+                        f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True
+                    )
+                else:
+                    await thread.send(
+                        f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True
+                    )
+                return
+            if lang_code == "ja":
+                outro_message = config.JA_OUTRO_MESSAGE
             else:
+                outro_message = config.EN_OUTRO_MESSAGE
+            sent_message = None
+            if len(response.answer) > 2000:
+                for i in range(0, len(response.aswer), 2000):
+                    response_copy = response.model_copy()
+                    response_copy.answer = response.answer[i : i + 2000]
+                    sent_message = await thread.send(
+                        f"🤖 {format_response(response_copy, outro_message, lang_code)}",
+                    )
+            else:
+                sent_message = await thread.send(
+                    f"🤖 {format_response(response, outro_message, lang_code)}",
+                )
+            if sent_message is not None:
+                await api_client.create_question_answer(
+                    thread_id=str(thread.id),
+                    question_answer_id=str(sent_message.id),
+                    **response.model_dump(),
+                )
+                # # Add reactions for feedback
+                await sent_message.add_reaction("👍")
+                await sent_message.add_reaction("👎")
+
+            # # Wait for reactions
+            def check(reaction, user):
+                return user == message.author and str(reaction.emoji) in ["👍", "👎"]
+
+            try:
+                reaction, user = await bot.wait_for(
+                    "reaction_add", timeout=config.WAIT_TIME, check=check
+                )
+
+            except asyncio.TimeoutError:
+                # await thread.send("🤖")
                 rating = 0
 
-        # Send feedback to API
-        await api_client.create_feedback(
-            feedback_id=str(uuid.uuid4()),
-            question_answer_id=str(sent_message.id),
-            rating=rating,
-        )
+            else:
+                # Get the feedback value
+                if str(reaction.emoji) == "👍":
+                    rating = 1
+                elif str(reaction.emoji) == "👎":
+                    rating = -1
+                else:
+                    rating = 0
 
-    await bot.process_commands(message)
+            # Send feedback to API
+            await api_client.create_feedback(
+                feedback_id=str(uuid.uuid4()),
+                question_answer_id=str(sent_message.id),
+                rating=rating,
+            )
+
+        await bot.process_commands(message)
 
 
 if __name__ == "__main__":

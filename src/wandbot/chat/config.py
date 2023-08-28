@@ -17,7 +17,7 @@ class ChatConfig(BaseSettings):
     llm_cache_path: pathlib.Path = pathlib.Path(
         "./data/cache/llm_cache.db", env="LLM_CACHE_PATH"
     )
-    verbose: bool = True
+    verbose: bool = False
     wandb_project: str | None = Field("wandbot-dev", env="WANDB_PROJECT")
     wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
     include_sources: bool = True
