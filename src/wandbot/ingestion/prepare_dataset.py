@@ -16,6 +16,10 @@ from wandbot.ingestion.config import (
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     SDKCodeStoreConfig,
+    SDKTestsStoreConfig,
+    WeaveCodeStoreConfig,
+    WeaveExamplesStoreConfig,
+    WeaveJsStoreConfig,
 )
 from wandbot.ingestion.utils import EXTENSION_MAP, WandbNotebookLoader, fetch_git_repo
 from wandbot.utils import get_logger
@@ -184,7 +188,7 @@ class CodeDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                if self.config.data_source.file_pattern == "*.ipynb":
+                if os.path.splitext(f_name)[-1] == "*.ipynb":
                     document = WandbNotebookLoader(
                         f_name,
                         include_outputs=False,
@@ -228,7 +232,10 @@ def load(
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
     examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
     sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
-    # weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
+    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
+    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
+    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
+    weave_js_loader = CodeDataLoader(WeaveJsStoreConfig())
 
     for loader in [
         en_docodile_loader,
@@ -236,11 +243,12 @@ def load(
         examples_code_loader,
         examples_notebook_loader,
         sdk_code_loader,
-        # weave_code_loader,
+        sdk_tests_loader,
+        weave_code_loader,
+        weave_examples_loader,
+        weave_js_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
-        with (loader.config.docstore_dir / "metadata.json").open("w") as f:
-            json.dump(loader.metadata, f)
 
         with (loader.config.docstore_dir / "config.json").open("w") as f:
             f.write(loader.config.model_dump_json())
@@ -252,6 +260,8 @@ def load(
                     "metadata": document.metadata,
                 }
                 f.write(json.dumps(document_json) + "\n")
+        with (loader.config.docstore_dir / "metadata.json").open("w") as f:
+            json.dump(loader.metadata, f)
 
         artifact.add_dir(
             str(loader.config.docstore_dir), name=loader.config.docstore_dir.name

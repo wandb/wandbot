@@ -72,14 +72,17 @@ class DocumentTransformer:
             if document_splitter is None:
                 continue
             for doc_split in document_splitter.split_documents([document]):
-                doc_split.metadata["parent_hash"] = document.metadata["hash"]
-                doc_split.metadata["hash"] = doc_split.metadata["hash"] = hashlib.md5(
-                    (
-                        str(doc_split.metadata["parent_hash"])
-                        + str(doc_split.page_content)
-                    ).encode("UTF-8")
-                ).hexdigest()
-                transformed_documents.append(doc_split)
+                if len(doc_split.page_content.split()) > 5:
+                    doc_split.metadata["parent_hash"] = document.metadata["hash"]
+                    doc_split.metadata["hash"] = doc_split.metadata[
+                        "hash"
+                    ] = hashlib.md5(
+                        (
+                            str(doc_split.metadata["parent_hash"])
+                            + str(doc_split.page_content)
+                        ).encode("UTF-8")
+                    ).hexdigest()
+                    transformed_documents.append(doc_split)
         return transformed_documents
 
 

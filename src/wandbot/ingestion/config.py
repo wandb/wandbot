@@ -116,12 +116,49 @@ class SDKCodeStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("docstore_sdk_code")
 
 
+class SDKTestsStoreConfig(DataStoreConfig):
+    name: str = "sdk_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/wandb/blob/main/",
+        repo_path="https://github.com/wandb/wandb",
+        base_path="tests",
+        file_pattern="*.py",
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_sdk_tests")
+
+
 class WeaveCodeStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/blob/main/",
         repo_path="https://github.com/wandb/weave",
-        file_pattern=["*.py", "*.ipynb", "*.md", "*.js", "*.ts"],
+        base_path="weave",
+        file_pattern=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_code")
+
+
+class WeaveExamplesStoreConfig(DataStoreConfig):
+    name: str = "weave_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave/blob/main/",
+        repo_path="https://github.com/wandb/weave",
+        base_path="examples",
+        file_pattern=["*.py", "*.ipynb"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_examples")
+
+
+class WeaveJsStoreConfig(DataStoreConfig):
+    name: str = "weave_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave/blob/main/",
+        repo_path="https://github.com/wandb/weave",
+        base_path="weave-js",
+        file_pattern=["*.js", "*.ts"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_js")
