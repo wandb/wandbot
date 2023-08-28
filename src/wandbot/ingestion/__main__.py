@@ -18,7 +18,9 @@ def main():
     # Create vectorstore
     vectorstore_artifact = vectorstores.load(project, entity, preprocessed_artifact)
     # TODO: include ingestion report
-    create_ingestion_report(project, entity, raw_artifact, preprocessed_artifact, vectorstore_artifact)
+    create_ingestion_report(
+        project, entity, raw_artifact, preprocessed_artifact, vectorstore_artifact
+    )
 
 
 if __name__ == "__main__":
