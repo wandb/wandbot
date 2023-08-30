@@ -6,7 +6,7 @@ import langchain
 import pandas as pd
 import tiktoken
 import wandb
-from langchain import FAISS, LLMChain, OpenAI
+from langchain import FAISS, LLMChain
 from langchain.cache import SQLiteCache
 from langchain.callbacks import get_openai_callback
 from langchain.chains.conversational_retrieval.base import (
@@ -23,7 +23,6 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.retrievers import (
     ContextualCompressionRetriever,
     MergerRetriever,
-    MultiQueryRetriever,
     TFIDFRetriever,
 )
 from langchain.retrievers.document_compressors import DocumentCompressorPipeline
@@ -77,10 +76,6 @@ class Chat:
             tfidf_retriever = TFIDFRetriever.load_local(str(tftdf_dir))
             retrievers.extend([faiss_retriever, tfidf_retriever])
         merger_retriever = MergerRetriever(retrievers=retrievers)
-        query_llm = ChatOpenAI(model=self.config.fallback_model_name, temperature=0.5)
-        retriever_from_llm = MultiQueryRetriever.from_llm(
-            retriever=merger_retriever, llm=query_llm
-        )
         embedding_filter = EmbeddingsRedundantFilter(embeddings=embedding_fn)
 
         filter_ordered_cluster = EmbeddingsClusteringFilter(
@@ -97,7 +92,7 @@ class Chat:
             ]
         )
         compression_retriever = ContextualCompressionRetriever(
-            base_compressor=pipeline, base_retriever=retriever_from_llm
+            base_compressor=pipeline, base_retriever=merger_retriever
         )
         return compression_retriever
 
@@ -110,16 +105,6 @@ class Chat:
     def _load_chain(
         self, model_name: str = None, max_retries: int = 1
     ) -> BaseConversationalRetrievalChain:
-        map_llm = OpenAI(
-            batch_size=10,
-            temperature=0.0,
-            max_retries=self.config.max_fallback_retries,
-        )
-        reduce_llm = ChatOpenAI(
-            model_name=self.config.fallback_model_name,
-            temperature=self.config.chat_temperature,
-            max_retries=max_retries,
-        )
         question_generator = LLMChain(
             llm=ChatOpenAI(
                 model_name=self.config.fallback_model_name,
@@ -129,21 +114,16 @@ class Chat:
             prompt=self.history_prompt,
             verbose=self.config.verbose,
         )
-        if self.config.chain_type == "map_reduce":
-            doc_chain = load_qa_with_sources_chain(
-                map_llm,
-                chain_type=self.config.chain_type,
-                combine_prompt=self.chat_prompt,
-                verbose=self.config.verbose,
-                reduce_llm=reduce_llm,
-            )
-        else:
-            doc_chain = load_qa_with_sources_chain(
-                reduce_llm,
-                chain_type=self.config.chain_type,
-                prompt=self.chat_prompt,
-                verbose=self.config.verbose,
-            )
+        doc_chain = load_qa_with_sources_chain(
+            ChatOpenAI(
+                model_name=model_name,
+                temperature=self.config.chat_temperature,
+                max_retries=max_retries,
+            ),
+            chain_type=self.config.chain_type,
+            prompt=self.chat_prompt,
+            verbose=self.config.verbose,
+        )
         chain = ConversationalRetrievalQASourcesChain(
             retriever=self.retriever,
             question_generator=question_generator,

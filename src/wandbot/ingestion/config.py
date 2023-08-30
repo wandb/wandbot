@@ -83,7 +83,7 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
 class ExampleCodeStoreConfig(DataStoreConfig):
     name: str = "examples_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/examples/blob/master/",
+        remote_path="https://github.com/wandb/examples/tree/master/",
         repo_path="https://github.com/wandb/examples",
         base_path="examples",
         file_pattern="*.py",
@@ -95,7 +95,7 @@ class ExampleCodeStoreConfig(DataStoreConfig):
 class ExampleNotebookStoreConfig(DataStoreConfig):
     name: str = "examples_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/examples/blob/master/",
+        remote_path="https://github.com/wandb/examples/tree/master/",
         repo_path="https://github.com/wandb/examples",
         base_path="colabs",
         file_pattern="*.ipynb",
@@ -107,7 +107,7 @@ class ExampleNotebookStoreConfig(DataStoreConfig):
 class SDKCodeStoreConfig(DataStoreConfig):
     name: str = "sdk_code_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/wandb/blob/main/",
+        remote_path="https://github.com/wandb/wandb/tree/main/",
         repo_path="https://github.com/wandb/wandb",
         base_path="wandb",
         file_pattern="*.py",
@@ -119,7 +119,7 @@ class SDKCodeStoreConfig(DataStoreConfig):
 class SDKTestsStoreConfig(DataStoreConfig):
     name: str = "sdk_code_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/wandb/blob/main/",
+        remote_path="https://github.com/wandb/wandb/tree/main/",
         repo_path="https://github.com/wandb/wandb",
         base_path="tests",
         file_pattern="*.py",
@@ -131,7 +131,7 @@ class SDKTestsStoreConfig(DataStoreConfig):
 class WeaveCodeStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/blob/main/",
+        remote_path="https://github.com/wandb/weave/tree/master/",
         repo_path="https://github.com/wandb/weave",
         base_path="weave",
         file_pattern=["*.py", "*.ipynb"],
@@ -143,7 +143,7 @@ class WeaveCodeStoreConfig(DataStoreConfig):
 class WeaveExamplesStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/blob/main/",
+        remote_path="https://github.com/wandb/weave/tree/master/",
         repo_path="https://github.com/wandb/weave",
         base_path="examples",
         file_pattern=["*.py", "*.ipynb"],
@@ -155,7 +155,7 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
 class WeaveJsStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/blob/main/",
+        remote_path="https://github.com/wandb/weave/tree/master/",
         repo_path="https://github.com/wandb/weave",
         base_path="weave-js",
         file_pattern=["*.js", "*.ts"],

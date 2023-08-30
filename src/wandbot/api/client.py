@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from urllib.parse import urljoin
 
 import aiohttp
@@ -129,7 +129,7 @@ class APIClient:
     def query(
         self,
         question: str,
-        chat_history: List[QuestionAnswer],
+        chat_history: Optional[List[QuestionAnswer]] = None,
     ) -> APIQueryResponse:
         request = APIQueryRequest(
             question=question,
