@@ -66,8 +66,10 @@ class ConversationalRetrievalQASourcesChain(ConversationalRetrievalChain):
     def _call(self, inputs: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         results = super()._call(inputs, **kwargs)
         answer = results["answer"]
-        if re.search(r"Sources:\s", answer, flags=re.IGNORECASE):
-            answers_and_sources = re.split(r"Sources:\s", answer, flags=re.IGNORECASE)
+        if re.search(r"Source[s]?:\s", answer, flags=re.IGNORECASE):
+            answers_and_sources = re.split(
+                r"Source[s]?:\s", answer, flags=re.IGNORECASE
+            )
             if len(answers_and_sources) > 1:
                 answer = answers_and_sources[0]
                 sources = answers_and_sources[1]
