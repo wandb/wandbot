@@ -13,47 +13,53 @@ include = ["src/**/*", "LICENSE", "README.md"]
 python = ">=3.10.0,<3.11"
 numpy = "^1.25.2"
 wandb = "^0.15.8"
-langchain = {version ="^0.0.271", optional = true}
 openai = {version="^0.27.9", optional = true}
 tiktoken = {version= "^0.4.0", optional = true}
 pandas = {version = "^2.0.3", optional = true}
 unstructured = {version = "^0.10.5", optional = true}
 pydantic-settings = {version = "^2.0.3", optional = true}
-urllib3 = {version = "^2.0.4", optional = true}
 gitpython = {version = "^3.1.32", optional = true}
 giturlparse = {version = "^0.11.1", optional = true}
 scikit-learn = {version = "^1.3.0", optional = true}
 python-dotenv = {version = "^1.0.0", optional = true}
-fastapi = {version = "^0.101.1", optional = true}
 faiss-cpu = {version = "^1.7.4", optional = true}
 slack-bolt = {version = "^1.18.0", optional = true}
 slack-sdk = {version = "^3.21.3", optional = true}
 discord = {version = "^2.3.2", optional = true}
 markdown = {version = "^3.4.4", optional = true}
-uvicorn = {version = "^0.23.2", optional = true}
+fastapi = { version = "^0.101.1", optional = true }
+gunicorn = { version = "^21.2.0", optional = true }
 langdetect = {version = "^1.0.9", optional = true}
+llama-index = { version = "^0.8.30", optional = true }
+tree-sitter-languages = { version = "^1.7.0", optional = true }
+cohere = { version = "^4.27", optional = true }
+jupyter = { version = "^1.0.0", optional = true }
+markdownify = { version = "^0.11.6", optional = true }
+uvicorn = { version = "^0.23.2", optional = true }
+
 
 [tool.poetry.extras]
 slack = ["slack-bolt", "slack-sdk",]
 discord = ["discord"]
 chat = [
-    "langchain",
+    "llama-index",
     "openai",
     "tiktoken",
     "pandas",
     "unstructured",
     "pydantic-settings",
-    "urllib3",
     "gitpython",
     "giturlparse",
     "scikit-learn",
     "python-dotenv",
     "faiss-cpu",
     "markdown",
-    "langdetect"
-]
-api = ["fastapi", "uvicorn"]
+    "langdetect",
+    "cohere",
 
+]
+api = ["fastapi", "uvicorn", "gunicorn"]
+dev = ["cohere", "jupyter", "tree-sitter-languages", "markdownify"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

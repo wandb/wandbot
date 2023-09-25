@@ -1,27 +1,24 @@
-import hashlib
 import json
 import os
 from typing import Iterator
 from urllib.parse import urljoin
 
 import markdown
+import nbformat
 import wandb
-from langchain.document_loaders import TextLoader, UnstructuredMarkdownLoader
+from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
+from nbconvert import MarkdownExporter
+
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
-    SDKCodeStoreConfig,
-    SDKTestsStoreConfig,
-    WeaveCodeStoreConfig,
-    WeaveExamplesStoreConfig,
-    WeaveJsStoreConfig,
 )
-from wandbot.ingestion.utils import EXTENSION_MAP, WandbNotebookLoader, fetch_git_repo
+from wandbot.ingestion.utils import EXTENSION_MAP, clean_contents, fetch_git_repo
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -121,19 +118,20 @@ class DocodileDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                document = UnstructuredMarkdownLoader(f_name).load()[0]
-                document.metadata["hash"] = hashlib.md5(
-                    (
-                        str(document.metadata["source"]) + str(document.page_content)
-                    ).encode("UTF-8")
-                ).hexdigest()
+                document = TextLoader(f_name).load()[0]
+                contents = document.page_content
+                document.page_content = clean_contents(contents)
+                # document.metadata["hash"] = hashlib.md5(
+                #     (
+                #         str(document.metadata["source"]) + str(document.page_content)
+                #     ).encode("UTF-8")
+                # ).hexdigest()
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
                 )[-1]
                 document.metadata["source"] = document_files[
                     document.metadata["source"]
                 ]
-                document.metadata["source_metadata"] = json.dumps(self.metadata)
                 document.metadata["language"] = self.config.language
                 yield document
             except Exception as e:
@@ -188,27 +186,27 @@ class CodeDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                if os.path.splitext(f_name)[-1] == "*.ipynb":
-                    document = WandbNotebookLoader(
-                        f_name,
-                        include_outputs=False,
-                        max_output_length=0,
-                        remove_newline=True,
-                    ).load()[0]
+                if os.path.splitext(f_name)[-1] == ".ipynb":
+                    document = TextLoader(f_name).load()[0]
+                    contents = document.page_content
+                    notebook = nbformat.reads(contents, as_version=4)
+                    md_exporter = MarkdownExporter(template="classic")
+                    (body, resources) = md_exporter.from_notebook_node(notebook)
+                    cleaned_body = clean_contents(body)
+                    document.page_content = cleaned_body
                 else:
                     document = TextLoader(f_name).load()[0]
-                document.metadata["hash"] = hashlib.md5(
-                    (
-                        str(document.metadata["source"]) + str(document.page_content)
-                    ).encode("UTF-8")
-                ).hexdigest()
+                # document.metadata["hash"] = hashlib.md5(
+                #     (
+                #         str(document.metadata["source"]) + str(document.page_content)
+                #     ).encode("UTF-8")
+                # ).hexdigest()
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
                 )[-1]
                 document.metadata["source"] = document_files[
                     document.metadata["source"]
                 ]
-                document.metadata["source_metadata"] = json.dumps(self.metadata)
                 document.metadata["language"] = EXTENSION_MAP[
                     document.metadata["file_type"]
                 ]
@@ -231,22 +229,22 @@ def load(
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
     examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
-    sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
-    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
-    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
-    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
-    weave_js_loader = CodeDataLoader(WeaveJsStoreConfig())
+    # sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
+    # sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
+    # weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
+    # weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
+    # weave_js_loader = CodeDataLoader(WeaveJsStoreConfig())
 
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
-        sdk_code_loader,
-        sdk_tests_loader,
-        weave_code_loader,
-        weave_examples_loader,
-        weave_js_loader,
+        # sdk_code_loader,
+        # sdk_tests_loader,
+        # weave_code_loader,
+        # weave_examples_loader,
+        # weave_js_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 
