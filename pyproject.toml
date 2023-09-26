@@ -28,7 +28,6 @@ slack-sdk = {version = "^3.21.3", optional = true}
 discord = {version = "^2.3.2", optional = true}
 markdown = {version = "^3.4.4", optional = true}
 fastapi = { version = "^0.101.1", optional = true }
-gunicorn = { version = "^21.2.0", optional = true }
 langdetect = {version = "^1.0.9", optional = true}
 llama-index = { version = "^0.8.30", optional = true }
 tree-sitter-languages = { version = "^1.7.0", optional = true }
@@ -58,9 +57,17 @@ chat = [
     "cohere",
 
 ]
-api = ["fastapi", "uvicorn", "gunicorn"]
+api = ["fastapi", "uvicorn"]
 dev = ["cohere", "jupyter", "tree-sitter-languages", "markdownify"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.isort]
+profile = "black"
+line_length = 119
+
+[tool.black]
+line-length = 119

@@ -1,5 +1,3 @@
-from typing import Iterable, List
-
 import regex as re
 import tiktoken
 from langchain.schema import Document as LcDocument
@@ -8,7 +6,7 @@ from llama_index import Document as LlamaDocument
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.text_splitter import CodeSplitter, TextSplitter
 from tree_sitter_languages import get_parser
-
+from typing import Iterable, List
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -75,9 +73,7 @@ def get_heading_level(chunk):
     for child in chunk:
         if child.type == "atx_heading" or child.type == "setext_heading":
             for grandchild in child.children:
-                if grandchild.type.startswith("atx") and grandchild.type.endswith(
-                    "marker"
-                ):
+                if grandchild.type.startswith("atx") and grandchild.type.endswith("marker"):
                     return len(grandchild.text)
     return None
 
@@ -88,13 +84,9 @@ def merge_small_chunks(chunks, max_chars):
     current_chars = 0
     for chunk in chunks:
         chunk_chars = sum(non_whitespace_len(child.text) for child in chunk)
-        current_heading_level, chunk_heading_level = get_heading_level(
-            current_chunk
-        ), get_heading_level(chunk)
+        current_heading_level, chunk_heading_level = get_heading_level(current_chunk), get_heading_level(chunk)
         cond = (current_heading_level is None and chunk_heading_level is None) or (
-            current_heading_level
-            and chunk_heading_level
-            and current_heading_level <= chunk_heading_level
+            current_heading_level and chunk_heading_level and current_heading_level <= chunk_heading_level
         )
         if current_chars + chunk_chars <= max_chars and (not current_chunk or cond):
             current_chunk.extend(chunk)
@@ -118,20 +110,15 @@ def coalesce_small_chunks(chunks, min_chars=100):
                 next_chunk_heading_level = get_heading_level(chunks[i + 1])
                 current_chunk_heading_level = get_heading_level(chunks[i])
                 if next_chunk_heading_level is None or (
-                    current_chunk_heading_level is not None
-                    and next_chunk_heading_level > current_chunk_heading_level
+                    current_chunk_heading_level is not None and next_chunk_heading_level > current_chunk_heading_level
                 ):
                     # if the next chunk is not a heading or is a heading of a higher level
-                    chunks[i + 1] = (
-                        chunks[i] + chunks[i + 1]
-                    )  # prepend the chunk to the next chunk
+                    chunks[i + 1] = chunks[i] + chunks[i + 1]  # prepend the chunk to the next chunk
                     i += 1  # skip to the next chunk
                     continue
             # if it's the last chunk or the next chunk is a heading of the same level
             if coalesced_chunks:  # if there are already some coalesced chunks
-                coalesced_chunks[-1].extend(
-                    chunks[i]
-                )  # add the chunk to the previous chunk
+                coalesced_chunks[-1].extend(chunks[i])  # add the chunk to the previous chunk
             else:
                 coalesced_chunks.append(chunks[i])
                 i += 1
@@ -155,10 +142,7 @@ def coalesce_strings(strings, max_length):
     current_string = ""
 
     for string in strings:
-        if (
-            non_whitespace_len(current_string) + non_whitespace_len(string)
-            <= max_length
-        ):
+        if non_whitespace_len(current_string) + non_whitespace_len(string) <= max_length:
             current_string += "\n" + string
         else:
             result.append(current_string)
@@ -204,14 +188,13 @@ class MarkdownSplitter(TextSplitter):
         chunks = split_by_headers(tree)
         chunks = split_large_chunks_by_code_blocks(chunks, self.chunk_size)
         chunks = merge_small_chunks(chunks, self.chunk_size)
-        # chunks = coalesce_small_chunks(chunks)
         for chunk in chunks:
             if chunk:
                 chunk_bytes = chunk[0].start_byte, chunk[-1].end_byte
                 chunk_lines = text.encode("utf-8").splitlines()[
-                    get_line_number(
-                        chunk_bytes[0], text.encode("utf-8")
-                    ) : get_line_number(chunk_bytes[1], text.encode("utf-8"))
+                    get_line_number(chunk_bytes[0], text.encode("utf-8")) : get_line_number(
+                        chunk_bytes[1], text.encode("utf-8")
+                    )
                     + 1
                 ]
                 chunk_str = ""
@@ -221,9 +204,7 @@ class MarkdownSplitter(TextSplitter):
                     else:
                         chunk_str += line.decode() + "\n"
 
-                for split in self.sub_splitter.split_documents(
-                    [LcDocument(page_content=chunk_str)]
-                ):
+                for split in self.sub_splitter.split_documents([LcDocument(page_content=chunk_str)]):
                     split_content = split.page_content
 
                     yield split_content
@@ -248,16 +229,17 @@ def convert_lc_to_llama(document: LcDocument):
     return LlamaDocument.from_langchain_format(document)
 
 
-md_parser = SimpleNodeParser(text_splitter=MarkdownSplitter(chunk_size=1024))
-code_parser = SimpleNodeParser(
-    text_splitter=CustomCodeSplitter(language="python", max_chars=1024)
-)
+def load(documents, chunk_size=1024):
+    md_parser = SimpleNodeParser(text_splitter=MarkdownSplitter(chunk_size=chunk_size))
+    code_parser = SimpleNodeParser(text_splitter=CustomCodeSplitter(language="python", max_chars=chunk_size))
 
-
-def get_nodes_from_documents(documents):
-    node_parser = md_parser
-    if documents[0].metadata["file_type"] == ".py":
-        node_parser = code_parser
     llama_docs = list(map(lambda x: convert_lc_to_llama(x), documents))
-    nodes = node_parser.get_nodes_from_documents(llama_docs)
+
+    nodes = []
+    for doc in llama_docs:
+        if doc.metadata["file_type"] == ".py":
+            parser = code_parser
+        else:
+            parser = md_parser
+        nodes.extend(node_parser.get_nodes_from_documents([doc]))
     return nodes

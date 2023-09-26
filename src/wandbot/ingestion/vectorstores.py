@@ -1,12 +1,10 @@
 import json
 import pathlib
-
 import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
-
+from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.ingestion.preprocess_data import get_nodes_from_documents
 from wandbot.utils import (
     get_logger,
     load_storage_context,
@@ -21,7 +19,7 @@ def load(
     project: str,
     entity: str,
     source_artifact_path: str,
-    result_artifact_name: str = "vectorstores",
+    result_artifact_name: str = "wandbot_index",
 ):
 
     config = VectorStoreConfig()
@@ -46,7 +44,7 @@ def load(
                 doc_dict = json.loads(line)
                 doc = LcDocument(**doc_dict)
                 documents.append(doc)
-        transformed_documents.extend(get_nodes_from_documents(documents))
+        transformed_documents.extend(preprocess_data.load(documents))
 
     index = load_index(
         transformed_documents,
@@ -56,7 +54,7 @@ def load(
     )
     wandb_callback = WandbCallbackHandler()
 
-    wandb_callback.persist_index(index, index_name="wandbot_index")
+    wandb_callback.persist_index(index, index_name=result_artifact_name)
     wandb_callback.finish()
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"
