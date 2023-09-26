@@ -1,39 +1,22 @@
-import logging
+import os
 
-from wandbot.ingestion.config import (
-    DocumentationStoreConfig,
-    ExampleCodeStoreConfig,
-    ExampleNotebookStoreConfig,
-    ExtraDataStoreConfig,
-    SDKCodeStoreConfig,
-    VectorIndexConfig,
-)
-from wandbot.ingestion.datastore import (
-    CodeDataStore,
-    DocumentationDataStore,
-    ExtraDataStore,
-    VectorIndex,
-)
-from wandbot.ingestion.report import create_ingestion_report
-from wandbot.ingestion.utils import save_dataset
+from wandbot.ingestion import prepare_data, vectorstores
+from wandbot.utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def main():
-    data_sources = [
-        DocumentationDataStore(DocumentationStoreConfig()),
-        CodeDataStore(ExampleCodeStoreConfig()),
-        CodeDataStore(ExampleNotebookStoreConfig()),
-        CodeDataStore(SDKCodeStoreConfig()),
-        ExtraDataStore(ExtraDataStoreConfig()),
-    ]
-    vectorindex_config = VectorIndexConfig(wandb_project="wandb_docs_bot_dev")
-    vector_index = VectorIndex(vectorindex_config)
-    vector_index = vector_index.load(data_sources)
-    vector_index.save()
-    raw_dataset_artifact = save_dataset(data_sources)
-    create_ingestion_report(vector_index, raw_dataset_artifact)
+    project = os.environ.get("WANDB_PROJECT", "wandbot-dev")
+    entity = os.environ.get("WANDB_ENTITY", "wandbot")
+
+    raw_artifact = prepare_data.load(project, entity)
+    vectorstore_artifact = vectorstores.load(project, entity, raw_artifact)
+    # TODO: include ingestion report
+    # create_ingestion_report(
+    #     project, entity, raw_artifact, preprocessed_artifact, vectorstore_artifact
+    # )
+    print(vectorstore_artifact)
 
 
 if __name__ == "__main__":

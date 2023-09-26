@@ -2,7 +2,7 @@ from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings
 
 EN_INTRO_MESSAGE = (
-    f"Please note that *wandbot is currently in alpha testing* and will experience frequent updates.\n\n"
+    f"Please note that **wandbot is currently in alpha testing** and will experience frequent updates.\n\n"
     f"Please do not share any private or sensitive information in your query at this time.\n\n"
     f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
@@ -28,11 +28,12 @@ JA_OUTRO_MESSAGE = (
 JA_ERROR_MESSAGE = "「おっと、問題が発生しました。しばらくしてからもう一度お試しください。」"
 
 
-class SlackAppConfig(BaseSettings):
-    APPLICATION: str = Field("Slack")
-    SLACK_APP_TOKEN: str = Field(..., env="SLACK_APP_TOKEN")
-    SLACK_BOT_TOKEN: str = Field(..., env="SLACK_BOT_TOKEN")
-    SLACK_SIGNING_SECRET: str = Field(..., env="SLACK_SIGNING_SECRET")
+class DiscordAppConfig(BaseSettings):
+    APPLICATION: str = "Discord"
+    WAIT_TIME: float = 300.0
+    PROD_DISCORD_CHANNEL_ID: int = 1090739438310654023
+    TEST_DISCORD_CHANNEL_ID: int = 1088892013321142484
+    DISCORD_BOT_TOKEN: str = Field(..., env="DISCORD_BOT_TOKEN")
     WANDB_API_KEY: str = Field(..., env="WANDB_API_KEY")
     EN_INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     EN_OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)

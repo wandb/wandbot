@@ -1,23 +1,22 @@
-import datetime
-import hashlib
-import logging
+import json
 import pathlib
+import re
 import subprocess
-import zipfile
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Dict, List
 
-import regex as re
-import wandb
+import giturlparse
+import markdown
+import markdownify
+import pandas as pd
+from bs4 import BeautifulSoup, Comment
 from git import Repo
-from giturlparse import parse
+from langchain.document_loaders import NotebookLoader
+from langchain.document_loaders.notebook import remove_newlines
 from langchain.schema import Document
-from llama_index import Document as LlamaDocument
-from pydantic import AnyHttpUrl
 
-if TYPE_CHECKING:
-    from wandbot.ingestion.datastore import DataStore
+from wandbot.utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_git_command(id_file):
@@ -32,7 +31,7 @@ def fetch_git_remote_hash(repo_url=None, id_file=None):
         logger.warning(f"No repo url was supplied. Not returning a repo hash")
         return None
     git_command = get_git_command(id_file)
-    repo_url = parse(repo_url).urls.get("ssh")
+    repo_url = giturlparse.parse(repo_url).urls.get("ssh")
 
     cmd = f'GIT_SSH_COMMAND="{git_command} -o IdentitiesOnly=yes" git ls-remote {repo_url}'
     normal = subprocess.run(
@@ -47,7 +46,7 @@ def fetch_git_remote_hash(repo_url=None, id_file=None):
     return sha
 
 
-def fetch_repo_metadata(repo: Repo) -> Dict[str, str]:
+def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
     head_commit = repo.head.commit
 
     return dict(
@@ -71,7 +70,7 @@ def fetch_git_repo(paths, id_file) -> Dict[str, str]:
         with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
             repo.remotes.origin.pull()
     else:
-        remote_url = parse(paths.repo_path).urls.get("ssh")
+        remote_url = giturlparse.parse(f"{paths.repo_path}").urls.get("ssh")
 
         logger.debug(f"Cloning {remote_url} to {paths.local_path}")
         repo = Repo.clone_from(
@@ -80,114 +79,131 @@ def fetch_git_repo(paths, id_file) -> Dict[str, str]:
     return fetch_repo_metadata(repo)
 
 
-def map_local_to_remote(
-    paths, base_name: str, remote_path: Union[str, AnyHttpUrl]
-) -> Dict[str, str]:
-    paths = list(paths)
-    local_paths = list(map(lambda x: str(x), paths))
-    local_path_parts = list(map(lambda x: x.parts, paths))
-    examples_idx = list(map(lambda x: x.index(base_name), local_path_parts))
-    remote_paths = list(
-        map(
-            lambda x: "/".join(x[1][x[0] + 1 :]),
-            zip(examples_idx, local_path_parts),
-        )
-    )
-    remote_paths = list(
-        map(
-            lambda x: f"{remote_path}{x}",
-            remote_paths,
-        )
-    )
-    return dict(zip(local_paths, remote_paths))
+def concatenate_cells(
+    cell: dict, include_outputs: bool, max_output_length: int, traceback: bool
+) -> str:
+    """Combine cells information in a readable format ready to be used."""
+    cell_type = cell["cell_type"]
+    source = cell["source"]
+    output = cell["outputs"]
 
-
-def md5_update_from_dir(directory, file_pattern, computed_hash):
-    # ref: https://stackoverflow.com/a/54477583
-    assert pathlib.Path(directory).is_dir()
-    if file_pattern is not None:
-        path_iterator = pathlib.Path(directory).glob(file_pattern)
-    else:
-        path_iterator = pathlib.Path(directory).iterdir()
-    for path in sorted(path_iterator, key=lambda p: str(p).lower()):
-        computed_hash.update(path.name.encode())
-        if path.is_file():
-            with open(path, "rb") as f:
-                for chunk in iter(lambda: f.read(), b""):
-                    computed_hash.update(chunk)
-        elif path.is_dir():
-            computed_hash = md5_update_from_dir(path, file_pattern, computed_hash)
-    return computed_hash
-
-
-def md5_dir(directory, file_pattern=None):
-    return md5_update_from_dir(directory, file_pattern, hashlib.md5()).hexdigest()
-
-
-def add_metadata_to_documents(
-    documents: List[Document], source_map: Optional[Dict[str, str]] = None
-) -> List[Document]:
-    out_documents = []
-    for document in documents:
-        doc_id = hashlib.md5(document.page_content.encode("UTF-8")).hexdigest()
-        if isinstance(source_map, dict):
-            source = source_map.get(
-                document.metadata["source"], document.metadata["source"]
+    if include_outputs and cell_type == "code" and output:
+        if "ename" in output[0].keys():
+            error_name = output[0]["ename"]
+            error_value = output[0]["evalue"]
+            if traceback:
+                traceback = output[0]["traceback"]
+                return (
+                    f"'{cell_type}' cell: '{source}'\n, gives error '{error_name}',"
+                    f" with description '{error_value}'\n"
+                    f"and traceback '{traceback}'\n\n"
+                )
+            else:
+                return (
+                    f"'{cell_type}' cell: '{source}'\n, gives error '{error_name}',"
+                    f"with description '{error_value}'\n\n"
+                )
+        elif output[0]["output_type"] == "stream":
+            output = output[0]["text"]
+            min_output = min(max_output_length, len(output))
+            return (
+                f"'{cell_type}' cell: '{source}'\n with "
+                f"output: '{output[:min_output]}'\n\n"
             )
+    else:
+        if cell_type == "markdown":
+            source = re.sub(r"!\[.*?\]\((.*?)\)", "", f"{source}").strip()
+            if source and len(source) > 5:
+                return f"'{cell_type}' cell: '{source}'\n\n"
         else:
-            source = document.metadata["source"]
-        metadata = {"source": source, "doc_id": doc_id}
-        out_documents.append(
-            Document(page_content=document.page_content, metadata=metadata)
-        )
-    return out_documents
+            return f"'{cell_type}' cell: '{source}'\n\n"
+
+    return ""
 
 
-def convert_llama_docstore_to_vectorstore_kwargs(
-    documents: Dict[str, LlamaDocument]
-) -> Dict[str, Any]:
-    docs_dict = {}
-    for doc_id, document in documents.items():
-        docs_dict["ids"] = docs_dict.get("ids", []) + [doc_id]
-        docs_dict["documents"] = docs_dict.get("documents", []) + [
-            document.to_langchain_format()
-        ]
-    return docs_dict
+class WandbNotebookLoader(NotebookLoader):
+    """Loader that loads .ipynb notebook files in wandb examples."""
+
+    def load(
+        self,
+    ) -> List[Document]:
+        """Load documents."""
+        p = pathlib.Path(self.file_path)
+
+        with open(p, encoding="utf8") as f:
+            d = json.load(f)
+
+        data = pd.json_normalize(d["cells"])
+        filtered_data = data[["cell_type", "source", "outputs"]]
+        if self.remove_newline:
+            filtered_data = filtered_data.applymap(remove_newlines)
+
+        text = filtered_data.apply(
+            lambda x: concatenate_cells(
+                x, self.include_outputs, self.max_output_length, self.traceback
+            ),
+            axis=1,
+        ).str.cat(sep=" ")
+
+        metadata = {"source": str(p)}
+
+        return [Document(page_content=text, metadata=metadata)]
 
 
-def load_docstore_class(module, cls: str):
-    return getattr(module, cls)
+EXTENSION_MAP = {
+    ".py": "python",
+    ".ipynb": "python",
+    ".md": "markdown",
+    ".js": "javascript",
+    ".ts": "typescript",
+}
 
 
-class Timer:
-    def __init__(self) -> None:
-        self.start = datetime.datetime.utcnow()
-        self.stop = self.start
-
-    def __enter__(self) -> "Timer":
-        return self
-
-    def __exit__(self, *args: Any) -> None:
-        self.stop = datetime.datetime.utcnow()
-
-    @property
-    def elapsed(self) -> float:
-        return (self.stop - self.start).total_seconds()
-
-
-def save_dataset(data_sources: List["DataStore"]):
-    artifact = wandb.Artifact("raw_dataset", type="dataset")
-    for data_source in data_sources:
-        archive_name = (
-            f"{data_source.config.data_source.cache_dir}/{data_source.config.name}.zip"
-        )
-        with zipfile.ZipFile(archive_name, "w") as f:
-            for file in data_source.config.data_source.local_path.rglob("**/*"):
-                if not file.is_symlink():
-                    f.write(file)
-        artifact.add_file(archive_name)
-
-    wandb.log_artifact(
-        artifact,
+def convert_contents_to_soup(contents):
+    markdown_document = markdown.markdown(
+        contents,
+        extensions=[
+            "extra",
+            "abbr",
+            "attr_list",
+            "def_list",
+            "fenced_code",
+            "footnotes",
+            "md_in_html",
+            "admonition",
+            "legacy_attrs",
+            "legacy_em",
+            "meta",
+            "nl2br",
+            "sane_lists",
+            "smarty",
+            "toc",
+            "wikilinks",
+        ],
     )
-    return artifact.wait()
+    soup = BeautifulSoup(markdown_document, "html.parser")
+    return soup
+
+
+def clean_soup(soup):
+    for img_tag in soup.find_all("img", src=True):
+        img_tag.extract()
+    comments = soup.find_all(string=lambda text: isinstance(text, Comment))
+    for comment in comments:
+        comment.extract()
+    for p_tag in soup.find_all("p"):
+        if not p_tag.text.strip():
+            p_tag.decompose()
+    return soup
+
+
+def clean_contents(contents):
+    soup = convert_contents_to_soup(contents)
+    soup = clean_soup(soup)
+    cleaned_document = markdownify.MarkdownConverter(heading_style="ATX").convert_soup(
+        soup
+    )
+    cleaned_document = cleaned_document.replace("![]()", "\n")
+    cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
+
+    return cleaned_document

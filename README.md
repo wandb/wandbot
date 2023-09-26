@@ -1,13 +1,14 @@
 # wandbot
 
-A question answering bot for Weights & Biases [documentation](https://docs.wandb.ai/). This bot is built using [langchain](https://python.langchain.com/en/latest/) and llms.
+A question answering bot for Weights & Biases [documentation](https://docs.wandb.ai/).
+This bot is built using [langchain](https://python.langchain.com/en/latest/) and openai gpt-4.
 
 ## Features
 
-- Utilizes advanced techniques such as HydeEmbeddings, FAISS index, and a fallback mechanism for model selection
+- Utilizes retrieval augmented generation with FAISS index and Tfidf search, and a fallback mechanism for model selection.
 - Efficiently handles user queries and provides accurate, context-aware responses
-- Integrated with Discord and Slack, allowing seamless integration into popular collaboration platforms
-- Logging and analysis with Weights & Biases Stream Table for performance monitoring and continuous improvement
+- Integrated with Discord and Slack, allowing seamless integration into popular collaboration platforms.
+- Logging and analysis with Weights & Biases Tables for performance monitoring and continuous improvement.
 - Evaluation using a combination of metrics such as retrieval accuracy, string similarity, and model-generated response correctness
 
 ## Installation
@@ -29,47 +30,39 @@ poetry install
 
 ### Data Ingestion
 
-To ingest the data, you first need to clone the [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) into the data directory.
-The data directory is located at `wandbot/data`.
-To clone the repositories, follow the commands:
-
+The data ingestion module pulls code and markdown from Weights & Biases repositories [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) ingests them into vectorstores for the retrieval augmented generation pipeline.
+To ingest the data run the following command from the root of the repository
 ```bash
-cd wandbot/data
-git clone git@github.com:your_md_repo/your_md_docs.git
-git clone git@github.com:your_python_repo/your_python_codebase.git
+poetry run python -m src.wandbot.ingestion
 ```
+You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `transformed_data`, `retriever_data` with individual files for each step of the ingestion process.
+These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot).
 
-To ingest the data, run the following command:
-
-```bash
-cd wandbot
-poetry run python -m wandbot.ingest --docs_dir data/docodile \
---documents_file data/documents.jsonl \
---faiss_index data/faiss_index \
---hyde_prompt data/prompts/hyde_prompt.txt \
---use_hyde \
---temperature 0.3 \
---wandb_project wandb_docs_bot_dev
-```
-
-After cloning the repositories, run the data ingestion command provided in the "Data Ingestion" section (…). This will create a `documents.jsonl` file in the `wandbot/data` directory and a `faiss_index` directory.
-The `documents.jsonl` file contains the documents that will be used to create the FAISS index.
-The `faiss_index` directory contains the FAISS index that will be used to retrieve the documents.
-Additionally, the `documents.jsonl`, `faiss_index`, and `hyde_prompt` will be uploaded to W&B as artifacts to the `wandb_project` specified in the command.
 
 ### Running the Q&A Bot
 
-To run the Q&A bot, use the provided command:
+You will need to set the following environment variables:
 
 ```bash
-cd wandbot
-cd discord_app
-# or
-# cd slack_app
-poetry run python -m main
+OPENAI_API_KEY
+SLACK_APP_TOKEN
+SLACK_BOT_TOKEN
+SLACK_SIGNING_SECRET
+WANDB_API_KEY
+DISCORD_BOT_TOKEN
+WANDBOT_API_URL="http://localhost:8000"
+WANDB_TRACING_ENABLED="true"
+WANDB_PROJECT="wandbot-dev"
+WANDB_ENTITY="wandbot"
+```
+Then you can run the Q&A bot application, use the following commands:
+```bash
+(poetry run uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 > api.log 2>&1) & \
+(poetry run python -m wandbot.apps.slack > slack_app.log 2>&1) & \
+(poetry run python -m wandbot.apps.discord > discord_app.log 2>&1)
 ```
 
-This will start the chatbot application, allowing you to interact with it and ask questions related to the Weights & Biases documentation.
+This will start the chatbot applications - the api, the slackbot and the discord bot, allowing you to interact with it and ask questions related to the Weights & Biases documentation.
 
 ### Evaluation
 
@@ -86,10 +79,9 @@ poetry run python -m eval
 
 ## Implementation Overview
 
-1. HydeEmbeddings and Langchain for Document Embedding
-2. Document Embeddings with FAISS
-3. Building the Q&A Pipeline
-4. Model Selection and Fallback Mechanism
-5. Deploying the Q&A Bot on Discord and Slack
-6. Logging and Analysis with Weights & Biases Stream Table
-7. Evaluation of the Q&A Bot
+1. Document Embeddings with FAISS and TFIDF
+2. Building the Q&A Pipeline with Langchain
+3. Model Selection and Fallback Mechanism
+4. Deploying the Q&A Bot on FastAPI, Discord and Slack
+5. Logging and Analysis with Weights & Biases Tables
+6. Evaluation of the Q&A Bot

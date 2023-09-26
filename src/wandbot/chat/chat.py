@@ -1,141 +1,102 @@
 import json
-import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Any, Dict
 
-import openai
-import pandas as pd
 import tiktoken
 import wandb
-from langchain import LLMChain, OpenAI
-from langchain.callbacks import get_openai_callback
-from langchain.callbacks.tracers import WandbTracer
-from langchain.chains.conversational_retrieval.base import (
-    BaseConversationalRetrievalChain,
+from llama_index import StorageContext, load_index_from_storage
+from llama_index.callbacks import (
+    WandbCallbackHandler,
+    TokenCountingHandler,
+    CallbackManager,
 )
-from langchain.chains.qa_with_sources import load_qa_with_sources_chain
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import BaseRetriever
-from src.wandbot.ingestion.utils import Timer
-from wandb.integration.langchain.wandb_tracer import WandbRunArgs
+from llama_index.chat_engine.types import ChatMode
+from llama_index.indices.postprocessor import CohereRerank
+from llama_index.llms import ChatMessage, MessageRole
+from llama_index.vector_stores import FaissVectorStore
+
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.langchain import ConversationalRetrievalQAWithSourcesandScoresChain
-from wandbot.chat.prompts import load_chat_prompt, load_history_prompt
+from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRepsonse, ChatRequest
 from wandbot.database.schemas import QuestionAnswer
-from wandbot.ingestion.datastore import VectorIndex
+from wandbot.utils import Timer, get_logger, load_service_context
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_chat_history(
     chat_history: List[QuestionAnswer] | None,
-) -> List[tuple[str, str]]:
+) -> Optional[List[ChatMessage]]:
     if not chat_history:
-        return []
+        return None
     else:
-        return [
-            (question_answer.question, question_answer.answer)
+        messages = [
+            [
+                ChatMessage(role=MessageRole.USER, content=question_answer.question),
+                ChatMessage(role=MessageRole.ASSISTANT, content=question_answer.answer),
+            ]
             for question_answer in chat_history
         ]
+        return [item for sublist in messages for item in sublist]
 
 
 class Chat:
-    config: ChatConfig
-
-    def __init__(self, config: Optional[ChatConfig] = None):
-        if config is not None:
-            self.config: ChatConfig = config
-        self.vector_index: VectorIndex = VectorIndex(
-            config=self.config.vectorindex_config
-        )
-        self.chat_prompt: ChatPromptTemplate = load_chat_prompt(self.config.chat_prompt)
-        self._retriever: BaseRetriever = self._load_retriever()
-        self._chain: BaseConversationalRetrievalChain = self._load_chain(
-            self.config.model_name, self.config.max_retries
-        )
-        self._fallback_chain: BaseConversationalRetrievalChain = self._load_chain(
-            self.config.fallback_model_name, self.config.max_fallback_retries
+    def __init__(self, config: ChatConfig):
+        self.config = config
+        self.run = wandb.init(
+            project=self.config.wandb_project,
+            entity=self.config.wandb_entity,
+            job_type="chat",
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        WandbTracer(
-            run_args=WandbRunArgs(
-                project=self.config.wandb_project,
-                entity=self.config.wandb_entity,
-                config=self.config.dict(),
-                job_type=self.config.wandb_job_type,
-            )
+
+        self.storage_context = self.load_storage_context_from_artifact(
+            artifact_url=self.config.index_artifact
+        )
+        self.index = load_index_from_storage(self.storage_context)
+
+        self.wandb_callback = WandbCallbackHandler()
+        self.token_counter = TokenCountingHandler(tokenizer=self.tokenizer.encode)
+        self.callback_manager = CallbackManager(
+            [self.wandb_callback, self.token_counter]
         )
 
-    def _load_retriever(self) -> BaseRetriever:
-        self.vector_index = self.vector_index.load_from_artifact(
-            self.config.vectorindex_artifact
+        self.qa_prompt = load_chat_prompt(self.config.chat_prompt)
+        self.chat_engine = self._load_chat_engine(
+            self.config.chat_model_name,
+            max_retries=self.config.max_retries,
         )
-        return self.vector_index.retriever
-
-    @property
-    def retriever(self):
-        if self._retriever is None:
-            self._retriever = self._load_retriever()
-        return self._retriever
-
-    def _load_chain(
-        self, model_name: str = None, max_retries: int = 1
-    ) -> BaseConversationalRetrievalChain:
-        map_llm = OpenAI(
-            batch_size=10,
-            temperature=0.3,
-            max_retries=max_retries,
+        self.fallback_chat_engine = self._load_chat_engine(
+            self.config.fallback_model_name,
+            max_retries=self.config.max_fallback_retries,
         )
-        reduce_llm = ChatOpenAI(
-            model_name=model_name,
+
+    def load_storage_context_from_artifact(self, artifact_url: str):
+        artifact = self.run.use_artifact(artifact_url)
+        artifact_dir = artifact.download()
+        storage_context = StorageContext.from_defaults(
+            vector_store=FaissVectorStore.from_persist_dir(artifact_dir),
+            persist_dir=artifact_dir,
+        )
+        return storage_context
+
+    def _load_chat_engine(self, model_name, max_retries):
+        service_context = load_service_context(
+            model_name,
             temperature=self.config.chat_temperature,
             max_retries=max_retries,
+            embeddings_cache=self.config.embeddings_cache,
+            callback_manager=self.callback_manager,
         )
-        question_generator = LLMChain(
-            llm=ChatOpenAI(
-                model_name=self.config.fallback_model_name,
-                temperature=self.config.chat_temperature,
-                max_retries=self.config.max_fallback_retries,
-            ),
-            prompt=load_history_prompt(self.config.history_prompt),
-            verbose=self.config.verbose,
+        chat_engine = self.index.as_chat_engine(
+            chat_mode=ChatMode.CONDENSE_QUESTION,
+            similarity_top_k=20,
+            response_mode="compact",
+            service_context=service_context,
+            text_qa_template=self.qa_prompt,
+            node_postprocessors=[CohereRerank(top_n=10, model="rerank-english-v2.0")],
+            storage_context=self.storage_context,
         )
-        doc_chain = load_qa_with_sources_chain(
-            map_llm,
-            chain_type=self.config.chain_type,
-            combine_prompt=self.chat_prompt,
-            verbose=self.config.verbose,
-            reduce_llm=reduce_llm,
-        )
-
-        chain = ConversationalRetrievalQAWithSourcesandScoresChain(
-            retriever=self.retriever,
-            question_generator=question_generator,
-            combine_docs_chain=doc_chain,
-            return_source_documents=True,
-        )
-
-        return chain
-
-    @property
-    def chain(self):
-        if self._chain is None:
-            self._chain = self._load_chain(
-                model_name=self.config.model_name,
-                max_retries=self.config.max_retries,
-            )
-        return self._chain
-
-    @property
-    def fallback_chain(self):
-        if self._fallback_chain is None:
-            self._fallback_chain = self._load_chain(
-                model_name=self.config.fallback_model_name,
-                max_retries=self.config.max_fallback_retries,
-            )
-        return self._fallback_chain
+        return chat_engine
 
     def validate_and_format_question(self, question: str) -> str:
         question = " ".join(question.strip().split())
@@ -146,48 +107,59 @@ class Chat:
             )
         return question
 
-    def format_response(self, result):
+    def format_response(self, result: Dict[str, Any]):
         response = {}
-        source_documents = [
-            {"source": doc.metadata["source"], "score": doc.metadata["score"]}
-            for doc in result["source_documents"]
-            # if doc.metadata["score"] <= self.config.source_score_threshold
-        ]
+        if result.get("source_documents", None):
+            source_documents = [
+                {
+                    "source": doc.metadata["source"],
+                    "text": doc.text,
+                }
+                for doc in result["source_documents"]
+            ]
+        else:
+            source_documents = []
         response["answer"] = result["answer"]
         response["model"] = result["model"]
 
         if len(source_documents) and self.config.include_sources:
             response["source_documents"] = json.dumps(source_documents)
+            response["sources"] = ",".join([doc["source"] for doc in source_documents])
         else:
             response["source_documents"] = ""
-        response["sources"] = result["sources"]
+            response["sources"] = ""
 
         return response
 
-    def get_answer(
-        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
-    ):
-        if chat_history is None:
-            chat_history = []
+    def get_answer(self, query: str, chat_history: Optional[List[ChatMessage]] = None):
         try:
-            result = self.chain(
-                {
-                    "question": query,
-                    "chat_history": chat_history,
-                },
-                return_only_outputs=True,
-            )
-            result["model"] = self.config.model_name
-        except openai.error.Timeout as e:
-            logger.debug(e)
-            result = self.fallback_chain(
-                {
-                    "question": query,
-                    "chat_history": chat_history,
-                },
-                return_only_outputs=True,
-            )
-            result["model"] = self.config.fallback_model_name
+            response = self.chat_engine.chat(message=query, chat_history=chat_history)
+            result = {
+                "answer": response.response,
+                "source_documents": response.source_nodes,
+                "model": self.config.chat_model_name,
+            }
+        except Exception as e:
+            logger.warning(f"{self.config.chat_model_name} failed with {e}")
+            logger.warning(f"Falling back to {self.config.fallback_model_name} model")
+            try:
+                response = self.fallback_chat_engine.chat(
+                    message=query, chat_history=chat_history
+                )
+                result = {
+                    "answer": response.response,
+                    "source_documents": response.source_nodes,
+                    "model": self.config.fallback_model_name,
+                }
+
+            except Exception as e:
+                logger.warning(f"{self.config.fallback_model_name} failed with {e}")
+                result = {
+                    "answer": "\uE058"
+                    + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
+                    "source_documents": None,
+                    "model": "None",
+                }
         return self.format_response(result)
 
     def __call__(self, chat_request: ChatRequest) -> ChatRepsonse:
@@ -200,17 +172,15 @@ class Chat:
                     "sources": "",
                 }
             else:
-                with get_openai_callback() as callback:
-                    result = self.get_answer(
-                        query, chat_history=get_chat_history(chat_request.chat_history)
-                    )
-                    usage_stats = {
-                        "total_tokens": callback.total_tokens,
-                        "prompt_tokens": callback.prompt_tokens,
-                        "completion_tokens": callback.completion_tokens,
-                        "successful_requests": callback.successful_requests,
-                        "total_cost": callback.total_cost,
-                    }
+                result = self.get_answer(
+                    query, chat_history=get_chat_history(chat_request.chat_history)
+                )
+                usage_stats = {
+                    "total_tokens": self.token_counter.total_llm_token_count,
+                    "prompt_tokens": self.token_counter.prompt_llm_token_count,
+                    "completion_tokens": self.token_counter.completion_llm_token_count,
+                }
+                self.token_counter.reset_counts()
 
         result.update(
             dict(
@@ -223,14 +193,7 @@ class Chat:
                 **usage_stats,
             )
         )
-        wandb.run.log(
-            {
-                "chat": wandb.Table(
-                    dataframe=pd.DataFrame({k: [v] for k, v in result.items()})
-                )
-            }
-        )
-        wandb.run.log(usage_stats)
+        self.run.log(usage_stats)
         return ChatRepsonse(**result)
 
 
@@ -244,6 +207,12 @@ def main():
             break
         else:
             response = chat(ChatRequest(question=question, chat_history=chat_history))
-            chat_history.append((question, response.answer))
+            chat_history.append(
+                QuestionAnswer(question=question, answer=response.answer)
+            )
             print(f"WandBot: {response.answer}")
             print(f"Time taken: {response.time_taken}")
+
+
+if __name__ == "__main__":
+    main()
