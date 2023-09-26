@@ -29,7 +29,7 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "", 
         if config.include_sources and response.sources:
             sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
             if len(sources_list) > 0:
-                items = max(len(sources_list), 3)
+                items = min(len(sources_list), 3)
                 if lang == "ja":
                     result = f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
                 else:
