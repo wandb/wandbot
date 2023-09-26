@@ -55,10 +55,11 @@ chat = [
     "markdown",
     "langdetect",
     "cohere",
-
+    "tree-sitter-languages",
+    "markdownify"
 ]
 api = ["fastapi", "uvicorn"]
-dev = ["cohere", "jupyter", "tree-sitter-languages", "markdownify"]
+dev = ["jupyter"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

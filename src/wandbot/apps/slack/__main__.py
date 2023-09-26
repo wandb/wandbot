@@ -1,6 +1,5 @@
-from functools import partial
-
 import langdetect
+from functools import partial
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from wandbot.api.client import APIClient
@@ -15,38 +14,26 @@ app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(
-    response: APIQueryResponse | None, outro_message: str = "", lang: str = "en"
-) -> str:
+def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
     if response is not None:
         result = response.answer
-        if response.model != "gpt-4":
+        if "gpt-4" not in response.model:
             if lang == "ja":
                 warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
             else:
                 warning_message = (
-                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
-                    f"*gpt-4*\n\n"
+                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as " f"*gpt-4*\n\n"
                 )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            sources_list = [
-                item
-                for item in response.sources.split(",")
-                if item.strip().startswith("http")
-            ]
+            sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
             if len(sources_list) > 0:
+                items = max(len(sources_list), 3)
                 if lang == "ja":
-                    result = (
-                        f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list) + "\n\n"
-                    )
+                    result = f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
                 else:
-                    result = (
-                        f"{result}\n\n*References*\n\n>"
-                        + "\n> ".join(sources_list)
-                        + "\n\n"
-                    )
+                    result = f"{result}\n\n*References*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
         if outro_message:
             result = f"{result}\n\n{outro_message}"
 
@@ -71,14 +58,10 @@ def command_handler(body, say, logger):
         query = body["event"].get("text")
         lang_code = langdetect.detect(query)
         user = body["event"].get("user")
-        thread_id = body["event"].get("thread_ts", None) or body["event"].get(
-            "ts", None
-        )
+        thread_id = body["event"].get("thread_ts", None) or body["event"].get("ts", None)
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = api_client.get_chat_history(
-            application=config.APPLICATION, thread_id=thread_id
-        )
+        chat_history = api_client.get_chat_history(application=config.APPLICATION, thread_id=thread_id)
 
         if not chat_history:
             # send out the intro message

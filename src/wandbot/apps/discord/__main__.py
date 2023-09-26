@@ -1,9 +1,8 @@
 import asyncio
-import logging
-import uuid
-
 import discord
 import langdetect
+import logging
+import uuid
 from discord.ext import commands
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
@@ -23,38 +22,26 @@ config = DiscordAppConfig()
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(
-    response: APIQueryResponse | None, outro_message: str = "", lang: str = "en"
-) -> str:
+def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
     if response is not None:
         result = response.answer
-        if response.model != "gpt-4":
+        if "gpt-4" not in response.model:
             if lang == "ja":
                 warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
             else:
                 warning_message = (
-                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
-                    f"*gpt-4*\n\n"
+                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as " f"*gpt-4*\n\n"
                 )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            sources_list = [
-                item
-                for item in response.sources.split(",")
-                if item.strip().startswith("http")
-            ]
+            sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
             if len(sources_list) > 0:
+                items = max(len(sources_list), 3)
                 if lang == "ja":
-                    result = (
-                        f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list) + "\n\n"
-                    )
+                    result = f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
                 else:
-                    result = (
-                        f"{result}\n\n*References*\n\n>"
-                        + "\n> ".join(sources_list)
-                        + "\n\n"
-                    )
+                    result = f"{result}\n\n*References*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
         if outro_message:
             result = f"{result}\n\n{outro_message}"
 
@@ -97,9 +84,7 @@ async def on_message(message: discord.Message):
                 chat_history = None
             if not chat_history:
                 if lang_code == "ja":
-                    await thread.send(
-                        f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True
-                    )
+                    await thread.send(f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True)
                 else:
                     await thread.send(
                         f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}",
@@ -112,13 +97,9 @@ async def on_message(message: discord.Message):
             )
             if response is None:
                 if lang_code == "ja":
-                    await thread.send(
-                        f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True
-                    )
+                    await thread.send(f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True)
                 else:
-                    await thread.send(
-                        f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True
-                    )
+                    await thread.send(f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True)
                 return
             if lang_code == "ja":
                 outro_message = config.JA_OUTRO_MESSAGE
@@ -151,9 +132,7 @@ async def on_message(message: discord.Message):
                 return user == message.author and str(reaction.emoji) in ["👍", "👎"]
 
             try:
-                reaction, user = await bot.wait_for(
-                    "reaction_add", timeout=config.WAIT_TIME, check=check
-                )
+                reaction, user = await bot.wait_for("reaction_add", timeout=config.WAIT_TIME, check=check)
 
             except asyncio.TimeoutError:
                 # await thread.send("🤖")
