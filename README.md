@@ -1,11 +1,11 @@
 # wandbot
 
 A question answering bot for Weights & Biases [documentation](https://docs.wandb.ai/).
-This bot is built using [langchain](https://python.langchain.com/en/latest/) and openai gpt-4.
+This bot is built using [llama-index](https://gpt-index.readthedocs.io/en/stable/) and openai gpt-4.
 
 ## Features
 
-- Utilizes retrieval augmented generation with FAISS index and Tfidf search, and a fallback mechanism for model selection.
+- Utilizes retrieval augmented generation, and a fallback mechanism for model selection.
 - Efficiently handles user queries and provides accurate, context-aware responses
 - Integrated with Discord and Slack, allowing seamless integration into popular collaboration platforms.
 - Logging and analysis with Weights & Biases Tables for performance monitoring and continuous improvement.
@@ -70,7 +70,7 @@ To evaluate the performance of the Q&A bot, the provided evaluation script (…)
 
 The evaluation script downloads the evaluation dataset from the specified W&B Artifact, performs the evaluation using the Q&A bot, and then logs the results, such as retrieval accuracy, average string distance, and chat model accuracy, back to W&B. The logged results can be viewed on the W&B dashboard.
 
-To run the evaluation script, use the provide the following commands:
+To run the evaluation script, use the following commands:
 
 ```bash
 cd wandbot
@@ -79,8 +79,8 @@ poetry run python -m eval
 
 ## Implementation Overview
 
-1. Document Embeddings with FAISS and TFIDF
-2. Building the Q&A Pipeline with Langchain
+1. Document Embeddings with FAISS
+2. Building the Q&A Pipeline with llama-index
 3. Model Selection and Fallback Mechanism
 4. Deploying the Q&A Bot on FastAPI, Discord and Slack
 5. Logging and Analysis with Weights & Biases Tables
