@@ -1,5 +1,3 @@
-git checkout refactor/simplified && \
-git pull && \
 python -m pip install -U poetry && \
 poetry install -E slack -E discord -E chat -E api --no-cache && \
 poetry build && \

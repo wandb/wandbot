@@ -1,10 +1,8 @@
 import pathlib
-from typing import List, Optional, Union
-from urllib.parse import urlparse
-
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
+from typing import List, Optional, Union
+from urllib.parse import urlparse
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,20 +27,14 @@ class DataStoreConfig(BaseModel):
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
-        values.docstore_dir = (
-            values.data_source.cache_dir / values.name / values.docstore_dir
-        )
+        values.docstore_dir = values.data_source.cache_dir / values.name / values.docstore_dir
         data_source = values.data_source
 
         if data_source.repo_path:
-            data_source.is_git_repo = (
-                urlparse(data_source.repo_path).netloc == "github.com"
-            )
+            data_source.is_git_repo = urlparse(data_source.repo_path).netloc == "github.com"
             local_path = urlparse(data_source.repo_path).path.split("/")[-1]
             if not data_source.local_path:
-                data_source.local_path = (
-                    data_source.cache_dir / values.name / local_path
-                )
+                data_source.local_path = data_source.cache_dir / values.name / local_path
             if data_source.is_git_repo:
                 if data_source.git_id_file is None:
                     logger.debug(
@@ -169,7 +161,7 @@ class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
     embedding_dim: int = 1536
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    model_name: str = "gpt-3.5-turbo-0613"
+    chat_model_name: str = "gpt-3.5-turbo-0613"
     temperature: float = 0.0
     max_retries: int = 3
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
