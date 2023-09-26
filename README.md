@@ -85,3 +85,6 @@ poetry run python -m eval
 4. Deploying the Q&A Bot on FastAPI, Discord and Slack
 5. Logging and Analysis with Weights & Biases Tables
 6. Evaluation of the Q&A Bot
+
+You can track the bot usage in the following project:
+https://wandb.ai/wandbot/wandbot_public

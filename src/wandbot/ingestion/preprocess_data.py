@@ -241,5 +241,5 @@ def load(documents, chunk_size=1024):
             parser = code_parser
         else:
             parser = md_parser
-        nodes.extend(node_parser.get_nodes_from_documents([doc]))
+        nodes.extend(parser.get_nodes_from_documents([doc]))
     return nodes

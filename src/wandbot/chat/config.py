@@ -11,12 +11,10 @@ class ChatConfig(BaseSettings):
     max_fallback_retries: int = 6
     chat_temperature: float = 0.0
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")
-    index_artifact: str = "parambharat/wandbot-dev/wandbot_index:latest"
-    embeddings_cache: pathlib.Path = Field(
-        pathlib.Path("./data/cache/embeddings"), env="EMBEDDINGS_CACHE_PATH"
-    )
+    index_artifact: str = "wandbot/wandbot-dev/wandbot_index:latest"
+    embeddings_cache: pathlib.Path = Field(pathlib.Path("./data/cache/embeddings"), env="EMBEDDINGS_CACHE_PATH")
     verbose: bool = False
-    wandb_project: str | None = Field("wandbot-dev", env="WANDB_PROJECT")
+    wandb_project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
     wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
     include_sources: bool = True
     query_tokens_threshold: int = 1024

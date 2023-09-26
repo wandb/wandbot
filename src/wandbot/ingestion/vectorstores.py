@@ -28,7 +28,7 @@ def load(
     artifact_dir = artifact.download()
     storage_context = load_storage_context(config.embedding_dim, config.persist_dir)
     service_context = load_service_context(
-        config.model_name,
+        config.chat_model_name,
         config.temperature,
         config.embeddings_cache,
         config.max_retries,
