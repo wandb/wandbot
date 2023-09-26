@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -162,3 +163,13 @@ class WeaveJsStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_js")
+
+
+class VectorStoreConfig(BaseSettings):
+    name: str = "vectorstore"
+    embedding_dim: int = 1536
+    persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
+    model_name: str = "gpt-3.5-turbo-0613"
+    temperature: float = 0.0
+    max_retries: int = 3
+    embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")

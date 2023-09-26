@@ -5,11 +5,15 @@ import subprocess
 from typing import Dict, List
 
 import giturlparse
+import markdown
+import markdownify
 import pandas as pd
+from bs4 import BeautifulSoup, Comment
 from git import Repo
 from langchain.document_loaders import NotebookLoader
 from langchain.document_loaders.notebook import remove_newlines
 from langchain.schema import Document
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -153,3 +157,53 @@ EXTENSION_MAP = {
     ".js": "javascript",
     ".ts": "typescript",
 }
+
+
+def convert_contents_to_soup(contents):
+    markdown_document = markdown.markdown(
+        contents,
+        extensions=[
+            "extra",
+            "abbr",
+            "attr_list",
+            "def_list",
+            "fenced_code",
+            "footnotes",
+            "md_in_html",
+            "admonition",
+            "legacy_attrs",
+            "legacy_em",
+            "meta",
+            "nl2br",
+            "sane_lists",
+            "smarty",
+            "toc",
+            "wikilinks",
+        ],
+    )
+    soup = BeautifulSoup(markdown_document, "html.parser")
+    return soup
+
+
+def clean_soup(soup):
+    for img_tag in soup.find_all("img", src=True):
+        img_tag.extract()
+    comments = soup.find_all(string=lambda text: isinstance(text, Comment))
+    for comment in comments:
+        comment.extract()
+    for p_tag in soup.find_all("p"):
+        if not p_tag.text.strip():
+            p_tag.decompose()
+    return soup
+
+
+def clean_contents(contents):
+    soup = convert_contents_to_soup(contents)
+    soup = clean_soup(soup)
+    cleaned_document = markdownify.MarkdownConverter(heading_style="ATX").convert_soup(
+        soup
+    )
+    cleaned_document = cleaned_document.replace("![]()", "\n")
+    cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
+
+    return cleaned_document

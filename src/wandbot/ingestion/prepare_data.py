@@ -1,27 +1,22 @@
-import hashlib
 import json
-import os
-from typing import Iterator
-from urllib.parse import urljoin
-
 import markdown
+import nbformat
+import os
 import wandb
-from langchain.document_loaders import TextLoader, UnstructuredMarkdownLoader
+from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
+from nbconvert import MarkdownExporter
+from typing import Iterator
+from urllib.parse import urljoin
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
-    SDKCodeStoreConfig,
-    SDKTestsStoreConfig,
-    WeaveCodeStoreConfig,
-    WeaveExamplesStoreConfig,
-    WeaveJsStoreConfig,
 )
-from wandbot.ingestion.utils import EXTENSION_MAP, WandbNotebookLoader, fetch_git_repo
+from wandbot.ingestion.utils import EXTENSION_MAP, clean_contents, fetch_git_repo
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -36,9 +31,7 @@ class DataLoader(BaseLoader):
         self,
     ) -> Iterator[Document]:
         """A lazy loader for Documents."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement lazy_load()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} does not implement lazy_load()")
 
     def load(self):
         documents = list(self.lazy_load())
@@ -67,9 +60,7 @@ class DocodileDataLoader(DataLoader):
             file_loc = file_path.relative_to((base_path / "ref")).parent
         elif relative_path.parts[0] == "tutorials":
             chapter = "tutorials"
-            slug = self.extract_slug(
-                (base_path / "tutorials") / "intro_to_tutorials.md"
-            )
+            slug = self.extract_slug((base_path / "tutorials") / "intro_to_tutorials.md")
             file_loc = file_path.relative_to((base_path / "tutorials")).parent
         else:
             chapter = ""
@@ -80,9 +71,7 @@ class DocodileDataLoader(DataLoader):
         if file_path.name in ("intro.md", "README.md", "intro_to_tutorials.md"):
             file_name = ""
         site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
-        site_url = urljoin(
-            str(self.config.data_source.remote_path), str(site_relative_path)
-        )
+        site_url = urljoin(str(self.config.data_source.remote_path), str(site_relative_path))
         if "other/" in site_url:
             site_url = site_url.replace("other/", "")
 
@@ -92,9 +81,7 @@ class DocodileDataLoader(DataLoader):
         self,
     ) -> Iterator[Document]:
         if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(
-                self.config.data_source, self.config.data_source.git_id_file
-            )
+            self.metadata = fetch_git_repo(self.config.data_source, self.config.data_source.git_id_file)
 
         local_paths = []
         file_patterns = (
@@ -104,12 +91,7 @@ class DocodileDataLoader(DataLoader):
         )
         for file_pattern in file_patterns:
             local_paths.extend(
-                list(
-                    (
-                        self.config.data_source.local_path
-                        / self.config.data_source.base_path
-                    ).rglob(file_pattern)
-                )
+                list((self.config.data_source.local_path / self.config.data_source.base_path).rglob(file_pattern))
             )
         document_files = {
             local_path: self.generate_site_url(
@@ -121,19 +103,11 @@ class DocodileDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                document = UnstructuredMarkdownLoader(f_name).load()[0]
-                document.metadata["hash"] = hashlib.md5(
-                    (
-                        str(document.metadata["source"]) + str(document.page_content)
-                    ).encode("UTF-8")
-                ).hexdigest()
-                document.metadata["file_type"] = os.path.splitext(
-                    document.metadata["source"]
-                )[-1]
-                document.metadata["source"] = document_files[
-                    document.metadata["source"]
-                ]
-                document.metadata["source_metadata"] = json.dumps(self.metadata)
+                document = TextLoader(f_name).load()[0]
+                contents = document.page_content
+                document.page_content = clean_contents(contents)
+                document.metadata["file_type"] = os.path.splitext(document.metadata["source"])[-1]
+                document.metadata["source"] = document_files[document.metadata["source"]]
                 document.metadata["language"] = self.config.language
                 yield document
             except Exception as e:
@@ -143,9 +117,7 @@ class DocodileDataLoader(DataLoader):
 class CodeDataLoader(DataLoader):
     def lazy_load(self) -> Iterator[Document]:
         if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(
-                self.config.data_source, self.config.data_source.git_id_file
-            )
+            self.metadata = fetch_git_repo(self.config.data_source, self.config.data_source.git_id_file)
 
         local_paths = []
         file_patterns = (
@@ -155,12 +127,7 @@ class CodeDataLoader(DataLoader):
         )
         for file_pattern in file_patterns:
             local_paths.extend(
-                list(
-                    (
-                        self.config.data_source.local_path
-                        / self.config.data_source.base_path
-                    ).rglob(file_pattern)
-                )
+                list((self.config.data_source.local_path / self.config.data_source.base_path).rglob(file_pattern))
             )
 
         paths = list(local_paths)
@@ -188,30 +155,19 @@ class CodeDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                if os.path.splitext(f_name)[-1] == "*.ipynb":
-                    document = WandbNotebookLoader(
-                        f_name,
-                        include_outputs=False,
-                        max_output_length=0,
-                        remove_newline=True,
-                    ).load()[0]
+                if os.path.splitext(f_name)[-1] == ".ipynb":
+                    document = TextLoader(f_name).load()[0]
+                    contents = document.page_content
+                    notebook = nbformat.reads(contents, as_version=4)
+                    md_exporter = MarkdownExporter(template="classic")
+                    (body, resources) = md_exporter.from_notebook_node(notebook)
+                    cleaned_body = clean_contents(body)
+                    document.page_content = cleaned_body
                 else:
                     document = TextLoader(f_name).load()[0]
-                document.metadata["hash"] = hashlib.md5(
-                    (
-                        str(document.metadata["source"]) + str(document.page_content)
-                    ).encode("UTF-8")
-                ).hexdigest()
-                document.metadata["file_type"] = os.path.splitext(
-                    document.metadata["source"]
-                )[-1]
-                document.metadata["source"] = document_files[
-                    document.metadata["source"]
-                ]
-                document.metadata["source_metadata"] = json.dumps(self.metadata)
-                document.metadata["language"] = EXTENSION_MAP[
-                    document.metadata["file_type"]
-                ]
+                document.metadata["file_type"] = os.path.splitext(document.metadata["source"])[-1]
+                document.metadata["source"] = document_files[document.metadata["source"]]
+                document.metadata["language"] = EXTENSION_MAP[document.metadata["file_type"]]
                 yield document
             except Exception as e:
                 logger.warning(f"Failed to load code in {f_name} with error {e}")
@@ -223,30 +179,18 @@ def load(
     result_artifact_name: str = "raw_dataset",
 ):
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
-    artifact = wandb.Artifact(
-        result_artifact_name, type="dataset", description="Raw documents for wandbot"
-    )
+    artifact = wandb.Artifact(result_artifact_name, type="dataset", description="Raw documents for wandbot")
 
     en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
     examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
-    sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
-    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
-    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
-    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
-    weave_js_loader = CodeDataLoader(WeaveJsStoreConfig())
 
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
-        sdk_code_loader,
-        sdk_tests_loader,
-        weave_code_loader,
-        weave_examples_loader,
-        weave_js_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 
@@ -263,20 +207,7 @@ def load(
         with (loader.config.docstore_dir / "metadata.json").open("w") as f:
             json.dump(loader.metadata, f)
 
-        artifact.add_dir(
-            str(loader.config.docstore_dir), name=loader.config.docstore_dir.name
-        )
+        artifact.add_dir(str(loader.config.docstore_dir), name=loader.config.docstore_dir.name)
     run.log_artifact(artifact)
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"
-
-
-def main():
-    load(
-        project=os.environ.get("WANDB_PROJECT", "wandbot-dev"),
-        entity=os.environ.get("WANDB_ENTITY", "wandbot"),
-    )
-
-
-if __name__ == "__main__":
-    main()

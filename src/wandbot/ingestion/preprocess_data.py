@@ -1,145 +1,245 @@
-import hashlib
-import json
-import os
-import pathlib
-from typing import List
-
+import regex as re
 import tiktoken
-import wandb
-from langchain.schema import Document
-from langchain.text_splitter import Language, RecursiveCharacterTextSplitter
-from pydantic import BaseModel
+from langchain.schema import Document as LcDocument
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from llama_index import Document as LlamaDocument
+from llama_index.node_parser import SimpleNodeParser
+from llama_index.text_splitter import CodeSplitter, TextSplitter
+from tree_sitter_languages import get_parser
+from typing import Iterable, List
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
 
-class DocumentTransformerConfig(BaseModel):
-    cache_dir: pathlib.Path = pathlib.Path("data/cache/transformed_data")
-    chunk_size: int = 2048
-    chunk_overlap: int = 128
-    encoding_type: str = "cl100k_base"
-    add_start_index: bool = True
+def make_texts_tokenization_safe(documents):
+    encoding = tiktoken.get_encoding("cl100k_base")
+    special_tokens_set = encoding.special_tokens_set
+
+    def remove_special_tokens(text):
+        for token in special_tokens_set:
+            text = text.replace(token, "")
+        return text
+
+    cleaned_documents = []
+    for document in documents:
+        cleaned_document = remove_special_tokens(document)
+        cleaned_documents.append(cleaned_document)
+    return cleaned_documents
 
 
-class DocumentTransformer:
-    def __init__(self, config: DocumentTransformerConfig):
-        self.config = config
-        self.splitter_kwargs = dict(
-            chunk_size=self.config.chunk_size,
-            chunk_overlap=self.config.chunk_overlap,
-            add_start_index=self.config.add_start_index,
+def non_whitespace_len(s) -> int:
+    if isinstance(s, str):
+        return len(re.sub("\s", "", s))
+    return len(re.sub("\s", "", s.decode("utf-8")))
+
+
+def split_by_headers(tree):
+    chunks = []
+    current_chunk = []
+    for child in tree.root_node.children:
+        if child.type == "atx_heading" or child.type == "setext_heading":
+            if current_chunk:  # if current_chunk is not empty, add it to chunks
+                chunks.append(current_chunk)
+                current_chunk = []  # start a new chunk
+            current_chunk.append(child)
+        else:
+            current_chunk.append(child)
+    if current_chunk:  # add the last chunk if it's not empty
+        chunks.append(current_chunk)
+    return chunks
+
+
+def split_large_chunks_by_code_blocks(chunks, max_chars):
+    new_chunks = []
+    for chunk in chunks:
+        current_chunk = []
+        current_chars = 0
+        for child in chunk:
+            child_chars = non_whitespace_len(child.text)
+            current_chars += child_chars
+            current_chunk.append(child)
+            if child.type == "fenced_code_block" and current_chars > max_chars:
+                if current_chunk:  # if current_chunk is not empty, add it to new_chunks
+                    new_chunks.append(current_chunk)
+                    current_chunk = []  # start a new chunk
+                current_chars = 0
+        if current_chunk:  # add the last chunk if it's not empty
+            new_chunks.append(current_chunk)
+    return new_chunks
+
+
+def get_heading_level(chunk):
+    for child in chunk:
+        if child.type == "atx_heading" or child.type == "setext_heading":
+            for grandchild in child.children:
+                if grandchild.type.startswith("atx") and grandchild.type.endswith("marker"):
+                    return len(grandchild.text)
+    return None
+
+
+def merge_small_chunks(chunks, max_chars):
+    merged_chunks = []
+    current_chunk = []
+    current_chars = 0
+    for chunk in chunks:
+        chunk_chars = sum(non_whitespace_len(child.text) for child in chunk)
+        current_heading_level, chunk_heading_level = get_heading_level(current_chunk), get_heading_level(chunk)
+        cond = (current_heading_level is None and chunk_heading_level is None) or (
+            current_heading_level and chunk_heading_level and current_heading_level <= chunk_heading_level
         )
-        self.document_splitters = {
-            ".md": RecursiveCharacterTextSplitter.from_language(
-                Language.MARKDOWN, **self.splitter_kwargs
-            ),
-            ".py": RecursiveCharacterTextSplitter.from_language(
-                Language.PYTHON, **self.splitter_kwargs
-            ),
-            ".ipynb": RecursiveCharacterTextSplitter.from_language(
-                Language.PYTHON, **self.splitter_kwargs
-            ),
-            ".js": RecursiveCharacterTextSplitter.from_language(
-                Language.JS, **self.splitter_kwargs
-            ),
-            ".ts": RecursiveCharacterTextSplitter.from_language(
-                Language.JS, **self.splitter_kwargs
-            ),
-        }
-
-    def make_documents_tokenization_safe(self, documents):
-        encoding = tiktoken.get_encoding(self.config.encoding_type)
-        special_tokens_set = encoding.special_tokens_set
-
-        def remove_special_tokens(text):
-            for token in special_tokens_set:
-                text = text.replace(token, "")
-            return text
-
-        cleaned_documents = []
-        for document in documents:
-            document.page_content = remove_special_tokens(document.page_content)
-            cleaned_documents.append(document)
-        return cleaned_documents
-
-    def transform(self, documents: List[Document]) -> List[Document]:
-        transformed_documents = []
-        documents = self.make_documents_tokenization_safe(documents)
-        for document in documents:
-            document_extension = document.metadata["file_type"]
-            document_splitter = self.document_splitters.get(document_extension, None)
-            if document_splitter is None:
-                continue
-            for doc_split in document_splitter.split_documents([document]):
-                if len(doc_split.page_content.split()) > 5:
-                    doc_split.metadata["parent_hash"] = document.metadata["hash"]
-                    doc_split.metadata["hash"] = doc_split.metadata[
-                        "hash"
-                    ] = hashlib.md5(
-                        (
-                            str(doc_split.metadata["parent_hash"])
-                            + str(doc_split.page_content)
-                        ).encode("UTF-8")
-                    ).hexdigest()
-                    transformed_documents.append(doc_split)
-        return transformed_documents
+        if current_chars + chunk_chars <= max_chars and (not current_chunk or cond):
+            current_chunk.extend(chunk)
+            current_chars += chunk_chars
+        else:
+            merged_chunks.append(current_chunk)
+            current_chunk = chunk
+            current_chars = chunk_chars
+    if current_chunk:  # add the last chunk if it's not empty
+        merged_chunks.append(current_chunk)
+    return merged_chunks
 
 
-def load(
-    project: str,
-    entity: str,
-    source_artifact_path: str,
-    result_artifact_name: str = "transformed_dataset",
-):
-    run = wandb.init(project=project, entity=entity, job_type="preprocess_dataset")
-    artifact = run.use_artifact(source_artifact_path, type="dataset")
-    artifact_dir = artifact.download()
-    processed_artifact = wandb.Artifact(
-        result_artifact_name,
-        type="dataset",
-        description="Wandbot dataset with transformed documents",
-    )
-    document_files = list(pathlib.Path(artifact_dir).rglob("documents.jsonl"))
-    transformer = DocumentTransformer(DocumentTransformerConfig())
-    for document_file in document_files:
-        documents = []
-        with document_file.open() as f:
-            for line in f:
-                doc_dict = json.loads(line)
-                doc = Document(**doc_dict)
-                documents.append(doc)
-        transformed_documents = transformer.transform(documents)
-        doc_store_dir = transformer.config.cache_dir.joinpath(document_file.parent.name)
-        doc_store_dir.mkdir(parents=True, exist_ok=True)
-        with doc_store_dir.joinpath("documents.jsonl").open("w") as f:
-            for document in transformed_documents:
-                document = {
-                    "page_content": document.page_content,
-                    "metadata": document.metadata,
-                }
-                f.write(json.dumps(document) + "\n")
-        doc_store_dir.joinpath("config.json").write_text(
-            transformer.config.model_dump_json()
-        )
-        metadata = {
-            "num_documents": len(documents),
-            "num_transformed_documents": len(transformed_documents),
-        }
-        doc_store_dir.joinpath("metadata.json").write_text(json.dumps(metadata))
-        processed_artifact.add_dir(str(doc_store_dir), name=doc_store_dir.name)
-    run.log_artifact(processed_artifact)
-    run.finish()
-    return f"{entity}/{project}/{result_artifact_name}:latest"
+def coalesce_small_chunks(chunks, min_chars=100):
+    coalesced_chunks = []
+    i = 0
+    while i < len(chunks):
+        chunk_chars = sum(non_whitespace_len(child.text) for child in chunks[i])
+        if chunk_chars < min_chars:  # if chunk is too small
+            if i < len(chunks) - 1:  # if it's not the last chunk
+                next_chunk_heading_level = get_heading_level(chunks[i + 1])
+                current_chunk_heading_level = get_heading_level(chunks[i])
+                if next_chunk_heading_level is None or (
+                    current_chunk_heading_level is not None and next_chunk_heading_level > current_chunk_heading_level
+                ):
+                    # if the next chunk is not a heading or is a heading of a higher level
+                    chunks[i + 1] = chunks[i] + chunks[i + 1]  # prepend the chunk to the next chunk
+                    i += 1  # skip to the next chunk
+                    continue
+            # if it's the last chunk or the next chunk is a heading of the same level
+            if coalesced_chunks:  # if there are already some coalesced chunks
+                coalesced_chunks[-1].extend(chunks[i])  # add the chunk to the previous chunk
+            else:
+                coalesced_chunks.append(chunks[i])
+                i += 1
+        else:
+            coalesced_chunks.append(chunks[i])  # add the chunk as a separate chunk
+        i += 1
+    return coalesced_chunks
 
 
-def main():
-    load(
-        project=os.environ.get("WANDB_PROJECT", "wandbot-dev"),
-        entity=os.environ.get("WANDB_ENTITY", "wandbot"),
-        source_artifact_path="wandbot/wandbot-dev/raw_dataset:latest",
-    )
+def get_line_number(index: int, source_code: bytes) -> int:
+    total_chars = 0
+    for line_number, line in enumerate(source_code.splitlines(keepends=True), start=1):
+        total_chars += len(line)
+        if total_chars > index:
+            return line_number - 1
+    return line_number
 
 
-if __name__ == "__main__":
-    main()
+def coalesce_strings(strings, max_length):
+    result = []
+    current_string = ""
+
+    for string in strings:
+        if non_whitespace_len(current_string) + non_whitespace_len(string) <= max_length:
+            current_string += "\n" + string
+        else:
+            result.append(current_string)
+            current_string = string
+
+    # Add the last remaining string
+    if current_string:
+        result.append(current_string)
+
+    return result
+
+
+def clean_extra_newlines(strings):
+    result = []
+    for string in strings:
+        string = re.sub(r"\n```\n", "CODEBREAK", string)
+        string = re.sub(r"\n{2,}", "LINEBREAK", string)
+        string = re.sub(r"\n", " ", string)
+        string = re.sub(r"LINEBREAK", "\n\n", string)
+        string = re.sub(r"CODEBREAK", "\n\n```\n\n", string)
+        result.append(string)
+    return result
+
+
+class MarkdownSplitter(TextSplitter):
+    sub_splitter = RecursiveCharacterTextSplitter.from_language("markdown")
+    chunk_size = 1024
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.sub_splitter = RecursiveCharacterTextSplitter.from_language("markdown")
+
+    @classmethod
+    def class_name(cls) -> str:
+        """Get class name."""
+        return "MarkdownSplitter"
+
+    def _chunk_text(self, text: str) -> Iterable[str]:
+        """Split text into chunks."""
+        parser = get_parser("markdown")
+        tree = parser.parse(text.encode("utf-8"))
+
+        chunks = split_by_headers(tree)
+        chunks = split_large_chunks_by_code_blocks(chunks, self.chunk_size)
+        chunks = merge_small_chunks(chunks, self.chunk_size)
+        for chunk in chunks:
+            if chunk:
+                chunk_bytes = chunk[0].start_byte, chunk[-1].end_byte
+                chunk_lines = text.encode("utf-8").splitlines()[
+                    get_line_number(chunk_bytes[0], text.encode("utf-8")) : get_line_number(
+                        chunk_bytes[1], text.encode("utf-8")
+                    )
+                    + 1
+                ]
+                chunk_str = ""
+                for line in chunk_lines:
+                    if line.decode().endswith("\n"):
+                        chunk_str += line.decode()
+                    else:
+                        chunk_str += line.decode() + "\n"
+
+                for split in self.sub_splitter.split_documents([LcDocument(page_content=chunk_str)]):
+                    split_content = split.page_content
+
+                    yield split_content
+
+    def split_text(self, text: str) -> List[str]:
+        """Split text into chunks."""
+        chunks = list(self._chunk_text(text))
+        chunks = coalesce_strings(chunks, self.chunk_size)
+        chunks = clean_extra_newlines(chunks)
+        chunks = make_texts_tokenization_safe(chunks)
+        return chunks
+
+
+class CustomCodeSplitter(CodeSplitter):
+    def split_text(self, text: str) -> List[str]:
+        text_splits = super().split_text(text)
+        text_splits = make_texts_tokenization_safe(text_splits)
+        return text_splits
+
+
+def convert_lc_to_llama(document: LcDocument):
+    return LlamaDocument.from_langchain_format(document)
+
+
+def load(documents, chunk_size=1024):
+    md_parser = SimpleNodeParser(text_splitter=MarkdownSplitter(chunk_size=chunk_size))
+    code_parser = SimpleNodeParser(text_splitter=CustomCodeSplitter(language="python", max_chars=chunk_size))
+
+    llama_docs = list(map(lambda x: convert_lc_to_llama(x), documents))
+
+    nodes = []
+    for doc in llama_docs:
+        if doc.metadata["file_type"] == ".py":
+            parser = code_parser
+        else:
+            parser = md_parser
+        nodes.extend(node_parser.get_nodes_from_documents([doc]))
+    return nodes
