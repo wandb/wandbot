@@ -1,5 +1,5 @@
 python -m pip install -U poetry && \
-poetry install -E slack -E discord -E chat -E api --no-cache && \
+poetry install --all-extras --no-cache && \
 poetry build && \
 rm -rf $POETRY_CACHE_DIR/* && \
 echo "Running applications" && \
