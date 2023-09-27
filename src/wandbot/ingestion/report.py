@@ -26,27 +26,17 @@ def log_processed_counts(
     return list(data.keys())
 
 
-def get_metadata_from_artifacts(
-    raw_artifact, preprocessed_artifact, vectorstore_artifact
-):
+def get_metadata_from_artifacts(raw_artifact, preprocessed_artifact, vectorstore_artifact):
     raw_artifact = wandb.run.use_artifact(raw_artifact, type="dataset")
     raw_artifact_dir = raw_artifact.download()
-    preprocessed_artifact = wandb.run.use_artifact(
-        preprocessed_artifact, type="dataset"
-    )
+    preprocessed_artifact = wandb.run.use_artifact(preprocessed_artifact, type="dataset")
     preprocessed_artifact_dir = preprocessed_artifact.download()
-    vectorstore_artifact = wandb.run.use_artifact(
-        vectorstore_artifact, type="vectorstore"
-    )
+    vectorstore_artifact = wandb.run.use_artifact(vectorstore_artifact, type="vectorstore")
     vectorstore_artifact_dir = vectorstore_artifact.download()
 
     raw_metadata_files = list(pathlib.Path(raw_artifact_dir).rglob("metadata.json"))
-    preprocessed_metadata_files = list(
-        pathlib.Path(preprocessed_artifact_dir).rglob("metadata.json")
-    )
-    vectorstore_metadata_files = list(
-        pathlib.Path(vectorstore_artifact_dir).rglob("metadata.json")
-    )
+    preprocessed_metadata_files = list(pathlib.Path(preprocessed_artifact_dir).rglob("metadata.json"))
+    vectorstore_metadata_files = list(pathlib.Path(vectorstore_artifact_dir).rglob("metadata.json"))
 
     raw_metadata = {}
     for metadata_file in raw_metadata_files:
@@ -87,9 +77,7 @@ def create_ingestion_report(
         raw_metadata,
         preprocessed_metadata,
         vectorstore_metadata,
-    ) = get_metadata_from_artifacts(
-        raw_artifact, preprocessed_artifact, vectorstore_artifact
-    )
+    ) = get_metadata_from_artifacts(raw_artifact, preprocessed_artifact, vectorstore_artifact)
 
     raw_sources = log_raw_counts(raw_metadata)
     preprocessed_sources = log_processed_counts(preprocessed_metadata)
@@ -117,9 +105,7 @@ def create_ingestion_report(
         wr.H1("Raw Datasources Metadata"),
         wr.CodeBlock([json.dumps(dict(raw_metadata), indent=2)], language="json"),
         wr.H1("Preprocessed Datasources Metadata"),
-        wr.CodeBlock(
-            [json.dumps(dict(preprocessed_metadata), indent=2)], language="json"
-        ),
+        wr.CodeBlock([json.dumps(dict(preprocessed_metadata), indent=2)], language="json"),
         wr.H1("VectorsStore Artifact Summary"),
         wr.WeaveBlockArtifact(
             wandb.run.entity,
@@ -138,9 +124,7 @@ def main():
     raw_artifact = "wandbot/wandbot-dev/raw_dataset:latest"
     preprocessed_artifact = "wandbot/wandbot-dev/transformed_dataset:latest"
     vectorstore_artifact = "wandbot/wandbot-dev/vectorstores:latest"
-    create_ingestion_report(
-        project, entity, raw_artifact, preprocessed_artifact, vectorstore_artifact
-    )
+    create_ingestion_report(project, entity, raw_artifact, preprocessed_artifact, vectorstore_artifact)
 
 
 if __name__ == "__main__":

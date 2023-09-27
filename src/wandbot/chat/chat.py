@@ -1,14 +1,10 @@
 import json
-from typing import List, Optional, Any, Dict
+from typing import Any, Dict, List, Optional
 
 import tiktoken
 import wandb
 from llama_index import StorageContext, load_index_from_storage
-from llama_index.callbacks import (
-    WandbCallbackHandler,
-    TokenCountingHandler,
-    CallbackManager,
-)
+from llama_index.callbacks import CallbackManager, TokenCountingHandler, WandbCallbackHandler
 from llama_index.chat_engine.types import ChatMode
 from llama_index.indices.postprocessor import CohereRerank
 from llama_index.llms import ChatMessage, MessageRole
@@ -49,16 +45,12 @@ class Chat:
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
-        self.storage_context = self.load_storage_context_from_artifact(
-            artifact_url=self.config.index_artifact
-        )
+        self.storage_context = self.load_storage_context_from_artifact(artifact_url=self.config.index_artifact)
         self.index = load_index_from_storage(self.storage_context)
 
         self.wandb_callback = WandbCallbackHandler()
         self.token_counter = TokenCountingHandler(tokenizer=self.tokenizer.encode)
-        self.callback_manager = CallbackManager(
-            [self.wandb_callback, self.token_counter]
-        )
+        self.callback_manager = CallbackManager([self.wandb_callback, self.token_counter])
 
         self.qa_prompt = load_chat_prompt(self.config.chat_prompt)
         self.chat_engine = self._load_chat_engine(
@@ -143,9 +135,7 @@ class Chat:
             logger.warning(f"{self.config.chat_model_name} failed with {e}")
             logger.warning(f"Falling back to {self.config.fallback_model_name} model")
             try:
-                response = self.fallback_chat_engine.chat(
-                    message=query, chat_history=chat_history
-                )
+                response = self.fallback_chat_engine.chat(message=query, chat_history=chat_history)
                 result = {
                     "answer": response.response,
                     "source_documents": response.source_nodes,
@@ -153,7 +143,7 @@ class Chat:
                 }
 
             except Exception as e:
-                logger.warning(f"{self.config.fallback_model_name} failed with {e}")
+                logger.error(f"{self.config.fallback_model_name} failed with {e}")
                 result = {
                     "answer": "\uE058"
                     + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
@@ -172,9 +162,7 @@ class Chat:
                     "sources": "",
                 }
             else:
-                result = self.get_answer(
-                    query, chat_history=get_chat_history(chat_request.chat_history)
-                )
+                result = self.get_answer(query, chat_history=get_chat_history(chat_request.chat_history))
                 usage_stats = {
                     "total_tokens": self.token_counter.total_llm_token_count,
                     "prompt_tokens": self.token_counter.prompt_llm_token_count,
@@ -207,9 +195,7 @@ def main():
             break
         else:
             response = chat(ChatRequest(question=question, chat_history=chat_history))
-            chat_history.append(
-                QuestionAnswer(question=question, answer=response.answer)
-            )
+            chat_history.append(QuestionAnswer(question=question, answer=response.answer))
             print(f"WandBot: {response.answer}")
             print(f"Time taken: {response.time_taken}")
 

@@ -1,7 +1,9 @@
-import langdetect
 from functools import partial
+
+import langdetect
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+
 from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig

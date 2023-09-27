@@ -4,14 +4,9 @@ import os
 from typing import Any
 
 import faiss
-from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
+from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
 from langchain.storage import LocalFileStore
-from llama_index import (
-    ServiceContext,
-    StorageContext,
-    load_index_from_storage,
-    VectorStoreIndex,
-)
+from llama_index import ServiceContext, StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.llms import OpenAI
 from llama_index.vector_stores import FaissVectorStore
 
@@ -54,20 +49,14 @@ def load_embeddings(cache_dir):
 
 
 def load_llm(model_name, temperature, max_retries):
-    llm = OpenAI(
-        temperature=0.0, model_name=model_name, streaming=True, max_retries=max_retries
-    )
+    llm = OpenAI(temperature=0.0, model_name=model_name, streaming=True, max_retries=max_retries)
     return llm
 
 
-def load_service_context(
-    llm, temperature, embeddings_cache, max_retries, callback_manager=None
-):
+def load_service_context(llm, temperature, embeddings_cache, max_retries, callback_manager=None):
     llm = load_llm(llm, temperature, max_retries=max_retries)
     embed_model = load_embeddings(embeddings_cache)
-    return ServiceContext.from_defaults(
-        llm=llm, embed_model=embed_model, callback_manager=callback_manager
-    )
+    return ServiceContext.from_defaults(llm=llm, embed_model=embed_model, callback_manager=callback_manager)
 
 
 def load_storage_context(embed_dimensions, persist_dir):

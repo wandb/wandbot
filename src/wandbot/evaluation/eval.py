@@ -8,6 +8,7 @@ from fuzzywuzzy import fuzz
 from langchain.chat_models import ChatOpenAI
 from langchain.evaluation.qa import QAEvalChain
 from tqdm.auto import tqdm
+
 from wandbot.chat.chat import Chat
 from wandbot.chat.prompts import load_eval_prompt
 from wandbot.evaluation.config import EvalConfig
@@ -82,28 +83,18 @@ class Evaluate:
                     )
                     break
                 except Exception as e:
-                    print(
-                        f"Error occurred: {e}. Retrying in {self.config.retry_delay} seconds..."
-                    )
+                    print(f"Error occurred: {e}. Retrying in {self.config.retry_delay} seconds...")
                     time.sleep(self.config.retry_delay)
 
-        self.eval_df["retrieval_match"] = self.eval_df.apply(
-            lambda x: x.orig_document in x.documents, axis=1
-        )
+        self.eval_df["retrieval_match"] = self.eval_df.apply(lambda x: x.orig_document in x.documents, axis=1)
         self.eval_df = self.eval_df.dropna()
-        self.eval_df["string_distance"] = self.eval_df.apply(
-            calculate_string_distance, axis=1
-        )
+        self.eval_df["string_distance"] = self.eval_df.apply(calculate_string_distance, axis=1)
 
         eval_df.orig_document = eval_df.orig_document.apply(
-            lambda x: x.replace("../docodile/docs/", "https://docs.wandb.ai/").replace(
-                ".md", ""
-            )
+            lambda x: x.replace("../docodile/docs/", "https://docs.wandb.ai/").replace(".md", "")
         )
 
-        retrieval_accuracy = len(
-            self.eval_df[self.eval_df["retrieval_match"] == True]
-        ) / len(self.eval_df)
+        retrieval_accuracy = len(self.eval_df[self.eval_df["retrieval_match"] == True]) / len(self.eval_df)
         print(f"Retrieval accuracy: {retrieval_accuracy}")
         wandb.log({"retrieval_accuracy": retrieval_accuracy})
 
@@ -140,9 +131,7 @@ class Evaluate:
         graded_outputs = eval_chain.evaluate(examples, predictions)
         self.eval_df["model_score"] = [x.get("text", "None") for x in graded_outputs]
 
-        model_accuracy = len(
-            self.eval_df[self.eval_df["model_score"] == "CORRECT"]
-        ) / len(self.eval_df)
+        model_accuracy = len(self.eval_df[self.eval_df["model_score"] == "CORRECT"]) / len(self.eval_df)
         print(f"Chat model accuracy: {model_accuracy}")
         wandb.log({"chat_accuracy": model_accuracy})
 
