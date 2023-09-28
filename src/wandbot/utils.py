@@ -49,7 +49,7 @@ def load_embeddings(cache_dir):
 
 
 def load_llm(model_name, temperature, max_retries):
-    llm = OpenAI(temperature=0.0, model_name=model_name, streaming=True, max_retries=max_retries)
+    llm = OpenAI(model=model_name, temperature=temperature, streaming=True, max_retries=max_retries)
     return llm
 
 
