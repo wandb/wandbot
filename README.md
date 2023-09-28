@@ -35,7 +35,7 @@ To ingest the data run the following command from the root of the repository
 ```bash
 poetry run python -m src.wandbot.ingestion
 ```
-You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `transformed_data`, `retriever_data` with individual files for each step of the ingestion process.
+You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot).
 
 
