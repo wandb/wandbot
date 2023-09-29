@@ -54,20 +54,14 @@ def load_embeddings(cache_dir):
 
 
 def load_llm(model_name, temperature, max_retries):
-    llm = OpenAI(
-        temperature=0.0, model_name=model_name, streaming=True, max_retries=max_retries
-    )
+    llm = OpenAI(model=model_name, temperature=temperature, streaming=True, max_retries=max_retries)
     return llm
 
 
-def load_service_context(
-    llm, temperature, embeddings_cache, max_retries, callback_manager=None
-):
+def load_service_context(llm, temperature, embeddings_cache, max_retries, callback_manager=None):
     llm = load_llm(llm, temperature, max_retries=max_retries)
     embed_model = load_embeddings(embeddings_cache)
-    return ServiceContext.from_defaults(
-        llm=llm, embed_model=embed_model, callback_manager=callback_manager
-    )
+    return ServiceContext.from_defaults(llm=llm, embed_model=embed_model, callback_manager=callback_manager)
 
 
 def load_storage_context(embed_dimensions, persist_dir):
