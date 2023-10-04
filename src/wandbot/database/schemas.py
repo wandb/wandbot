@@ -26,6 +26,7 @@ class FeedbackCreate(Feedback):
 
 
 class QuestionAnswerBase(BaseModel):
+    system_prompt: str | None = None
     question: str
     answer: str | None = None
     model: str | None = None

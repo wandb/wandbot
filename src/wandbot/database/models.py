@@ -18,6 +18,7 @@ class QuestionAnswer(Base):
 
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
     question_answer_id = Column(String, primary_key=True, index=True)
+    system_prompt = Column(String)
     question = Column(String)
     answer = Column(String)
     model = Column(String)

@@ -60,6 +60,7 @@ class APIClient:
         question_answer_id: str,
         thread_id: str,
         question: str,
+        system_prompt: str | None = None,
         answer: str | None = None,
         model: str | None = None,
         sources: str | None = None,
@@ -76,6 +77,7 @@ class APIClient:
         request = APIQuestionAnswerRequest(
             question_answer_id=question_answer_id,
             thread_id=thread_id,
+            system_prompt=system_prompt,
             question=question,
             answer=answer,
             model=model,
@@ -167,6 +169,7 @@ class AsyncAPIClient(APIClient):
         question_answer_id: str,
         thread_id: str,
         question: str,
+        system_prompt: str | None = None,
         answer: str | None = None,
         model: str | None = None,
         sources: str | None = None,
@@ -183,6 +186,7 @@ class AsyncAPIClient(APIClient):
         request = APIQuestionAnswerRequest(
             question_answer_id=question_answer_id,
             thread_id=thread_id,
+            system_prompt=system_prompt,
             question=question,
             answer=answer,
             model=model,
@@ -228,7 +232,7 @@ class AsyncAPIClient(APIClient):
     async def query(
         self,
         question: str,
-        chat_history: List[QuestionAnswer],
+        chat_history: List[QuestionAnswer] = None,
     ) -> APIQueryResponse:
         request = APIQueryRequest(
             question=question,

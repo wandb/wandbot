@@ -182,6 +182,7 @@ class Chat:
             )
         )
         self.run.log(usage_stats)
+        result["system_prompt"] = self.qa_prompt.message_templates[0].content
         return ChatRepsonse(**result)
 
 
