@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from collections import OrderedDict
 
 import discord
 import langdetect
@@ -24,6 +25,10 @@ config = DiscordAppConfig()
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
+def deduplicate(input_list):
+    return list(OrderedDict.fromkeys(input_list))
+
+
 def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
     if response is not None:
         result = response.answer
@@ -37,7 +42,9 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "", 
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            sources_list = list(set([item for item in response.sources.split(",") if item.strip().startswith("http")]))
+            sources_list = deduplicate(
+                [item for item in response.sources.split(",") if item.strip().startswith("http")]
+            )
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
                 if lang == "ja":
