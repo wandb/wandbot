@@ -26,6 +26,7 @@ class FeedbackCreate(Feedback):
 
 
 class QuestionAnswerBase(BaseModel):
+    system_prompt: str | None = None
     question: str
     answer: str | None = None
     model: str | None = None
@@ -34,8 +35,6 @@ class QuestionAnswerBase(BaseModel):
     total_tokens: int | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
-    successful_requests: int | None = None
-    total_cost: float | None = None
     time_taken: float | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None

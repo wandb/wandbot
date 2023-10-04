@@ -1,9 +1,11 @@
 import asyncio
-import discord
-import langdetect
 import logging
 import uuid
+
+import discord
+import langdetect
 from discord.ext import commands
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.discord.config import DiscordAppConfig

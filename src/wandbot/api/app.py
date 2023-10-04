@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 import wandb
 from fastapi import FastAPI, Response, status
+
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -70,9 +71,7 @@ async def create_question_answer(
     response_model=APIGetChatThreadResponse | None,
     status_code=status.HTTP_200_OK,
 )
-async def get_chat_thread(
-    application: str, thread_id: str, response: Response
-) -> APIGetChatThreadResponse:
+async def get_chat_thread(application: str, thread_id: str, response: Response) -> APIGetChatThreadResponse:
     chat_thread = db_client.get_chat_thread(
         application=application,
         thread_id=thread_id,
@@ -107,9 +106,7 @@ async def query(
     response_model=APIFeedbackResponse | None,
     status_code=status.HTTP_201_CREATED,
 )
-async def feedback(
-    request: APIFeedbackRequest, response: Response
-) -> APIFeedbackResponse:
+async def feedback(request: APIFeedbackRequest, response: Response) -> APIFeedbackResponse:
     feedback_response = db_client.create_feedback(request)
     if feedback_response is not None:
         wandb.log(

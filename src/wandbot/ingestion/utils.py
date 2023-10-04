@@ -64,24 +64,18 @@ def fetch_git_repo(paths, id_file) -> Dict[str, str]:
 
     if paths.local_path.is_dir():
         repo = Repo(paths.local_path)
-        logger.debug(
-            f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
-        )
+        logger.debug(f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}")
         with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
             repo.remotes.origin.pull()
     else:
         remote_url = giturlparse.parse(f"{paths.repo_path}").urls.get("ssh")
 
         logger.debug(f"Cloning {remote_url} to {paths.local_path}")
-        repo = Repo.clone_from(
-            remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command)
-        )
+        repo = Repo.clone_from(remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command))
     return fetch_repo_metadata(repo)
 
 
-def concatenate_cells(
-    cell: dict, include_outputs: bool, max_output_length: int, traceback: bool
-) -> str:
+def concatenate_cells(cell: dict, include_outputs: bool, max_output_length: int, traceback: bool) -> str:
     """Combine cells information in a readable format ready to be used."""
     cell_type = cell["cell_type"]
     source = cell["source"]
@@ -106,10 +100,7 @@ def concatenate_cells(
         elif output[0]["output_type"] == "stream":
             output = output[0]["text"]
             min_output = min(max_output_length, len(output))
-            return (
-                f"'{cell_type}' cell: '{source}'\n with "
-                f"output: '{output[:min_output]}'\n\n"
-            )
+            return f"'{cell_type}' cell: '{source}'\n with " f"output: '{output[:min_output]}'\n\n"
     else:
         if cell_type == "markdown":
             source = re.sub(r"!\[.*?\]\((.*?)\)", "", f"{source}").strip()
@@ -139,9 +130,7 @@ class WandbNotebookLoader(NotebookLoader):
             filtered_data = filtered_data.applymap(remove_newlines)
 
         text = filtered_data.apply(
-            lambda x: concatenate_cells(
-                x, self.include_outputs, self.max_output_length, self.traceback
-            ),
+            lambda x: concatenate_cells(x, self.include_outputs, self.max_output_length, self.traceback),
             axis=1,
         ).str.cat(sep=" ")
 
@@ -200,9 +189,7 @@ def clean_soup(soup):
 def clean_contents(contents):
     soup = convert_contents_to_soup(contents)
     soup = clean_soup(soup)
-    cleaned_document = markdownify.MarkdownConverter(heading_style="ATX").convert_soup(
-        soup
-    )
+    cleaned_document = markdownify.MarkdownConverter(heading_style="ATX").convert_soup(soup)
     cleaned_document = cleaned_document.replace("![]()", "\n")
     cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
 

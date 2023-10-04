@@ -1,14 +1,16 @@
 import json
+import os
+from typing import Iterator
+from urllib.parse import urljoin
+
 import markdown
 import nbformat
-import os
 import wandb
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
-from typing import Iterator
-from urllib.parse import urljoin
+
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,

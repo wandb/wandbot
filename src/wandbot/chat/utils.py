@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains import ConversationalRetrievalChain, StuffDocumentsChain
 from langchain.schema import Document
+
 from wandbot.database.schemas import QuestionAnswer
 
 
@@ -13,10 +14,7 @@ def get_chat_history(
     if not chat_history:
         return []
     else:
-        return [
-            (question_answer.question, question_answer.answer)
-            for question_answer in chat_history
-        ]
+        return [(question_answer.question, question_answer.answer) for question_answer in chat_history]
 
 
 class ConversationalRetrievalQASourcesChain(ConversationalRetrievalChain):
@@ -26,13 +24,8 @@ class ConversationalRetrievalQASourcesChain(ConversationalRetrievalChain):
     def _reduce_tokens_below_limit(self, docs: List[Document]) -> List[Document]:
         num_docs = len(docs)
 
-        if self.max_tokens_limit and isinstance(
-            self.combine_docs_chain, StuffDocumentsChain
-        ):
-            tokens = [
-                self.combine_docs_chain.llm_chain.llm.get_num_tokens(doc.page_content)
-                for doc in docs
-            ]
+        if self.max_tokens_limit and isinstance(self.combine_docs_chain, StuffDocumentsChain):
+            tokens = [self.combine_docs_chain.llm_chain.llm.get_num_tokens(doc.page_content) for doc in docs]
             token_count = sum(tokens[:num_docs])
             while token_count > self.max_tokens_limit:
                 num_docs -= 1
@@ -47,9 +40,7 @@ class ConversationalRetrievalQASourcesChain(ConversationalRetrievalChain):
         *,
         run_manager: CallbackManagerForChainRun,
     ) -> List[Document]:
-        docs = self.retriever.get_relevant_documents(
-            question, callbacks=run_manager.get_child()
-        )
+        docs = self.retriever.get_relevant_documents(question, callbacks=run_manager.get_child())
         return self._reduce_tokens_below_limit(docs)
 
     @property
@@ -67,9 +58,7 @@ class ConversationalRetrievalQASourcesChain(ConversationalRetrievalChain):
         results = super()._call(inputs, **kwargs)
         answer = results["answer"]
         if re.search(r"Source[s]?:\s", answer, flags=re.IGNORECASE):
-            answers_and_sources = re.split(
-                r"Source[s]?:\s", answer, flags=re.IGNORECASE
-            )
+            answers_and_sources = re.split(r"Source[s]?:\s", answer, flags=re.IGNORECASE)
             if len(answers_and_sources) > 1:
                 answer = answers_and_sources[0]
                 sources = answers_and_sources[1]

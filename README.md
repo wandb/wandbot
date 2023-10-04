@@ -17,7 +17,7 @@ The project uses `python = ">=3.10.0,<3.11"` and uses [poetry](https://python-po
 
 ```bash
 git clone git@github.com:wandb/wandbot.git
-pip install poetry
+pip install poetry --all-extras
 cd wandbot
 poetry install
 # Depending on which platform you want to run on run the following command:
@@ -35,7 +35,7 @@ To ingest the data run the following command from the root of the repository
 ```bash
 poetry run python -m src.wandbot.ingestion
 ```
-You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `transformed_data`, `retriever_data` with individual files for each step of the ingestion process.
+You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot).
 
 
@@ -50,17 +50,22 @@ SLACK_BOT_TOKEN
 SLACK_SIGNING_SECRET
 WANDB_API_KEY
 DISCORD_BOT_TOKEN
+COHERE_API_KEY
 WANDBOT_API_URL="http://localhost:8000"
 WANDB_TRACING_ENABLED="true"
 WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY="wandbot"
 ```
+
 Then you can run the Q&A bot application, use the following commands:
+
 ```bash
 (poetry run uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 > api.log 2>&1) & \
 (poetry run python -m wandbot.apps.slack > slack_app.log 2>&1) & \
 (poetry run python -m wandbot.apps.discord > discord_app.log 2>&1)
 ```
+
+Please refer to the [run.sh](./run.sh) file in the root of the repository for more details on commands related to installing and running the bot.
 
 This will start the chatbot applications - the api, the slackbot and the discord bot, allowing you to interact with it and ask questions related to the Weights & Biases documentation.
 

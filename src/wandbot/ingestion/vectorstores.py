@@ -1,16 +1,13 @@
 import json
 import pathlib
+
 import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
+
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.utils import (
-    get_logger,
-    load_storage_context,
-    load_service_context,
-    load_index,
-)
+from wandbot.utils import get_logger, load_index, load_service_context, load_storage_context
 
 logger = get_logger(__name__)
 
@@ -21,7 +18,6 @@ def load(
     source_artifact_path: str,
     result_artifact_name: str = "wandbot_index",
 ):
-
     config = VectorStoreConfig()
     run = wandb.init(project=project, entity=entity, job_type="create_vectorstore")
     artifact = run.use_artifact(source_artifact_path, type="dataset")
