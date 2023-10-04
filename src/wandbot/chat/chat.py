@@ -81,11 +81,11 @@ class Chat:
         )
         chat_engine = self.index.as_chat_engine(
             chat_mode=ChatMode.CONDENSE_QUESTION,
-            similarity_top_k=20,
+            similarity_top_k=25,
             response_mode="compact",
             service_context=service_context,
             text_qa_template=self.qa_prompt,
-            node_postprocessors=[CohereRerank(top_n=10, model="rerank-english-v2.0")],
+            node_postprocessors=[CohereRerank(top_n=15, model="rerank-english-v2.0")],
             storage_context=self.storage_context,
         )
         return chat_engine
