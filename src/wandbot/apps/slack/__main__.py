@@ -29,7 +29,7 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "", 
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
+            sources_list = list(set([item for item in response.sources.split(",") if item.strip().startswith("http")]))
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
                 if lang == "ja":
