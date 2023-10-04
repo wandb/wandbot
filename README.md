@@ -1,15 +1,17 @@
 # wandbot
 
 A question answering bot for Weights & Biases [documentation](https://docs.wandb.ai/).
-This bot is built using [llama-index](https://gpt-index.readthedocs.io/en/stable/) and openai gpt-4.
+This bot is built using [llama-index](https://gpt-index.readthedocs.io/en/stable/) and openai [gpt-4](https://openai.com/research/gpt-4).
 
 ## Features
 
-- Utilizes retrieval augmented generation, and a fallback mechanism for model selection.
-- Efficiently handles user queries and provides accurate, context-aware responses
+- The bot utilizes retrieval augmented generation with [FAISS](https://github.com/facebookresearch/faiss) backend to retrieve relevant documents and efficiently handle user queries and provides accurate, context-aware responses
+- Periodic data ingestion with report generation for continuous improvement of the bot.: Checkout the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist)
 - Integrated with Discord and Slack, allowing seamless integration into popular collaboration platforms.
-- Logging and analysis with Weights & Biases Tables for performance monitoring and continuous improvement.
+- Logging and analysis with Weights & Biases Tables for performance monitoring and continuous improvement.: Checkout the workspace for more details [here](https://wandb.ai/wandbot/wandbot_public)
+- Uses a fallback mechanism for model selection when GPT-4 is unable to generate a response.
 - Evaluation using a combination of metrics such as retrieval accuracy, string similarity, and model-generated response correctness
+- Want to know more about the custom system prompt used by the bot?: Checkout the full prompt [here](data/prompts/chat_prompt.json)
 
 ## Installation
 
@@ -36,7 +38,7 @@ To ingest the data run the following command from the root of the repository
 poetry run python -m src.wandbot.ingestion
 ```
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
-These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot).
+These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot-dev).
 
 
 ### Running the Q&A Bot
