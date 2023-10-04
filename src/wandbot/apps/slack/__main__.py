@@ -1,7 +1,10 @@
-import langdetect
+from collections import OrderedDict
 from functools import partial
+
+import langdetect
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+
 from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig
@@ -12,6 +15,10 @@ logger = get_logger(__name__)
 config = SlackAppConfig()
 app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
+
+
+def deduplicate(input_list):
+    return list(OrderedDict.fromkeys(input_list))
 
 
 def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
@@ -27,7 +34,9 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "", 
             result = warning_message + response.answer
 
         if config.include_sources and response.sources:
-            sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
+            sources_list = deduplicate(
+                [item for item in response.sources.split(",") if item.strip().startswith("http")]
+            )
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
                 if lang == "ja":

@@ -15,10 +15,7 @@ EN_OUTRO_MESSAGE = (
 
 EN_ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
 
-JA_INTRO_MESSAGE = (
-    "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。"
-    "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
-)
+JA_INTRO_MESSAGE = "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。" "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
 
 JA_OUTRO_MESSAGE = (
     ":robot_face: この答えが十分でなかった場合には、質問を少し変えて試してみると結果が良くなることがあるので、お試しください。もしくは、"

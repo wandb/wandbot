@@ -1,3 +1,4 @@
+git pull && \
 python -m pip install -U poetry && \
 poetry install --all-extras --no-cache && \
 poetry build && \

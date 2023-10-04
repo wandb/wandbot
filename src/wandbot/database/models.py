@@ -18,6 +18,7 @@ class QuestionAnswer(Base):
 
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
     question_answer_id = Column(String, primary_key=True, index=True)
+    system_prompt = Column(String)
     question = Column(String)
     answer = Column(String)
     model = Column(String)
@@ -39,8 +40,6 @@ class FeedBack(Base):
     __tablename__ = "feedback"
 
     feedback_id = Column(String, primary_key=True, index=True)
-    question_answer_id = Column(
-        String, ForeignKey("question_answers.question_answer_id")
-    )
+    question_answer_id = Column(String, ForeignKey("question_answers.question_answer_id"))
     rating = Column(Integer)
     question_answer = relationship("QuestionAnswer", back_populates="feedback")
