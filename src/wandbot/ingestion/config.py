@@ -164,6 +164,6 @@ class VectorStoreConfig(BaseSettings):
     embedding_dim: int = 1536
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     chat_model_name: str = "gpt-3.5-turbo-0613"
-    temperature: float = 0.0
+    temperature: float = 0.1
     max_retries: int = 3
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
