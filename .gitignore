@@ -132,4 +132,4 @@ wandb/
 artifacts/
 data/
 .idea/
-
+.aider

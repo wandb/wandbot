@@ -939,13 +939,13 @@ six = "*"
 
 [[package]]
 name = "langsmith"
-version = "0.0.41"
+version = "0.0.42"
 description = "Client library to connect to the LangSmith LLM Tracing and Evaluation Platform."
 optional = false
 python-versions = ">=3.8.1,<4.0"
 files = [
-    {file = "langsmith-0.0.41-py3-none-any.whl", hash = "sha256:a555bef3d51e37bce284090b155e2148ec4098efa96ee918b3092c43c4bfaa77"},
-    {file = "langsmith-0.0.41.tar.gz", hash = "sha256:ea05649bb140d6e58614e171df6539410b77ce393c23545453278677e916e351"},
+    {file = "langsmith-0.0.42-py3-none-any.whl", hash = "sha256:e10a5084bdd71735a00e91850d4a293b6206825834027676d76fec8d0d044d0a"},
+    {file = "langsmith-0.0.42.tar.gz", hash = "sha256:66fec6bce07cd18c8d9a7b9d7be216de5f7a93790c2f4cf37efb6956f9fffbf6"},
 ]
 
 [package.dependencies]
@@ -2545,13 +2545,13 @@ files = [
 
 [[package]]
 name = "unstructured"
-version = "0.10.18"
+version = "0.10.19"
 description = "A library that prepares raw documents for downstream ML tasks."
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "unstructured-0.10.18-py3-none-any.whl", hash = "sha256:eaec0f0ecc470bb646a750cb32c125275d34d258ced46cfc3364098939d9ca77"},
-    {file = "unstructured-0.10.18.tar.gz", hash = "sha256:7f330573d4297182f4b1500e05c9fc4779a08811bce23c527a96898b2ff374f6"},
+    {file = "unstructured-0.10.19-py3-none-any.whl", hash = "sha256:d967efb7e56c3da7c5d0304a0b2671a6eb2a4f79fe0fa5ed5a4e35aa9889ee2f"},
+    {file = "unstructured-0.10.19.tar.gz", hash = "sha256:f99edf5727221d3a2d1e6880cf59a307f40cadcb3e8df58f424ba2b561862742"},
 ]
 
 [package.dependencies]
@@ -2571,7 +2571,7 @@ tabulate = "*"
 
 [package.extras]
 airtable = ["pyairtable"]
-all-docs = ["ebooklib", "markdown", "msg-parser", "openpyxl", "pandas", "pdf2image", "pdfminer.six", "pypandoc", "python-docx", "python-pptx (<=0.6.21)", "unstructured-inference (==0.5.31)", "unstructured.pytesseract (>=0.3.12)", "xlrd"]
+all-docs = ["ebooklib", "markdown", "msg-parser", "openpyxl", "pandas", "pdf2image", "pdfminer.six", "pypandoc", "python-docx", "python-pptx (<=0.6.21)", "unstructured-inference (==0.6.6)", "unstructured.pytesseract (>=0.3.12)", "xlrd"]
 azure = ["adlfs", "fsspec (==2023.9.1)"]
 azure-cognitive-search = ["azure-search-documents"]
 biomed = ["bs4"]
@@ -2590,9 +2590,9 @@ github = ["pygithub (>1.58.0)"]
 gitlab = ["python-gitlab"]
 google-drive = ["google-api-python-client"]
 huggingface = ["langdetect", "sacremoses", "sentencepiece", "torch", "transformers"]
-image = ["pdf2image", "pdfminer.six", "unstructured-inference (==0.5.31)", "unstructured.pytesseract (>=0.3.12)"]
+image = ["pdf2image", "pdfminer.six", "unstructured-inference (==0.6.6)", "unstructured.pytesseract (>=0.3.12)"]
 jira = ["atlassian-python-api"]
-local-inference = ["ebooklib", "markdown", "msg-parser", "openpyxl", "pandas", "pdf2image", "pdfminer.six", "pypandoc", "python-docx", "python-pptx (<=0.6.21)", "unstructured-inference (==0.5.31)", "unstructured.pytesseract (>=0.3.12)", "xlrd"]
+local-inference = ["ebooklib", "markdown", "msg-parser", "openpyxl", "pandas", "pdf2image", "pdfminer.six", "pypandoc", "python-docx", "python-pptx (<=0.6.21)", "unstructured-inference (==0.6.6)", "unstructured.pytesseract (>=0.3.12)", "xlrd"]
 md = ["markdown"]
 msg = ["msg-parser"]
 notion = ["htmlBuilder", "notion-client"]
@@ -2602,7 +2602,7 @@ openai = ["langchain", "openai", "tiktoken"]
 org = ["pypandoc"]
 outlook = ["Office365-REST-Python-Client (<2.4.3)", "msal"]
 paddleocr = ["unstructured.paddleocr (==2.6.1.3)"]
-pdf = ["pdf2image", "pdfminer.six", "unstructured-inference (==0.5.31)", "unstructured.pytesseract (>=0.3.12)"]
+pdf = ["pdf2image", "pdfminer.six", "unstructured-inference (==0.6.6)", "unstructured.pytesseract (>=0.3.12)"]
 ppt = ["python-pptx (<=0.6.21)"]
 pptx = ["python-pptx (<=0.6.21)"]
 reddit = ["praw"]
@@ -2794,4 +2794,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "bfe95f62da4f94b68ae1aa1d1c67fd61d2393d53855425cecb18989fb7acdfcb"
+content-hash = "821477b2d4e888f8bc3ab13c6e99a3b26daee8138f7c438af65910a96623f837"

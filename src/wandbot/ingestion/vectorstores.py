@@ -1,3 +1,17 @@
+"""This module contains functions for loading and managing vector stores in the Wandbot ingestion system.
+
+The module includes the following functions:
+- `load`: Loads the vector store from the specified source artifact path and returns the name of the resulting artifact.
+
+Typical usage example:
+
+    project = "wandbot-dev"
+    entity = "wandbot"
+    source_artifact_path = "wandbot/wandbot-dev/raw_dataset:latest"
+    result_artifact_name = "wandbot_index"
+    load(project, entity, source_artifact_path, result_artifact_name)
+"""
+
 import json
 import pathlib
 
@@ -7,7 +21,12 @@ from llama_index.callbacks import WandbCallbackHandler
 
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.utils import get_logger, load_index, load_service_context, load_storage_context
+from wandbot.utils import (
+    get_logger,
+    load_index,
+    load_service_context,
+    load_storage_context,
+)
 
 logger = get_logger(__name__)
 
@@ -17,12 +36,34 @@ def load(
     entity: str,
     source_artifact_path: str,
     result_artifact_name: str = "wandbot_index",
-):
-    config = VectorStoreConfig()
-    run = wandb.init(project=project, entity=entity, job_type="create_vectorstore")
-    artifact = run.use_artifact(source_artifact_path, type="dataset")
-    artifact_dir = artifact.download()
-    storage_context = load_storage_context(config.embedding_dim, config.persist_dir)
+) -> str:
+    """Load the vector store.
+
+    Loads the vector store from the specified source artifact path and returns the name of the resulting artifact.
+
+    Args:
+        project: The name of the project.
+        entity: The name of the entity.
+        source_artifact_path: The path to the source artifact.
+        result_artifact_name: The name of the resulting artifact. Defaults to "wandbot_index".
+
+    Returns:
+        The name of the resulting artifact.
+
+    Raises:
+        wandb.Error: An error occurred during the loading process.
+    """
+    config: VectorStoreConfig = VectorStoreConfig()
+    run: wandb.Run = wandb.init(
+        project=project, entity=entity, job_type="create_vectorstore"
+    )
+    artifact: wandb.Artifact = run.use_artifact(
+        source_artifact_path, type="dataset"
+    )
+    artifact_dir: str = artifact.download()
+    storage_context = load_storage_context(
+        config.embedding_dim, config.persist_dir
+    )
     service_context = load_service_context(
         config.chat_model_name,
         config.temperature,
@@ -30,15 +71,17 @@ def load(
         config.max_retries,
     )
 
-    document_files = list(pathlib.Path(artifact_dir).rglob("documents.jsonl"))
+    document_files: List[pathlib.Path] = list(
+        pathlib.Path(artifact_dir).rglob("documents.jsonl")
+    )
 
-    transformed_documents = []
+    transformed_documents: List[LcDocument] = []
     for document_file in document_files:
-        documents = []
+        documents: List[LcDocument] = []
         with document_file.open() as f:
             for line in f:
-                doc_dict = json.loads(line)
-                doc = LcDocument(**doc_dict)
+                doc_dict: Dict[str, Any] = json.loads(line)
+                doc: LcDocument = LcDocument(**doc_dict)
                 documents.append(doc)
         transformed_documents.extend(preprocess_data.load(documents))
 
@@ -48,7 +91,7 @@ def load(
         storage_context,
         persist_dir=config.persist_dir,
     )
-    wandb_callback = WandbCallbackHandler()
+    wandb_callback: WandbCallbackHandler = WandbCallbackHandler()
 
     wandb_callback.persist_index(index, index_name=result_artifact_name)
     wandb_callback.finish()
