@@ -12,7 +12,7 @@ include = ["src/**/*", "LICENSE", "README.md"]
 [tool.poetry.dependencies]
 python = ">=3.10.0,<3.11"
 numpy = "^1.25.2"
-wandb = "^0.15.8"
+wandb = "^0.15.12"
 openai = "^0.28.1"
 tiktoken = "^0.5.1"
 pandas = "^2.0.3"
@@ -34,7 +34,6 @@ tree-sitter-languages = "^1.7.0"
 cohere = "^4.27"
 markdownify = "^0.11.6"
 uvicorn = "^0.23.2"
-jupyter = "^1.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
