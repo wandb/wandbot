@@ -19,9 +19,9 @@ The project uses `python = ">=3.10.0,<3.11"` and uses [poetry](https://python-po
 
 ```bash
 git clone git@github.com:wandb/wandbot.git
-pip install poetry --all-extras
+pip install poetry
 cd wandbot
-poetry install
+poetry install --all-extras
 # Depending on which platform you want to run on run the following command:
 # poetry install --extras discord # for discord
 # poetry install --extras slack # for slack
