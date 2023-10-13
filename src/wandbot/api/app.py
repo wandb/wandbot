@@ -3,6 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 import wandb
+from dotenv import load_dotenv
 from fastapi import FastAPI, Response, status
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
@@ -21,6 +22,8 @@ from wandbot.database.client import DatabaseClient
 from wandbot.database.database import engine
 from wandbot.database.models import Base
 from wandbot.utils import get_logger
+
+load_dotenv()
 
 logger = get_logger(__name__)
 
