@@ -55,9 +55,6 @@ class ZendeskAIResponseSystem:
 
             response = self.api_client.query(question=question, chat_history=[])
 
-            print(f"WandBot: {response.answer}")
-            print(f"Time taken: {response.time_taken}")
-
         except Exception as e:
             print(f"Error: {e}")
             response = 'Something went wrong!'
@@ -67,7 +64,6 @@ class ZendeskAIResponseSystem:
 
     #TODO: add the necessary format we want to depending on ticket type
     def format_response(self, response):
-        print(response)
         response = str(response)
         max_length = 2000
         if len(response) > max_length:
@@ -100,7 +96,6 @@ class ZendeskAIResponseSystem:
         # self.create_new_ticket("Is there a way to programatically list all projects for a given entity?")
         while True:
             now = datetime.now()
-            print(f"{now} : At the beginning of the Wandbot for Zendesk loop")
             await asyncio.sleep(360)
 
             new_tickets = self.fetch_new_tickets()
@@ -110,7 +105,6 @@ class ZendeskAIResponseSystem:
                 question = self.extract_question(ticket)
                 
                 response = await self.generate_response(question, ticket)
-                print(response)
 
                 formatted_response = self.format_response(response)
                 self.update_ticket(ticket, formatted_response)
