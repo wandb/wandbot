@@ -13,18 +13,8 @@ from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 
 import pandas as pd
-
-# from weave.monitoring import StreamTable
-
-
-
-# tagging to review wandbot
-# botGreat - copied and pasted the reply
-# botFine - used a part of the reply
-# botOk - started the investigation using bots msg, but did not use the message in the response
-# botWrong - bot's info is irrelevant to the question or straight up wrong
-
 from dotenv import load_dotenv
+
 load_dotenv()
 
 class ZendeskAIResponseSystem:
@@ -36,8 +26,6 @@ class ZendeskAIResponseSystem:
         'subdomain': os.environ["ZENDESK_SUBDOMAIN"]
     }
         self.zenpy_client = Zenpy(**userCreds)
-        # config = ChatConfig()
-        # self.chat = Chat(config=config)
         self.api_client = APIClient(url=os.environ["WANDBOT_API_URL"])
 
 
@@ -58,11 +46,10 @@ class ZendeskAIResponseSystem:
         # Preprocessing
         question = description.lower().replace('\n', ' ').replace('\r', '')
         question = question.replace('[discourse post]','')
-        # chat_history = ticket.comments
-        # return question, chat_history
+       
         return question
     
-    async def generate_response(self, question, ticket_id):        #<--- took out chat_history
+    async def generate_response(self, question, ticket_id):
         try:
             chat_history = []
 
@@ -75,19 +62,10 @@ class ZendeskAIResponseSystem:
             print(f"Error: {e}")
             response = 'Something went wrong!'
             return response
-        
-
-        # st = StreamTable("acyrtest/stBot/questionAnswerST")
-        # st.log({"question" : question, 
-        #         "answer" : response.answer,
-        #         "time_taken": response.time_taken,
-        #         "ticket_id": ticket_id.id })
-
-        # print(type(ticket_id))
-        # print(ticket_id)
+    
         return response.answer
 
-    #TODO: add the necessary format we want to
+    #TODO: add the necessary format we want to depending on ticket type
     def format_response(self, response):
         print(response)
         response = str(response)
@@ -99,9 +77,7 @@ class ZendeskAIResponseSystem:
     def update_ticket(self, ticket, response):
         try:
             comment = Comment(body=response)
-            print("here")
             ticket.comment = Comment(body=response, public=False)
-            print("here")
 
             ticket.status="open"
             ticket.tags.append('answered_by_bot')
@@ -109,10 +85,11 @@ class ZendeskAIResponseSystem:
         except Exception as e:
             print(f"Error: {e}")
 
+    #TODO add feedback gathering
     def gather_feedback(self, ticket):
         try:
             feedback_comment = Comment(body="How did we do?")
-            ticket.comments.append(feedback_comment)
+            ticket.comment.append(feedback_comment)
             self.zenpy_client.tickets.update(ticket)
         except Exception as e:
             print(f"Error: {e}")
@@ -124,7 +101,7 @@ class ZendeskAIResponseSystem:
         while True:
             now = datetime.now()
             print(f"{now} : At the beginning of the Wandbot for Zendesk loop")
-            await asyncio.sleep(60)
+            await asyncio.sleep(360)
 
             new_tickets = self.fetch_new_tickets()
             now = datetime.now()

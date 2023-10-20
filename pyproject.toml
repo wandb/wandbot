@@ -35,9 +35,11 @@ cohere = { version = "^4.27", optional = true }
 jupyter = { version = "^1.0.0", optional = true }
 markdownify = { version = "^0.11.6", optional = true }
 uvicorn = { version = "^0.23.2", optional = true }
+zenpy = { version = "^2.0.41", optional = true }
 
 
 [tool.poetry.extras]
+zendesk = ["zenpy"]
 slack = ["slack-bolt", "slack-sdk",]
 discord = ["discord"]
 chat = [
