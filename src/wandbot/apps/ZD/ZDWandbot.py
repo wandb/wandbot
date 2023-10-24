@@ -11,11 +11,13 @@ from datetime import datetime
 from functools import partial
 from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
+from wandbot.utils import get_logger
 
 import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = get_logger(__name__)
 
 class ZendeskAIResponseSystem:
 
@@ -28,12 +30,11 @@ class ZendeskAIResponseSystem:
         self.zenpy_client = Zenpy(**userCreds)
         self.api_client = APIClient(url=os.environ["WANDBOT_API_URL"])
 
-
     def create_new_ticket(self, questionText):
         self.zenpy_client.tickets.create(Ticket(subject="WandbotTest4", description=questionText, status = 'new', priority = 'low', tags=["botTest"]))
 
     def fetch_new_tickets(self):
-        new_tickets = self.zenpy_client.search(type='ticket', status='new')
+        new_tickets = self.zenpy_client.search(type='ticket', status='new', group_id="360016040851")
         # Filtering based on specific requirements
         filtered_tickets = [ticket for ticket in new_tickets if 'forum' in ticket.tags]
         # filtered_tickets = [ticket for ticket in new_tickets if 'bottest' in ticket.tags]         # for testing purposes only
@@ -46,7 +47,8 @@ class ZendeskAIResponseSystem:
         # Preprocessing
         question = description.lower().replace('\n', ' ').replace('\r', '')
         question = question.replace('[discourse post]','')
-       
+        question = question[:4095]
+
         return question
     
     async def generate_response(self, question, ticket_id):
@@ -54,9 +56,11 @@ class ZendeskAIResponseSystem:
             chat_history = []
 
             response = self.api_client.query(question=question, chat_history=[])
+            if response == None:
+                raise Exception("Recieved no response") 
 
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
             response = 'Something went wrong!'
             return response
     
@@ -79,36 +83,32 @@ class ZendeskAIResponseSystem:
             ticket.tags.append('answered_by_bot')
             self.zenpy_client.tickets.update(ticket)
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
 
     #TODO add feedback gathering
     def gather_feedback(self, ticket):
         try:
-            feedback_comment = Comment(body="How did we do?")
-            ticket.comment.append(feedback_comment)
+            ticket.comment = Comment(body="How did we do?", public=False)
             self.zenpy_client.tickets.update(ticket)
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
 
     async def main(self):
         # test tickets
         # self.create_new_ticket("How Do I start a run?")
         # self.create_new_ticket("Is there a way to programatically list all projects for a given entity?")
         while True:
-            now = datetime.now()
-            await asyncio.sleep(360)
+            await asyncio.sleep(120)
 
             new_tickets = self.fetch_new_tickets()
-            now = datetime.now()
-            print(f"{now} : New unanswered Tickets: ", new_tickets)
+            logger.info(f"New unanswered Tickets: {new_tickets}")
             for ticket in new_tickets:
                 question = self.extract_question(ticket)
-                
                 response = await self.generate_response(question, ticket)
 
                 formatted_response = self.format_response(response)
                 self.update_ticket(ticket, formatted_response)
-                self.gather_feedback(ticket)
+                # self.gather_feedback(ticket)
 
 if __name__ == "__main__":
 
