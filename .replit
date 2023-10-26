@@ -13,4 +13,7 @@ channel = "stable-23_05"
 run = ["sh", "-c", "bash run.sh"]
 build = ["sh", "-c", "bash build.sh"]
 deploymentTarget = "gce"
-ignorePorts = true
+
+[[ports]]
+localPort=8000
+externalPort=80
