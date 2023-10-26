@@ -116,6 +116,7 @@ class DatabaseClient:
         question_answers = question_answers.all()
         if question_answers is not None:
             question_answers = [
-                QuestionAnswerCreateSchema.from_orm(question_answer).dict() for question_answer in question_answers
+                QuestionAnswerCreateSchema.from_orm(question_answer).model_dump()
+                for question_answer in question_answers
             ]
             return question_answers
