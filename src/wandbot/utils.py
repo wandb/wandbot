@@ -4,14 +4,9 @@ import os
 from typing import Any
 
 import faiss
-from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
+from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
 from langchain.storage import LocalFileStore
-from llama_index import (
-    ServiceContext,
-    StorageContext,
-    load_index_from_storage,
-    VectorStoreIndex,
-)
+from llama_index import ServiceContext, StorageContext, VectorStoreIndex, load_index_from_storage
 from llama_index.llms import OpenAI
 from llama_index.vector_stores import FaissVectorStore
 

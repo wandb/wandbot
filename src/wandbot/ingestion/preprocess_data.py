@@ -1,3 +1,5 @@
+from typing import Iterable, List
+
 import regex as re
 import tiktoken
 from langchain.schema import Document as LcDocument
@@ -6,7 +8,7 @@ from llama_index import Document as LlamaDocument
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.text_splitter import CodeSplitter, TextSplitter
 from tree_sitter_languages import get_parser
-from typing import Iterable, List
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

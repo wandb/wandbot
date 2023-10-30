@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatRepsonse(BaseModel):
+    system_prompt: str
     question: str
     answer: str
     model: str

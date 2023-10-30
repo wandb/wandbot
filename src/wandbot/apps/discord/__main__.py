@@ -1,9 +1,12 @@
 import asyncio
-import discord
-import langdetect
 import logging
 import uuid
+from collections import OrderedDict
+
+import discord
+import langdetect
 from discord.ext import commands
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.discord.config import DiscordAppConfig
@@ -22,7 +25,13 @@ config = DiscordAppConfig()
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
+def deduplicate(input_list):
+    return list(OrderedDict.fromkeys(input_list))
+
+
+def format_response(
+    response: APIQueryResponse | None, outro_message: str = "", lang: str = "en", is_last=False
+) -> str:
     if response is not None:
         result = response.answer
         if "gpt-4" not in response.model:
@@ -34,8 +43,10 @@ def format_response(response: APIQueryResponse | None, outro_message: str = "", 
                 )
             result = warning_message + response.answer
 
-        if config.include_sources and response.sources:
-            sources_list = [item for item in response.sources.split(",") if item.strip().startswith("http")]
+        if config.include_sources and response.sources and is_last:
+            sources_list = deduplicate(
+                [item for item in response.sources.split(",") if item.strip().startswith("http")]
+            )
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
                 if lang == "ja":
@@ -107,15 +118,23 @@ async def on_message(message: discord.Message):
                 outro_message = config.EN_OUTRO_MESSAGE
             sent_message = None
             if len(response.answer) > 2000:
-                for i in range(0, len(response.aswer), 2000):
+                answer_chunks = []
+                for i in range(0, len(response.answer), 1900):
+                    answer_chunks.append(response.answer[i : i + 1900])
+                for i, answer_chunk in enumerate(answer_chunks):
                     response_copy = response.model_copy()
-                    response_copy.answer = response.answer[i : i + 2000]
-                    sent_message = await thread.send(
-                        f"🤖 {format_response(response_copy, outro_message, lang_code)}",
-                    )
+                    response_copy.answer = answer_chunk
+                    if i == len(answer_chunks) - 1:
+                        sent_message = await thread.send(
+                            format_response(response_copy, outro_message, lang_code, is_last=True),
+                        )
+                    else:
+                        sent_message = await thread.send(
+                            format_response(response_copy, "", lang_code),
+                        )
             else:
                 sent_message = await thread.send(
-                    f"🤖 {format_response(response, outro_message, lang_code)}",
+                    format_response(response, outro_message, lang_code, is_last=True),
                 )
             if sent_message is not None:
                 await api_client.create_question_answer(
