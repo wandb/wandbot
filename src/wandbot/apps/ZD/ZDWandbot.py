@@ -13,8 +13,6 @@ from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.utils import get_logger
 from wandbot.apps.ZD.config import ZDAppConfig
-
-
 import pandas as pd
 
 logger = get_logger(__name__)
