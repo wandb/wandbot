@@ -12,29 +12,30 @@ from functools import partial
 from wandbot.api.client import APIClient
 from wandbot.api.schemas import APIQueryResponse
 from wandbot.utils import get_logger
+from wandbot.apps.ZD.config import ZDAppConfig
+
 
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
 logger = get_logger(__name__)
+config = ZDAppConfig()
 
 class ZendeskAIResponseSystem:
 
     def __init__(self):
         userCreds = {
-        'email' : os.environ["ZENDESK_EMAIL"],
-        'password' : os.environ["ZENDESK_PASSWORD"],
-        'subdomain': os.environ["ZENDESK_SUBDOMAIN"]
-    }
+        'email' : config.ZENDESK_EMAIL,
+        'password' : config.ZENDESK_PASSWORD,
+        'subdomain': config.ZENDESK_SUBDOMAIN
+        }
         self.zenpy_client = Zenpy(**userCreds)
-        self.api_client = APIClient(url=os.environ["WANDBOT_API_URL"])
+        self.api_client = APIClient(url=config.WANDBOT_API_URL)
 
     def create_new_ticket(self, questionText):
-        self.zenpy_client.tickets.create(Ticket(subject="WandbotTest4", description=questionText, status = 'new', priority = 'low', tags=["botTest"]))
+        self.zenpy_client.tickets.create(Ticket(subject="WandbotTest4", description=questionText, status = 'new', priority = 'low', tags=["botTest","forum"]))
 
     def fetch_new_tickets(self):
-        new_tickets = self.zenpy_client.search(type='ticket', status='new', group_id="360016040851")
+        new_tickets = self.zenpy_client.search(type='ticket', status='new', group_id=config.ZDGROUPID)
         # Filtering based on specific requirements
         filtered_tickets = [ticket for ticket in new_tickets if 'forum' in ticket.tags]
         # filtered_tickets = [ticket for ticket in new_tickets if 'bottest' in ticket.tags]         # for testing purposes only
@@ -93,15 +94,15 @@ class ZendeskAIResponseSystem:
         except Exception as e:
             logger.error(f"Error: {e}")
 
-    async def main(self):
+    async def run(self):
         # test tickets
         # self.create_new_ticket("How Do I start a run?")
-        # self.create_new_ticket("Is there a way to programatically list all projects for a given entity?")
+        self.create_new_ticket("Is there a way to programatically list all projects for a given entity?")
         while True:
             await asyncio.sleep(120)
 
             new_tickets = self.fetch_new_tickets()
-            logger.info(f"New unanswered Tickets: {new_tickets}")
+            logger.info(f"New unanswered Tickets: {len(new_tickets)}")
             for ticket in new_tickets:
                 question = self.extract_question(ticket)
                 response = await self.generate_response(question, ticket)
@@ -113,4 +114,4 @@ class ZendeskAIResponseSystem:
 if __name__ == "__main__":
 
     zd = ZendeskAIResponseSystem()
-    asyncio.run(zd.main())
+    asyncio.run(zd.run())
