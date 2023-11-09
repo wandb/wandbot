@@ -42,9 +42,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-line_length = 119
+line_length = 80
 skip = [".gitignore", "data", "examples", "notebooks", "artifacts", ".vscode", ".github", ".idea", ".replit", "*.md", "wandb", ".env", ".git", ]
 
 [tool.black]
-line-length = 119
+line-length = 80
 skip = [".gitignore", "data", "examples", "notebooks", "artifacts", ".vscode", ".github", ".idea", ".replit", "*.md", "wandb", ".env", ".git", ]

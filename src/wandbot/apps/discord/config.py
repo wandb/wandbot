@@ -1,3 +1,20 @@
+"""Discord bot configuration module.
+
+This module contains the configuration settings for the Discord bot application. 
+It includes settings for the application name, wait time, channel IDs, bot token, 
+API keys, messages in English and Japanese, API URL, and a flag to include sources.
+
+The settings are defined in the DiscordAppConfig class, which inherits from the 
+BaseSettings class provided by the pydantic_settings package. The settings values 
+are either hardcoded or fetched from environment variables.
+
+Typical usage example:
+
+  config = DiscordAppConfig()
+  wait_time = config.WAIT_TIME
+  bot_token = config.DISCORD_BOT_TOKEN
+"""
+
 from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings
 
@@ -13,9 +30,14 @@ EN_OUTRO_MESSAGE = (
     f" Was this response helpful? Please react below to let us know"
 )
 
-EN_ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
+EN_ERROR_MESSAGE = (
+    "Oops!, Something went wrong. Please retry again in some time"
+)
 
-JA_INTRO_MESSAGE = "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。" "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
+JA_INTRO_MESSAGE = (
+    "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。"
+    "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
+)
 
 JA_OUTRO_MESSAGE = (
     ":robot_face: この答えが十分でなかった場合には、質問を少し変えて試してみると結果が良くなることがあるので、お試しください。もしくは、"

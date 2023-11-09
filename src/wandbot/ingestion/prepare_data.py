@@ -1,5 +1,22 @@
+"""
+This module contains classes and functions for preparing data in the Wandbot ingestion system.
+
+The module includes the following classes:
+- `DataLoader`: A base class for data loaders that provides a base implementation for lazy loading of documents.
+- `DocodileDataLoader`: A data loader specifically designed for Docodile documents.
+- `CodeDataLoader`: A data loader for code documents.
+
+The module also includes the following functions:
+- `load`: Loads and prepares data for the Wandbot ingestion system.
+
+Typical usage example:
+
+    load(project="my_project", entity="my_entity", result_artifact_name="raw_dataset")
+"""
+
 import json
 import os
+import pathlib
 from typing import Iterator
 from urllib.parse import urljoin
 
@@ -18,31 +35,78 @@ from wandbot.ingestion.config import (
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
 )
-from wandbot.ingestion.utils import EXTENSION_MAP, clean_contents, fetch_git_repo
+from wandbot.ingestion.utils import (
+    EXTENSION_MAP,
+    clean_contents,
+    fetch_git_repo,
+)
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 class DataLoader(BaseLoader):
+    """A base class for data loaders.
+
+    This class provides a base implementation for lazy loading of documents.
+    Subclasses should implement the `lazy_load` method to define the specific
+    loading behavior.
+    """
+
     def __init__(self, config: DataStoreConfig):
+        """Initializes the DataLoader instance.
+
+        Args:
+            config: The configuration for the data store.
+        """
         self.config = config
         self.metadata = None
 
     def lazy_load(
         self,
     ) -> Iterator[Document]:
-        """A lazy loader for Documents."""
-        raise NotImplementedError(f"{self.__class__.__name__} does not implement lazy_load()")
+        """A lazy loader for Documents.
+
+        This method should be implemented by subclasses to define the specific
+        loading behavior.
+
+        Returns:
+            An iterator of Document objects.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement lazy_load()"
+        )
 
     def load(self):
+        """Loads the documents.
+
+        Returns:
+            A list of Document objects.
+        """
         documents = list(self.lazy_load())
         self.metadata.update({"num_documents": len(documents)})
         return documents
 
 
 class DocodileDataLoader(DataLoader):
-    def extract_slug(self, file_path):
+    """A data loader for Docodile documents.
+
+    This class provides a data loader specifically designed for Docodile documents.
+    It implements the lazy_load method to define the loading behavior.
+
+    Attributes:
+        config: The configuration for the data store.
+    """
+
+    def extract_slug(self, file_path: pathlib.Path) -> str:
+        """Extracts the slug from a file.
+
+        Args:
+            file_path: The path to the file.
+
+        Returns:
+            The extracted slug.
+        """
         with open(file_path, "r") as file:
             content = file.read()
             md = markdown.Markdown(extensions=["meta"])
@@ -50,7 +114,16 @@ class DocodileDataLoader(DataLoader):
             meta = md.Meta.get("slug", [""])
             return meta[0]
 
-    def generate_site_url(self, base_path, file_path):
+    def generate_site_url(self, base_path: Path, file_path: Path) -> str:
+        """Generates the site URL for a file.
+
+        Args:
+            base_path: The base path of the file.
+            file_path: The path to the file.
+
+        Returns:
+            The generated site URL.
+        """
         relative_path = file_path.relative_to(base_path)
         if relative_path.parts[0] == "guides":
             chapter = "guides"
@@ -62,7 +135,9 @@ class DocodileDataLoader(DataLoader):
             file_loc = file_path.relative_to((base_path / "ref")).parent
         elif relative_path.parts[0] == "tutorials":
             chapter = "tutorials"
-            slug = self.extract_slug((base_path / "tutorials") / "intro_to_tutorials.md")
+            slug = self.extract_slug(
+                (base_path / "tutorials") / "intro_to_tutorials.md"
+            )
             file_loc = file_path.relative_to((base_path / "tutorials")).parent
         else:
             chapter = ""
@@ -73,7 +148,9 @@ class DocodileDataLoader(DataLoader):
         if file_path.name in ("intro.md", "README.md", "intro_to_tutorials.md"):
             file_name = ""
         site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
-        site_url = urljoin(str(self.config.data_source.remote_path), str(site_relative_path))
+        site_url = urljoin(
+            str(self.config.data_source.remote_path), str(site_relative_path)
+        )
         if "other/" in site_url:
             site_url = site_url.replace("other/", "")
 
@@ -82,8 +159,17 @@ class DocodileDataLoader(DataLoader):
     def lazy_load(
         self,
     ) -> Iterator[Document]:
+        """A lazy loader for Docodile documents.
+
+        This method implements the lazy loading behavior for Docodile documents.
+
+        Yields:
+            A Document object.
+        """
         if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(self.config.data_source, self.config.data_source.git_id_file)
+            self.metadata = fetch_git_repo(
+                self.config.data_source, self.config.data_source.git_id_file
+            )
 
         local_paths = []
         file_patterns = (
@@ -93,11 +179,17 @@ class DocodileDataLoader(DataLoader):
         )
         for file_pattern in file_patterns:
             local_paths.extend(
-                list((self.config.data_source.local_path / self.config.data_source.base_path).rglob(file_pattern))
+                list(
+                    (
+                        self.config.data_source.local_path
+                        / self.config.data_source.base_path
+                    ).rglob(file_pattern)
+                )
             )
         document_files = {
             local_path: self.generate_site_url(
-                self.config.data_source.local_path / self.config.data_source.base_path,
+                self.config.data_source.local_path
+                / self.config.data_source.base_path,
                 local_path,
             )
             for local_path in local_paths
@@ -108,18 +200,33 @@ class DocodileDataLoader(DataLoader):
                 document = TextLoader(f_name).load()[0]
                 contents = document.page_content
                 document.page_content = clean_contents(contents)
-                document.metadata["file_type"] = os.path.splitext(document.metadata["source"])[-1]
-                document.metadata["source"] = document_files[document.metadata["source"]]
+                document.metadata["file_type"] = os.path.splitext(
+                    document.metadata["source"]
+                )[-1]
+                document.metadata["source"] = document_files[
+                    document.metadata["source"]
+                ]
                 document.metadata["language"] = self.config.language
                 yield document
             except Exception as e:
-                logger.warning(f"Failed to load documentation {f_name} due to {e}")
+                logger.warning(
+                    f"Failed to load documentation {f_name} due to {e}"
+                )
 
 
 class CodeDataLoader(DataLoader):
     def lazy_load(self) -> Iterator[Document]:
+        """A lazy loader for code documents.
+
+        This method implements the lazy loading behavior for code documents.
+
+        Yields:
+            A Document object.
+        """
         if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(self.config.data_source, self.config.data_source.git_id_file)
+            self.metadata = fetch_git_repo(
+                self.config.data_source, self.config.data_source.git_id_file
+            )
 
         local_paths = []
         file_patterns = (
@@ -129,7 +236,12 @@ class CodeDataLoader(DataLoader):
         )
         for file_pattern in file_patterns:
             local_paths.extend(
-                list((self.config.data_source.local_path / self.config.data_source.base_path).rglob(file_pattern))
+                list(
+                    (
+                        self.config.data_source.local_path
+                        / self.config.data_source.base_path
+                    ).rglob(file_pattern)
+                )
             )
 
         paths = list(local_paths)
@@ -167,21 +279,47 @@ class CodeDataLoader(DataLoader):
                     document.page_content = cleaned_body
                 else:
                     document = TextLoader(f_name).load()[0]
-                document.metadata["file_type"] = os.path.splitext(document.metadata["source"])[-1]
-                document.metadata["source"] = document_files[document.metadata["source"]]
-                document.metadata["language"] = EXTENSION_MAP[document.metadata["file_type"]]
+                document.metadata["file_type"] = os.path.splitext(
+                    document.metadata["source"]
+                )[-1]
+                document.metadata["source"] = document_files[
+                    document.metadata["source"]
+                ]
+                document.metadata["language"] = EXTENSION_MAP[
+                    document.metadata["file_type"]
+                ]
                 yield document
             except Exception as e:
-                logger.warning(f"Failed to load code in {f_name} with error {e}")
+                logger.warning(
+                    f"Failed to load code in {f_name} with error {e}"
+                )
 
 
 def load(
     project: str,
     entity: str,
     result_artifact_name: str = "raw_dataset",
-):
+) -> str:
+    """Load and prepare data for the Wandbot ingestion system.
+
+    This function initializes a Wandb run, creates an artifact for the prepared dataset,
+    and loads and prepares data from different loaders. The prepared data is then saved
+    in the docstore directory and added to the artifact.
+
+    Args:
+        project: The name of the Wandb project.
+        entity: The name of the Wandb entity.
+        result_artifact_name: The name of the result artifact. Default is "raw_dataset".
+
+    Returns:
+        The latest version of the prepared dataset artifact in the format "{entity}/{project}/{result_artifact_name}:latest".
+    """
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
-    artifact = wandb.Artifact(result_artifact_name, type="dataset", description="Raw documents for wandbot")
+    artifact = wandb.Artifact(
+        result_artifact_name,
+        type="dataset",
+        description="Raw documents for wandbot",
+    )
 
     en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
@@ -209,7 +347,10 @@ def load(
         with (loader.config.docstore_dir / "metadata.json").open("w") as f:
             json.dump(loader.metadata, f)
 
-        artifact.add_dir(str(loader.config.docstore_dir), name=loader.config.docstore_dir.name)
+        artifact.add_dir(
+            str(loader.config.docstore_dir),
+            name=loader.config.docstore_dir.name,
+        )
     run.log_artifact(artifact)
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"

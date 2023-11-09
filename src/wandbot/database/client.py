@@ -1,51 +1,122 @@
+"""This module provides a Database and DatabaseClient class for managing database operations.
+
+The Database class provides a connection to the database and manages the session. It also provides methods for getting and setting the current session object and the name of the database.
+
+The DatabaseClient class uses an instance of the Database class to perform operations such as getting and creating chat threads, question answers, and feedback from the database.
+
+Typical usage example:
+
+  db_client = DatabaseClient()
+  chat_thread = db_client.get_chat_thread(application='app1', thread_id='123')
+  question_answer = db_client.create_question_answer(question_answer=QuestionAnswerCreateSchema())
+"""
+
 from typing import Any, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
 from wandbot.database.models import QuestionAnswer as QuestionAnswerModel
 from wandbot.database.schemas import ChatThreadCreate as ChatThreadCreateSchema
 from wandbot.database.schemas import Feedback as FeedbackSchema
-from wandbot.database.schemas import QuestionAnswerCreate as QuestionAnswerCreateSchema
+from wandbot.database.schemas import (
+    QuestionAnswerCreate as QuestionAnswerCreateSchema,
+)
 
 
 class Database:
-    db_config = DataBaseConfig()
+    """A class representing a database connection.
+
+    This class provides a connection to the database and manages the session.
+
+    Attributes:
+        db_config: An instance of the DataBaseConfig class.
+        SessionLocal: A sessionmaker object for creating sessions.
+        db: The current session object.
+        name: The name of the database.
+    """
+
+    db_config: DataBaseConfig = DataBaseConfig()
 
     def __init__(self, database: str | None = None):
+        """Initializes the Database instance.
+
+        Args:
+            database: The URL of the database. If None, the default URL is used.
+        """
         if database is not None:
-            engine = create_engine(url=database, connect_args=self.db_config.connect_args)
+            engine: Any = create_engine(
+                url=database, connect_args=self.db_config.connect_args
+            )
         else:
-            engine = create_engine(
+            engine: Any = create_engine(
                 url=self.db_config.SQLALCHEMY_DATABASE_URL,
                 connect_args=self.db_config.connect_args,
             )
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        self.SessionLocal: Any = sessionmaker(
+            autocommit=False, autoflush=False, bind=engine
+        )
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner) -> Any:
+        """Gets the current session object.
+
+        Args:
+            instance: The instance of the owner class.
+            owner: The owner class.
+
+        Returns:
+            The current session object.
+        """
         if not hasattr(self, "db"):
-            self.db = self.SessionLocal()
+            self.db: Any = self.SessionLocal()
         return self.db
 
-    def __set__(self, instance, value):
+    def __set__(self, instance, value) -> None:
+        """Sets the current session object.
+
+        Args:
+            instance: The instance of the owner class.
+            value: The new session object.
+        """
         self.db = value
 
-    def __set_name__(self, owner, name):
-        self.name = name
+    def __set_name__(self, owner, name) -> None:
+        """Sets the name of the database.
+
+        Args:
+            owner: The owner class.
+            name: The name of the database.
+        """
+        self.name: str = name
 
 
 class DatabaseClient:
-    database = Database()
+    database: Database = Database()
 
     def __init__(self, database: str | None = None):
+        """Initializes the DatabaseClient instance.
+
+        Args:
+            database: The URL of the database. If None, the default URL is used.
+        """
         if database is not None:
             self.database = Database(database=database)
 
-    def get_chat_thread(self, application: str, thread_id: str) -> ChatThreadModel | None:
-        chat_thread = (
+    def get_chat_thread(
+        self, application: str, thread_id: str
+    ) -> ChatThreadModel | None:
+        """Gets a chat thread from the database.
+
+        Args:
+            application: The application name.
+            thread_id: The ID of the chat thread.
+
+        Returns:
+            The chat thread model if found, None otherwise.
+        """
+        chat_thread: ChatThreadModel | None = (
             self.database.query(ChatThreadModel)
             .filter(
                 ChatThreadModel.thread_id == thread_id,
@@ -55,9 +126,22 @@ class DatabaseClient:
         )
         return chat_thread
 
-    def create_chat_thread(self, chat_thread: ChatThreadCreateSchema) -> ChatThreadModel:
+    def create_chat_thread(
+        self, chat_thread: ChatThreadCreateSchema
+    ) -> ChatThreadModel:
+        """Creates a chat thread in the database.
+
+        Args:
+            chat_thread: The chat thread to create.
+
+        Returns:
+            The created chat thread model.
+        """
         try:
-            chat_thread = ChatThreadModel(thread_id=chat_thread.thread_id, application=chat_thread.application)
+            chat_thread: ChatThreadModel = ChatThreadModel(
+                thread_id=chat_thread.thread_id,
+                application=chat_thread.application,
+            )
             self.database.add(chat_thread)
             self.database.flush()
             self.database.commit()
@@ -68,8 +152,19 @@ class DatabaseClient:
 
         return chat_thread
 
-    def get_question_answer(self, question_answer_id: str, thread_id: str) -> QuestionAnswerModel | None:
-        question_answer = (
+    def get_question_answer(
+        self, question_answer_id: str, thread_id: str
+    ) -> QuestionAnswerModel | None:
+        """Gets a question answer from the database.
+
+        Args:
+            question_answer_id: The ID of the question answer.
+            thread_id: The ID of the chat thread.
+
+        Returns:
+            The question answer model if found, None otherwise.
+        """
+        question_answer: QuestionAnswerModel | None = (
             self.database.query(QuestionAnswerModel)
             .filter(
                 QuestionAnswerModel.thread_id == thread_id,
@@ -79,9 +174,21 @@ class DatabaseClient:
         )
         return question_answer
 
-    def create_question_answer(self, question_answer: QuestionAnswerCreateSchema) -> QuestionAnswerModel:
+    def create_question_answer(
+        self, question_answer: QuestionAnswerCreateSchema
+    ) -> QuestionAnswerModel:
+        """Creates a question answer in the database.
+
+        Args:
+            question_answer: The question answer to create.
+
+        Returns:
+            The created question answer model.
+        """
         try:
-            question_answer = QuestionAnswerModel(**question_answer.dict())
+            question_answer: QuestionAnswerModel = QuestionAnswerModel(
+                **question_answer.dict()
+            )
             self.database.add(question_answer)
             self.database.flush()
             self.database.commit()
@@ -91,15 +198,33 @@ class DatabaseClient:
         return question_answer
 
     def get_feedback(self, question_answer_id: str) -> FeedBackModel | None:
-        feedback = (
-            self.database.query(FeedBackModel).filter(FeedBackModel.question_answer_id == question_answer_id).first()
+        """Gets feedback from the database.
+
+        Args:
+            question_answer_id: The ID of the question answer.
+
+        Returns:
+            The feedback model if found, None otherwise.
+        """
+        feedback: FeedBackModel | None = (
+            self.database.query(FeedBackModel)
+            .filter(FeedBackModel.question_answer_id == question_answer_id)
+            .first()
         )
         return feedback
 
     def create_feedback(self, feedback: FeedbackSchema) -> FeedBackModel:
+        """Creates feedback in the database.
+
+        Args:
+            feedback: The feedback to create.
+
+        Returns:
+            The created feedback model.
+        """
         if feedback.rating:
             try:
-                feedback = FeedBackModel(**feedback.dict())
+                feedback: FeedBackModel = FeedBackModel(**feedback.dict())
                 self.database.add(feedback)
                 self.database.flush()
                 self.database.commit()
@@ -109,14 +234,30 @@ class DatabaseClient:
 
             return feedback
 
-    def get_all_question_answers(self, time=None) -> List[dict[str, Any]] | None:
-        question_answers = self.database.query(QuestionAnswerModel)
+    def get_all_question_answers(
+        self, time: Any = None
+    ) -> List[dict[str, Any]] | None:
+        """Gets all question answers from the database.
+
+        Args:
+            time: The time to filter the question answers by.
+
+        Returns:
+            A list of question answer dictionaries if found, None otherwise.
+        """
+        question_answers: List[dict[str, Any]] | None = self.database.query(
+            QuestionAnswerModel
+        )
         if time is not None:
-            question_answers = question_answers.filter(QuestionAnswerModel.end_time >= time)
+            question_answers = question_answers.filter(
+                QuestionAnswerModel.end_time >= time
+            )
         question_answers = question_answers.all()
         if question_answers is not None:
             question_answers = [
-                QuestionAnswerCreateSchema.from_orm(question_answer).model_dump()
+                QuestionAnswerCreateSchema.from_orm(
+                    question_answer
+                ).model_dump()
                 for question_answer in question_answers
             ]
             return question_answers

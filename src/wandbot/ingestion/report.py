@@ -1,3 +1,19 @@
+"""This module contains functions for creating and logging data ingestion reports in the Wandbot system.
+
+The module includes the following functions:
+- `log_raw_counts`: Logs the number of documents for each data source.
+- `get_metadata_from_artifacts`: Extracts metadata from raw and vectorstore artifacts.
+- `create_ingestion_report`: Creates a data ingestion report.
+- `main`: The main function that runs the report creation process.
+
+Typical usage example:
+
+    project = "wandbot-dev"
+    entity = "wandbot"
+    raw_artifact = "wandbot/wandbot-dev/raw_dataset:latest"
+    vectorstore_artifact = "wandbot/wandbot-dev/vectorstores:latest"
+    create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
+"""
 import json
 import pathlib
 from datetime import datetime
@@ -6,30 +22,53 @@ import wandb
 import wandb.apis.reports as wr
 
 
-def log_raw_counts(
-    metadata: dict,
-):
-    data = {}
+def log_raw_counts(metadata: dict[str, dict[str, int]]) -> list[str]:
+    """Logs the number of documents for each data source.
+
+    Args:
+        metadata: A dictionary containing metadata about each data source.
+
+    Returns:
+        A list of data source names.
+    """
+    data: dict[str, int] = {}
     for source, info in metadata.items():
         data[source] = info["num_documents"]
     wandb.run.log(data)
     return list(data.keys())
 
 
-def get_metadata_from_artifacts(raw_artifact, vectorstore_artifact):
+def get_metadata_from_artifacts(
+    raw_artifact: str, vectorstore_artifact: str
+) -> tuple[dict[str, dict[str, int]], dict[str, int]]:
+    """Extracts metadata from raw and vectorstore artifacts.
+
+    Args:
+        raw_artifact: The raw artifact to extract metadata from.
+        vectorstore_artifact: The vectorstore artifact to extract metadata from.
+
+    Returns:
+        A tuple containing dictionaries of raw and vectorstore metadata.
+    """
     raw_artifact = wandb.run.use_artifact(raw_artifact, type="dataset")
     raw_artifact_dir = raw_artifact.download()
-    vectorstore_artifact = wandb.run.use_artifact(vectorstore_artifact, type="storage_context")
+    vectorstore_artifact = wandb.run.use_artifact(
+        vectorstore_artifact, type="storage_context"
+    )
     vectorstore_artifact_dir = vectorstore_artifact.download()
 
-    raw_metadata_files = list(pathlib.Path(raw_artifact_dir).rglob("metadata.json"))
-    vectorstore_metadata_files = list(pathlib.Path(vectorstore_artifact_dir).rglob("docstore.json"))
+    raw_metadata_files = list(
+        pathlib.Path(raw_artifact_dir).rglob("metadata.json")
+    )
+    vectorstore_metadata_files = list(
+        pathlib.Path(vectorstore_artifact_dir).rglob("docstore.json")
+    )
 
-    raw_metadata = {}
+    raw_metadata: dict[str, dict[str, int]] = {}
     for metadata_file in raw_metadata_files:
         with metadata_file.open("r") as f:
             raw_metadata[metadata_file.parent.name] = json.load(f)
-    vectorstore_metadata = {}
+    vectorstore_metadata: dict[str, int] = {}
     num_nodes = 0
     for metadata_file in vectorstore_metadata_files:
         with metadata_file.open("r") as f:
@@ -48,7 +87,15 @@ def create_ingestion_report(
     entity: str,
     raw_artifact: str,
     vectorstore_artifact: str,
-):
+) -> None:
+    """Creates a data ingestion report.
+
+    Args:
+        project: The name of the project.
+        entity: The name of the entity.
+        raw_artifact: The raw artifact to include in the report.
+        vectorstore_artifact: The vectorstore artifact to include in the report.
+    """
     report = wr.Report(
         project=project,
         entity=entity,
@@ -80,7 +127,9 @@ def create_ingestion_report(
         wr.UnorderedList(list(raw_metadata.keys())),
         pg_raw,
         wr.H1("Raw Datasources Metadata"),
-        wr.CodeBlock([json.dumps(dict(raw_metadata), indent=2)], language="json"),
+        wr.CodeBlock(
+            [json.dumps(dict(raw_metadata), indent=2)], language="json"
+        ),
         wr.H1("VectorsStore Artifact Summary"),
         wr.WeaveBlockArtifact(
             wandb.run.entity,
