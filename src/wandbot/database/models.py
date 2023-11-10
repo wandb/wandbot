@@ -1,3 +1,15 @@
+"""This module defines the SQLAlchemy models for the ChatThread, QuestionAnswer, and FeedBack tables.
+
+Each class represents a table in the database and includes columns and relationships. The Base class is a declarative base that stores a catalog of classes and mapped tables in the Declarative system.
+
+Typical usage example:
+
+  from wandbot.database.models import ChatThread, QuestionAnswer, FeedBack
+  chat_thread = ChatThread(thread_id='123', application='app1')
+  question_answer = QuestionAnswer(question_answer_id='456', thread_id='123')
+  feedback = FeedBack(feedback_id='789', question_answer_id='456')
+"""
+
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -10,7 +22,9 @@ class ChatThread(Base):
 
     thread_id = Column(String, primary_key=True, index=True)
     application = Column(String)
-    question_answers = relationship("QuestionAnswer", back_populates="chat_thread")
+    question_answers = relationship(
+        "QuestionAnswer", back_populates="chat_thread"
+    )
 
 
 class QuestionAnswer(Base):
@@ -40,6 +54,8 @@ class FeedBack(Base):
     __tablename__ = "feedback"
 
     feedback_id = Column(String, primary_key=True, index=True)
-    question_answer_id = Column(String, ForeignKey("question_answers.question_answer_id"))
+    question_answer_id = Column(
+        String, ForeignKey("question_answers.question_answer_id")
+    )
     rating = Column(Integer)
     question_answer = relationship("QuestionAnswer", back_populates="feedback")

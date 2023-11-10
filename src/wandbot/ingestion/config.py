@@ -1,3 +1,15 @@
+"""This module defines the configuration for data sources and stores in the Wandbot ingestion system.
+
+This module contains classes that define the configuration for various data sources and stores used in the Wandbot ingestion system. 
+Each class represents a different type of data source or store, such as English and Japanese documentation, example code, SDK code, 
+and more. Each class is defined with various attributes like name, data source, docstore directory, etc. 
+
+Typical usage example:
+
+  data_store_config = DataStoreConfig()
+  docodile_english_store_config = DocodileEnglishStoreConfig()
+"""
+
 import pathlib
 from typing import List, Optional, Union
 from urllib.parse import urlparse
@@ -11,7 +23,9 @@ logger = get_logger(__name__)
 
 
 class DataSource(BaseSettings):
-    cache_dir: pathlib.Path = Field("data/cache/raw_data", env="WANDBOT_CACHE_DIR")
+    cache_dir: pathlib.Path = Field(
+        "data/cache/raw_data", env="WANDBOT_CACHE_DIR"
+    )
     ignore_cache: bool = False
     remote_path: str = ""
     repo_path: str = ""
@@ -29,21 +43,29 @@ class DataStoreConfig(BaseModel):
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
-        values.docstore_dir = values.data_source.cache_dir / values.name / values.docstore_dir
+        values.docstore_dir = (
+            values.data_source.cache_dir / values.name / values.docstore_dir
+        )
         data_source = values.data_source
 
         if data_source.repo_path:
-            data_source.is_git_repo = urlparse(data_source.repo_path).netloc == "github.com"
+            data_source.is_git_repo = (
+                urlparse(data_source.repo_path).netloc == "github.com"
+            )
             local_path = urlparse(data_source.repo_path).path.split("/")[-1]
             if not data_source.local_path:
-                data_source.local_path = data_source.cache_dir / values.name / local_path
+                data_source.local_path = (
+                    data_source.cache_dir / values.name / local_path
+                )
             if data_source.is_git_repo:
                 if data_source.git_id_file is None:
                     logger.debug(
                         "The source data is a git repo but no git_id_file is set."
                         " Attempting to use the default ssh id file"
                     )
-                    data_source.git_id_file = pathlib.Path.home() / ".ssh" / "id_rsa"
+                    data_source.git_id_file = (
+                        pathlib.Path.home() / ".ssh" / "id_rsa"
+                    )
         values.data_source = data_source
 
         return values

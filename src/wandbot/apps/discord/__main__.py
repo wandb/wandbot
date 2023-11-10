@@ -1,15 +1,21 @@
+"""Discord bot for handling user queries and interacting with an API.
+
+This module contains the main functionality for a Discord bot that listens to user messages,
+detects the language of the message, creates threads for user queries, interacts with an API to get responses,
+formats the responses, and sends them back to the user. It also handles user feedback on the bot's responses.
+
+"""
 import asyncio
 import logging
 import uuid
-from collections import OrderedDict
 
 import discord
 import langdetect
 from discord.ext import commands
 
 from wandbot.api.client import AsyncAPIClient
-from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.discord.config import DiscordAppConfig
+from wandbot.apps.utils import format_response
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -25,44 +31,16 @@ config = DiscordAppConfig()
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def deduplicate(input_list):
-    return list(OrderedDict.fromkeys(input_list))
-
-
-def format_response(
-    response: APIQueryResponse | None, outro_message: str = "", lang: str = "en", is_last=False
-) -> str:
-    if response is not None:
-        result = response.answer
-        if "gpt-4" not in response.model:
-            if lang == "ja":
-                warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
-            else:
-                warning_message = (
-                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as " f"*gpt-4*\n\n"
-                )
-            result = warning_message + response.answer
-
-        if config.include_sources and response.sources and is_last:
-            sources_list = deduplicate(
-                [item for item in response.sources.split(",") if item.strip().startswith("http")]
-            )
-            if len(sources_list) > 0:
-                items = min(len(sources_list), 3)
-                if lang == "ja":
-                    result = f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
-                else:
-                    result = f"{result}\n\n*References*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
-        if outro_message:
-            result = f"{result}\n\n{outro_message}"
-
-    else:
-        result = config.ERROR_MESSAGE
-    return result
-
-
 @bot.event
 async def on_message(message: discord.Message):
+    """Handles the on_message event in Discord.
+
+    Args:
+        message: The message object received.
+
+    Returns:
+        None
+    """
     if message.author == bot.user:
         return
     if bot.user is not None and bot.user.mentioned_in(message):
@@ -95,7 +73,10 @@ async def on_message(message: discord.Message):
                 chat_history = None
             if not chat_history:
                 if lang_code == "ja":
-                    await thread.send(f"🤖 {mention}: {config.JA_INTRO_MESSAGE}", mention_author=True)
+                    await thread.send(
+                        f"🤖 {mention}: {config.JA_INTRO_MESSAGE}",
+                        mention_author=True,
+                    )
                 else:
                     await thread.send(
                         f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}",
@@ -108,9 +89,15 @@ async def on_message(message: discord.Message):
             )
             if response is None:
                 if lang_code == "ja":
-                    await thread.send(f"🤖 {mention}: {config.JA_ERROR_MESSAGE}", mention_author=True)
+                    await thread.send(
+                        f"🤖 {mention}: {config.JA_ERROR_MESSAGE}",
+                        mention_author=True,
+                    )
                 else:
-                    await thread.send(f"🤖 {mention}: {config.EN_ERROR_MESSAGE}", mention_author=True)
+                    await thread.send(
+                        f"🤖 {mention}: {config.EN_ERROR_MESSAGE}",
+                        mention_author=True,
+                    )
                 return
             if lang_code == "ja":
                 outro_message = config.JA_OUTRO_MESSAGE
@@ -126,15 +113,31 @@ async def on_message(message: discord.Message):
                     response_copy.answer = answer_chunk
                     if i == len(answer_chunks) - 1:
                         sent_message = await thread.send(
-                            format_response(response_copy, outro_message, lang_code, is_last=True),
+                            format_response(
+                                config,
+                                response_copy,
+                                outro_message,
+                                lang_code,
+                            ),
                         )
                     else:
                         sent_message = await thread.send(
-                            format_response(response_copy, "", lang_code),
+                            format_response(
+                                config,
+                                response_copy,
+                                "",
+                                lang_code,
+                                is_last=False,
+                            ),
                         )
             else:
                 sent_message = await thread.send(
-                    format_response(response, outro_message, lang_code, is_last=True),
+                    format_response(
+                        config,
+                        response,
+                        outro_message,
+                        lang_code,
+                    ),
                 )
             if sent_message is not None:
                 await api_client.create_question_answer(
@@ -148,10 +151,15 @@ async def on_message(message: discord.Message):
 
             # # Wait for reactions
             def check(reaction, user):
-                return user == message.author and str(reaction.emoji) in ["👍", "👎"]
+                return user == message.author and str(reaction.emoji) in [
+                    "👍",
+                    "👎",
+                ]
 
             try:
-                reaction, user = await bot.wait_for("reaction_add", timeout=config.WAIT_TIME, check=check)
+                reaction, user = await bot.wait_for(
+                    "reaction_add", timeout=config.WAIT_TIME, check=check
+                )
 
             except asyncio.TimeoutError:
                 # await thread.send("🤖")
