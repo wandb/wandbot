@@ -1,32 +1,74 @@
-import json
-import pathlib
+"""This module contains utility functions for the Wandbot ingestion system.
+
+The module includes the following functions:
+- `convert_contents_to_soup`: Converts contents to a BeautifulSoup object.
+- `clean_soup`: Cleans the BeautifulSoup object.
+- `clean_contents`: Cleans the contents.
+- `get_git_command`: Get the git command with the given id file.
+- `fetch_git_remote_hash`: Fetches the remote hash of the git repository.
+- `fetch_repo_metadata`: Fetches the metadata of the git repository.
+- `fetch_git_repo`: Fetches the git repository.
+- `concatenate_cells`: Combines cells information in a readable format.
+
+The module also includes the following constants:
+- `EXTENSION_MAP`: A dictionary mapping file extensions to programming languages.
+
+Typical usage example:
+
+    contents = "This is some markdown content."
+    soup = convert_contents_to_soup(contents)
+    cleaned_soup = clean_soup(soup)
+    cleaned_contents = clean_contents(contents)
+    git_command = get_git_command(id_file)
+    remote_hash = fetch_git_remote_hash(repo_url, id_file)
+    repo_metadata = fetch_repo_metadata(repo)
+    git_repo_metadata = fetch_git_repo(paths, id_file)
+    cell_info = concatenate_cells(cell, include_outputs, max_output_length, traceback)
+"""
+
 import re
 import subprocess
-from typing import Dict, List
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import giturlparse
 import markdown
 import markdownify
-import pandas as pd
 from bs4 import BeautifulSoup, Comment
 from git import Repo
-from langchain.document_loaders import NotebookLoader
-from langchain.document_loaders.notebook import remove_newlines
-from langchain.schema import Document
 
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
 
-def get_git_command(id_file):
+def get_git_command(id_file: Path) -> str:
+    """Get the git command with the given id file.
+
+    Args:
+        id_file: The path to the id file.
+
+    Returns:
+        The git command with the id file.
+    """
     assert id_file.is_file()
 
     git_command = f"ssh -v -i /{id_file}"
     return git_command
 
 
-def fetch_git_remote_hash(repo_url=None, id_file=None):
+def fetch_git_remote_hash(
+    repo_url: Optional[str] = None, id_file: Optional[Path] = None
+) -> Optional[str]:
+    """Fetch the remote hash of the git repository.
+
+    Args:
+        repo_url: The URL of the git repository.
+        id_file: The path to the id file.
+
+    Returns:
+        The remote hash of the git repository.
+    """
     if repo_url is None:
         logger.warning(f"No repo url was supplied. Not returning a repo hash")
         return None
@@ -47,36 +89,74 @@ def fetch_git_remote_hash(repo_url=None, id_file=None):
 
 
 def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
+    """Fetch the metadata of the git repository.
+
+    Args:
+        repo: The git repository.
+
+    Returns:
+        The metadata of the git repository.
+    """
     head_commit = repo.head.commit
 
     return dict(
         commit_summary=head_commit.summary,
         commit_message=head_commit.message,
         commit_author=str(head_commit.author),
-        commit_time=head_commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        commit_time=head_commit.committed_datetime.strftime(
+            "%Y-%m-%d %H:%M:%S"
+        ),
         commit_hash=head_commit.hexsha,
         commit_stats=head_commit.stats.total,
     )
 
 
-def fetch_git_repo(paths, id_file) -> Dict[str, str]:
+def fetch_git_repo(paths: Any, id_file: Path) -> Dict[str, str]:
+    """Fetch the git repository.
+
+    Args:
+        paths: The paths of the git repository.
+        id_file: The path to the id file.
+
+    Returns:
+        The metadata of the git repository.
+    """
     git_command = get_git_command(id_file)
 
     if paths.local_path.is_dir():
         repo = Repo(paths.local_path)
-        logger.debug(f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}")
+        logger.debug(
+            f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
+        )
         with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
             repo.remotes.origin.pull()
     else:
         remote_url = giturlparse.parse(f"{paths.repo_path}").urls.get("ssh")
 
         logger.debug(f"Cloning {remote_url} to {paths.local_path}")
-        repo = Repo.clone_from(remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command))
+        repo = Repo.clone_from(
+            remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command)
+        )
     return fetch_repo_metadata(repo)
 
 
-def concatenate_cells(cell: dict, include_outputs: bool, max_output_length: int, traceback: bool) -> str:
-    """Combine cells information in a readable format ready to be used."""
+def concatenate_cells(
+    cell: Dict[str, Any],
+    include_outputs: bool,
+    max_output_length: int,
+    traceback: bool,
+) -> str:
+    """Combine cells information in a readable format ready to be used.
+
+    Args:
+        cell: The cell dictionary.
+        include_outputs: Whether to include outputs.
+        max_output_length: The maximum length of the output.
+        traceback: Whether to include traceback.
+
+    Returns:
+        The combined cell information.
+    """
     cell_type = cell["cell_type"]
     source = cell["source"]
     output = cell["outputs"]
@@ -100,7 +180,10 @@ def concatenate_cells(cell: dict, include_outputs: bool, max_output_length: int,
         elif output[0]["output_type"] == "stream":
             output = output[0]["text"]
             min_output = min(max_output_length, len(output))
-            return f"'{cell_type}' cell: '{source}'\n with " f"output: '{output[:min_output]}'\n\n"
+            return (
+                f"'{cell_type}' cell: '{source}'\n with "
+                f"output: '{output[:min_output]}'\n\n"
+            )
     else:
         if cell_type == "markdown":
             source = re.sub(r"!\[.*?\]\((.*?)\)", "", f"{source}").strip()
@@ -112,34 +195,7 @@ def concatenate_cells(cell: dict, include_outputs: bool, max_output_length: int,
     return ""
 
 
-class WandbNotebookLoader(NotebookLoader):
-    """Loader that loads .ipynb notebook files in wandb examples."""
-
-    def load(
-        self,
-    ) -> List[Document]:
-        """Load documents."""
-        p = pathlib.Path(self.file_path)
-
-        with open(p, encoding="utf8") as f:
-            d = json.load(f)
-
-        data = pd.json_normalize(d["cells"])
-        filtered_data = data[["cell_type", "source", "outputs"]]
-        if self.remove_newline:
-            filtered_data = filtered_data.applymap(remove_newlines)
-
-        text = filtered_data.apply(
-            lambda x: concatenate_cells(x, self.include_outputs, self.max_output_length, self.traceback),
-            axis=1,
-        ).str.cat(sep=" ")
-
-        metadata = {"source": str(p)}
-
-        return [Document(page_content=text, metadata=metadata)]
-
-
-EXTENSION_MAP = {
+EXTENSION_MAP: Dict[str, str] = {
     ".py": "python",
     ".ipynb": "python",
     ".md": "markdown",
@@ -148,7 +204,15 @@ EXTENSION_MAP = {
 }
 
 
-def convert_contents_to_soup(contents):
+def convert_contents_to_soup(contents: str) -> BeautifulSoup:
+    """Converts contents to BeautifulSoup object.
+
+    Args:
+        contents: The contents to convert.
+
+    Returns:
+        The BeautifulSoup object.
+    """
     markdown_document = markdown.markdown(
         contents,
         extensions=[
@@ -174,7 +238,15 @@ def convert_contents_to_soup(contents):
     return soup
 
 
-def clean_soup(soup):
+def clean_soup(soup: BeautifulSoup) -> BeautifulSoup:
+    """Cleans the BeautifulSoup object.
+
+    Args:
+        soup: The BeautifulSoup object to clean.
+
+    Returns:
+        The cleaned BeautifulSoup object.
+    """
     for img_tag in soup.find_all("img", src=True):
         img_tag.extract()
     comments = soup.find_all(string=lambda text: isinstance(text, Comment))
@@ -186,10 +258,20 @@ def clean_soup(soup):
     return soup
 
 
-def clean_contents(contents):
+def clean_contents(contents: str) -> str:
+    """Cleans the contents.
+
+    Args:
+        contents: The contents to clean.
+
+    Returns:
+        The cleaned contents.
+    """
     soup = convert_contents_to_soup(contents)
     soup = clean_soup(soup)
-    cleaned_document = markdownify.MarkdownConverter(heading_style="ATX").convert_soup(soup)
+    cleaned_document = markdownify.MarkdownConverter(
+        heading_style="ATX"
+    ).convert_soup(soup)
     cleaned_document = cleaned_document.replace("![]()", "\n")
     cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
 

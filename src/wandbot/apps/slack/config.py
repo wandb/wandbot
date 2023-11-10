@@ -1,3 +1,17 @@
+"""This module contains the configuration settings for the Slack application.
+
+This module uses the Pydantic library to define the configuration settings for the Slack application. 
+These settings include tokens, secrets, API keys, and messages for the application. 
+The settings are loaded from an environment file and can be accessed as properties of the `SlackAppConfig` class.
+
+Typical usage example:
+
+  from .config import SlackAppConfig
+
+  config = SlackAppConfig()
+  token = config.SLACK_APP_TOKEN
+"""
+
 from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings
 
@@ -13,9 +27,14 @@ EN_OUTRO_MESSAGE = (
     f" Was this response helpful? Please react below to let us know"
 )
 
-EN_ERROR_MESSAGE = "Oops!, Something went wrong. Please retry again in some time"
+EN_ERROR_MESSAGE = (
+    "Oops!, Something went wrong. Please retry again in some time"
+)
 
-JA_INTRO_MESSAGE = "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。" "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
+JA_INTRO_MESSAGE = (
+    "Wandbotは現在アルファテスト中ですので、頻繁にアップデートされます。"
+    "ご利用の際にはプライバシーに関わる情報は入力されないようお願いします。返答を生成しています・・・"
+)
 
 JA_OUTRO_MESSAGE = (
     ":robot_face: この答えが十分でなかった場合には、質問を少し変えて試してみると結果が良くなることがあるので、お試しください。もしくは、"

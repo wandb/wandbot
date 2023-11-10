@@ -1,21 +1,23 @@
 # wandbot
 
-A question answering bot for Weights & Biases [documentation](https://docs.wandb.ai/).
-This bot is built using [llama-index](https://gpt-index.readthedocs.io/en/stable/) and openai [gpt-4](https://openai.com/research/gpt-4).
+Wandbot is a question-answering bot designed specifically for Weights & Biases [documentation](https://docs.wandb.ai/).
+Leveraging the power of [llama-index](https://gpt-index.readthedocs.io/en/stable/) and OpenAI's [gpt-4](https://openai.com/research/gpt-4), it provides precise and context-aware responses
+using a combination of [FAISS](https://github.com/facebookresearch/faiss) for RAG and OpenAI's [gpt-4](https://openai.com/research/gpt-4) for generating responses.
+
 
 ## Features
 
-- The bot utilizes retrieval augmented generation with [FAISS](https://github.com/facebookresearch/faiss) backend to retrieve relevant documents and efficiently handle user queries and provides accurate, context-aware responses
-- Periodic data ingestion with report generation for continuous improvement of the bot.: Checkout the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist)
-- Integrated with Discord and Slack, allowing seamless integration into popular collaboration platforms.
-- Logging and analysis with Weights & Biases Tables for performance monitoring and continuous improvement.: Checkout the workspace for more details [here](https://wandb.ai/wandbot/wandbot_public)
-- Uses a fallback mechanism for model selection when GPT-4 is unable to generate a response.
-- Evaluation using a combination of metrics such as retrieval accuracy, string similarity, and model-generated response correctness
-- Want to know more about the custom system prompt used by the bot?: Checkout the full prompt [here](data/prompts/chat_prompt.json)
+- Wandbot employs Retrieval Augmented Generation with a [FAISS](https://github.com/facebookresearch/faiss) backend, ensuring efficient and accurate responses to user queries by retrieving relevant documents.
+- It features periodic data ingestion and report generation, contributing to the bot's continuous improvement. You can view the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist).
+- The bot is integrated with Discord and Slack, facilitating seamless integration with these popular collaboration platforms.
+- Performance monitoring and continuous improvement are made possible through logging and analysis with Weights & Biases Tables. Visit the workspace for more details [here](https://wandb.ai/wandbot/wandbot_public).
+- Wandbot has a fallback mechanism for model selection, which is used when GPT-4 fails to generate a response.
+- The bot's performance is evaluated using a mix of metrics, including retrieval accuracy, string similarity, and the correctness of model-generated responses.
+- Curious about the custom system prompt used by the bot? You can view the full prompt [here](data/prompts/chat_prompt.json).
 
 ## Installation
 
-The project uses `python = ">=3.10.0,<3.11"` and uses [poetry](https://python-poetry.org/) for dependency management. To install the dependencies:
+The project is built with Python version `>=3.10.0,<3.11` and utilizes [poetry](https://python-poetry.org/) for managing dependencies. Follow the steps below to install the necessary dependencies:
 
 ```bash
 git clone git@github.com:wandb/wandbot.git
@@ -43,7 +45,7 @@ These datasets are also stored as wandb artifacts in the project defined in the 
 
 ### Running the Q&A Bot
 
-You will need to set the following environment variables:
+Before running the Q&A bot, ensure the following environment variables are set:
 
 ```bash
 OPENAI_API_KEY
@@ -60,7 +62,7 @@ WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY="wandbot"
 ```
 
-Then you can run the Q&A bot application, use the following commands:
+Once these environment variables are set, you can start the Q&A bot application using the following commands:
 
 ```bash
 (poetry run uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 > api.log 2>&1) & \
@@ -68,9 +70,9 @@ Then you can run the Q&A bot application, use the following commands:
 (poetry run python -m wandbot.apps.discord > discord_app.log 2>&1)
 ```
 
-Please refer to the [run.sh](./run.sh) file in the root of the repository for more details on commands related to installing and running the bot.
+For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
-This will start the chatbot applications - the api, the slackbot and the discord bot, allowing you to interact with it and ask questions related to the Weights & Biases documentation.
+Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
 
 ### Evaluation
 
@@ -85,14 +87,14 @@ cd wandbot
 poetry run python -m eval
 ```
 
-## Implementation Overview
+## Overview of the Implementation
 
-1. Document Embeddings with FAISS
-2. Building the Q&A Pipeline with llama-index
-3. Model Selection and Fallback Mechanism
-4. Deploying the Q&A Bot on FastAPI, Discord and Slack
-5. Logging and Analysis with Weights & Biases Tables
-6. Evaluation of the Q&A Bot
+1. Creating Document Embeddings with FAISS
+2. Constructing the Q&A Pipeline using llama-index
+3. Selection of Models and Implementation of Fallback Mechanism
+4. Deployment of the Q&A Bot on FastAPI, Discord, and Slack
+5. Utilizing Weights & Biases Tables for Logging and Analysis
+6. Evaluating the Performance of the Q&A Bot
 
-You can track the bot usage in the following project:
+You can monitor the usage of the bot in the following project:
 https://wandb.ai/wandbot/wandbot_public

@@ -1,4 +1,15 @@
-from collections import OrderedDict
+"""A Slack bot that interacts with users and processes their queries.
+
+This module contains the main functionality of the Slack bot. It listens for mentions of the bot in messages,
+processes the text of the message, and sends a response. It also handles reactions added to messages and 
+saves them as feedback. The bot supports both English and Japanese languages.
+
+The bot uses the Slack Bolt framework for handling events and the langdetect library for language detection.
+It also communicates with an external API for processing queries and storing chat history and feedback.
+
+"""
+
+import logging
 from functools import partial
 
 import langdetect
@@ -6,8 +17,8 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from wandbot.api.client import APIClient
-from wandbot.api.schemas import APIQueryResponse
 from wandbot.apps.slack.config import SlackAppConfig
+from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -17,44 +28,7 @@ app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
 
 
-def deduplicate(input_list):
-    return list(OrderedDict.fromkeys(input_list))
-
-
-def format_response(response: APIQueryResponse | None, outro_message: str = "", lang: str = "en") -> str:
-    if response is not None:
-        result = response.answer
-        if "gpt-4" not in response.model:
-            if lang == "ja":
-                warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
-            else:
-                warning_message = (
-                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as " f"*gpt-4*\n\n"
-                )
-            result = warning_message + response.answer
-
-        if config.include_sources and response.sources:
-            sources_list = deduplicate(
-                [item for item in response.sources.split(",") if item.strip().startswith("http")]
-            )
-            if len(sources_list) > 0:
-                items = min(len(sources_list), 3)
-                if lang == "ja":
-                    result = f"{result}\n\n*参考文献*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
-                else:
-                    result = f"{result}\n\n*References*\n\n>" + "\n> ".join(sources_list[:items]) + "\n\n"
-        if outro_message:
-            result = f"{result}\n\n{outro_message}"
-
-    else:
-        if lang == "ja":
-            result = config.JA_ERROR_MESSAGE
-        else:
-            result = config.EN_ERROR_MESSAGE
-    return result
-
-
-def send_message(say, message, thread=None):
+def send_message(say: callable, message: str, thread: str = None) -> None:
     if thread is not None:
         return say(text=message, thread_ts=thread)
     else:
@@ -62,15 +36,30 @@ def send_message(say, message, thread=None):
 
 
 @app.event("app_mention")
-def command_handler(body, say, logger):
+def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
+    """
+    Handles the command when the app is mentioned in a message.
+
+    Args:
+        body (dict): The event body containing the message details.
+        say (function): The function to send a message.
+        logger (Logger): The logger instance for logging errors.
+
+    Raises:
+        Exception: If there is an error posting the message.
+    """
     try:
         query = body["event"].get("text")
         lang_code = langdetect.detect(query)
         user = body["event"].get("user")
-        thread_id = body["event"].get("thread_ts", None) or body["event"].get("ts", None)
+        thread_id = body["event"].get("thread_ts", None) or body["event"].get(
+            "ts", None
+        )
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = api_client.get_chat_history(application=config.APPLICATION, thread_id=thread_id)
+        chat_history = api_client.get_chat_history(
+            application=config.APPLICATION, thread_id=thread_id
+        )
 
         if not chat_history:
             # send out the intro message
@@ -87,11 +76,17 @@ def command_handler(body, say, logger):
                     thread=thread_id,
                 )
         # process the query through the api
-        api_response = api_client.query(question=query, chat_history=chat_history)
+        api_response = api_client.query(
+            question=query, chat_history=chat_history
+        )
         if lang_code == "ja":
-            response = format_response(api_response, config.JA_OUTRO_MESSAGE, lang_code)
+            response = format_response(
+                config, api_response, config.JA_OUTRO_MESSAGE, lang_code
+            )
         else:
-            response = format_response(api_response, config.EN_OUTRO_MESSAGE)
+            response = format_response(
+                config, api_response, config.EN_OUTRO_MESSAGE
+            )
 
         # send the response
         sent_message = send_message(say=say, message=response, thread=thread_id)
@@ -120,7 +115,16 @@ def command_handler(body, say, logger):
         logger.error(f"Error posting message: {e}")
 
 
-def parse_reaction(reaction: str):
+def parse_reaction(reaction: str) -> int:
+    """
+    Parses the reaction and returns the corresponding rating value.
+
+    Args:
+        reaction (str): The reaction emoji.
+
+    Returns:
+        int: The rating value (-1, 0, or 1).
+    """
     if reaction == "+1":
         return 1
     elif reaction == "-1":
@@ -130,7 +134,14 @@ def parse_reaction(reaction: str):
 
 
 @app.event("reaction_added")
-def handle_reaction_added(event, say):
+def handle_reaction_added(event: dict, say: callable) -> None:
+    """
+    Handles the event when a reaction is added to a message.
+
+    Args:
+        event (dict): The event details.
+        say (callable): The function to send a message.
+    """
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
 
