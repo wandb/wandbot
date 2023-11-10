@@ -49,6 +49,7 @@ Before running the Q&A bot, ensure the following environment variables are set:
 
 ```bash
 OPENAI_API_KEY
+COHERE_API_KEY
 SLACK_APP_TOKEN
 SLACK_BOT_TOKEN
 SLACK_SIGNING_SECRET
