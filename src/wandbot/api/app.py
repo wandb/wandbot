@@ -34,7 +34,6 @@ from datetime import datetime
 import pandas as pd
 import wandb
 from fastapi import FastAPI, Response, status
-
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,

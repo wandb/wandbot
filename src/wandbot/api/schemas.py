@@ -51,6 +51,13 @@ class APIQueryRequest(ChatRequest):
     pass
 
 
+class WSQueryRequest(ChatRequest):
+    application: str | None = None
+    thread_id: str | None = None
+    language_code: str | None = None
+    user: str | None = None
+
+
 class APIQueryResponse(ChatRepsonse):
     pass
 

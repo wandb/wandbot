@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings
 
 
 class ChatConfig(BaseSettings):
-    chat_model_name: str = "gpt-4-0613"
+    chat_model_name: str = "gpt-4-1106-preview"
     max_retries: int = 2
     fallback_model_name: str = "gpt-3.5-turbo-16k-0613"
     max_fallback_retries: int = 6
@@ -34,3 +34,8 @@ class ChatConfig(BaseSettings):
     wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
     include_sources: bool = True
     query_tokens_threshold: int = 1024
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "allow"

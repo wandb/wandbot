@@ -13,7 +13,6 @@ include = ["src/**/*", "LICENSE", "README.md"]
 python = ">=3.10.0,<3.11"
 numpy = "^1.26.1"
 wandb = "^0.15.12"
-openai = "^0.28.1"
 tiktoken = "^0.5.1"
 pandas = "^2.0.3"
 unstructured = "^0.10.26"
@@ -34,7 +33,8 @@ tree-sitter-languages = "^1.7.1"
 cohere = "^4.32"
 markdownify = "^0.11.6"
 uvicorn = "^0.23.2"
-zenpy = { version = "^2.0.41", optional = true }
+zenpy = "^2.0.41"
+openai = "^1.3.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

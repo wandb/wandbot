@@ -8,22 +8,38 @@ The bot uses the Slack Bolt framework for handling events and the langdetect lib
 It also communicates with an external API for processing queries and storing chat history and feedback.
 
 """
-
+import argparse
 import logging
 from functools import partial
 
-import langdetect
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-
 from wandbot.api.client import APIClient
-from wandbot.apps.slack.config import SlackAppConfig
+from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-config = SlackAppConfig()
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "-l",
+    "--language",
+    default="en",
+    help="Language of the bot",
+    type=str,
+    choices=["en", "ja"],
+)
+
+args = parser.parse_args()
+
+if args.language == "ja":
+    config = SlackAppJaConfig()
+else:
+    config = SlackAppEnConfig()
+
+
 app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
 
@@ -50,7 +66,6 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
     """
     try:
         query = body["event"].get("text")
-        lang_code = langdetect.detect(query)
         user = body["event"].get("user")
         thread_id = body["event"].get("thread_ts", None) or body["event"].get(
             "ts", None
@@ -63,30 +78,20 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
 
         if not chat_history:
             # send out the intro message
-            if lang_code == "ja":
-                send_message(
-                    say=say,
-                    message=f"こんにちは <@{user}>:\n\n{config.JA_INTRO_MESSAGE}",
-                    thread=thread_id,
-                )
-            else:
-                send_message(
-                    say=say,
-                    message=f"Hi <@{user}>:\n\n{config.EN_INTRO_MESSAGE}",
-                    thread=thread_id,
-                )
+            send_message(
+                say=say,
+                message=config.INTRO_MESSAGE.format(user=user),
+                thread=thread_id,
+            )
         # process the query through the api
         api_response = api_client.query(
             question=query, chat_history=chat_history
         )
-        if lang_code == "ja":
-            response = format_response(
-                config, api_response, config.JA_OUTRO_MESSAGE, lang_code
-            )
-        else:
-            response = format_response(
-                config, api_response, config.EN_OUTRO_MESSAGE
-            )
+        response = format_response(
+            config,
+            api_response,
+            config.OUTRO_MESSAGE,
+        )
 
         # send the response
         sent_message = send_message(say=say, message=response, thread=thread_id)

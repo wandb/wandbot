@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import tiktoken
 import wandb
-from llama_index import StorageContext, load_index_from_storage
+from llama_index import QueryBundle, StorageContext, load_index_from_storage
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
@@ -38,9 +38,10 @@ from llama_index.callbacks import (
 )
 from llama_index.chat_engine.types import BaseChatEngine, ChatMode
 from llama_index.indices.postprocessor import CohereRerank
+from llama_index.indices.postprocessor.types import BaseNodePostprocessor
 from llama_index.llms import ChatMessage, MessageRole
+from llama_index.schema import NodeWithScore
 from llama_index.vector_stores import FaissVectorStore
-
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRepsonse, ChatRequest
@@ -171,9 +172,35 @@ class Chat:
             model_name,
             temperature=self.config.chat_temperature,
             max_retries=max_retries,
-            embeddings_cache=self.config.embeddings_cache,
+            embeddings_cache=str(self.config.embeddings_cache),
             callback_manager=self.callback_manager,
         )
+
+        from llama_index.bridge.pydantic import Field
+
+        class LanguageFilterPostprocessor(BaseNodePostprocessor):
+            """Language-based Node processor."""
+
+            languages: List[str] = Field(default=["en", "python"])
+
+            @classmethod
+            def class_name(cls) -> str:
+                return "LanguageFilterPostprocessor"
+
+            def _postprocess_nodes(
+                self,
+                nodes: List[NodeWithScore],
+                query_bundle: Optional[QueryBundle] = None,
+            ) -> List[NodeWithScore]:
+                """Postprocess nodes."""
+
+                new_nodes = []
+                for node in nodes:
+                    if node.metadata["language"] in self.languages:
+                        new_nodes.append(node)
+
+                return new_nodes
+
         chat_engine = self.index.as_chat_engine(
             chat_mode=ChatMode.CONDENSE_QUESTION,
             similarity_top_k=25,
@@ -181,7 +208,12 @@ class Chat:
             service_context=service_context,
             text_qa_template=self.qa_prompt,
             node_postprocessors=[
-                CohereRerank(top_n=15, model="rerank-english-v2.0")
+                LanguageFilterPostprocessor(
+                    languages=[
+                        "ja",
+                    ]
+                ),
+                CohereRerank(top_n=5, model="rerank-multilingual-v2.0"),
             ],
             storage_context=self.storage_context,
         )
@@ -242,7 +274,10 @@ class Chat:
         return response
 
     def get_answer(
-        self, query: str, chat_history: Optional[List[ChatMessage]] = None
+        self,
+        query: str,
+        chat_history: Optional[List[ChatMessage]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Gets the answer for the given query and chat history.
 

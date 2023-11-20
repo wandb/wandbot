@@ -29,8 +29,9 @@ class ChatThread(Base):
 
 class QuestionAnswer(Base):
     __tablename__ = "question_answers"
-
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
+    language_code = Column(String)
+    user = Column(String)
     question_answer_id = Column(String, primary_key=True, index=True)
     system_prompt = Column(String)
     question = Column(String)

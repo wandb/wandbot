@@ -20,7 +20,6 @@ from datetime import datetime
 from typing import List
 
 from pydantic import BaseModel
-
 from wandbot.database.schemas import QuestionAnswer
 
 
@@ -44,6 +43,7 @@ class ChatThread(ChatThreadCreate):
 class ChatRequest(BaseModel):
     question: str
     chat_history: List[QuestionAnswer] | None = None
+    language_code: str = "en"
 
 
 class ChatRepsonse(BaseModel):

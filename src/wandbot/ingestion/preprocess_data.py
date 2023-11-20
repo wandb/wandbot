@@ -19,7 +19,7 @@ Typical usage example:
     nodes = load(documents, chunk_size=1024)
 """
 
-from typing import Iterable, List
+from typing import Any, Iterable, List, Optional, Union
 
 import regex as re
 import tiktoken
@@ -29,7 +29,6 @@ from llama_index import Document as LlamaDocument
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.text_splitter import CodeSplitter, TextSplitter
 from tree_sitter_languages import get_parser
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

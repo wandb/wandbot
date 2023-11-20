@@ -27,7 +27,6 @@ from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
-
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -114,7 +113,9 @@ class DocodileDataLoader(DataLoader):
             meta = md.Meta.get("slug", [""])
             return meta[0]
 
-    def generate_site_url(self, base_path: Path, file_path: Path) -> str:
+    def generate_site_url(
+        self, base_path: pathlib.Path, file_path: pathlib.Path
+    ) -> str:
         """Generates the site URL for a file.
 
         Args:

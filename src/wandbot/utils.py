@@ -118,7 +118,7 @@ def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
 
 
 def load_service_context(
-    llm: OpenAI,
+    llm: str,
     temperature: float,
     embeddings_cache: str,
     max_retries: int,

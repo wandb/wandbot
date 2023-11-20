@@ -16,7 +16,6 @@ from collections import OrderedDict
 from typing import Any, List
 
 from pydantic_settings import BaseSettings
-
 from wandbot.api.schemas import APIQueryResponse
 
 
@@ -36,7 +35,6 @@ def format_response(
     config: BaseSettings,
     response: APIQueryResponse | None,
     outro_message: str = "",
-    lang: str = "en",
     is_last: bool = True,
 ) -> str:
     """Formats the response from the API query.
@@ -45,7 +43,6 @@ def format_response(
         :param config: The config object for the app.
         response: The response from the API query.
         outro_message: The outro message to append to the formatted response.
-        lang: The language of the response.
         is_last: Whether the response is the last in a series.
 
     Returns:
@@ -55,13 +52,9 @@ def format_response(
     if response is not None:
         result = response.answer
         if "gpt-4" not in response.model:
-            if lang == "ja":
-                warning_message = f"*警告: {response.model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*"
-            else:
-                warning_message = (
-                    f"*Warning: Falling back to {response.model}*, These results may nor be as good as "
-                    f"*gpt-4*\n\n"
-                )
+            warning_message = config.WARNING_MESSAGE.format(
+                model=response.model
+            )
             result = warning_message + response.answer
 
         if config.include_sources and response.sources and is_last:
@@ -74,7 +67,7 @@ def format_response(
             )
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
-                if lang == "ja":
+                if config.lang_code == "ja":
                     result = (
                         f"{result}\n\n*参考文献*\n\n>"
                         + "\n> ".join(sources_list[:items])
