@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import tiktoken
 import wandb
-from llama_index import QueryBundle, StorageContext, load_index_from_storage
+from llama_index import StorageContext, load_index_from_storage
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
@@ -38,15 +38,20 @@ from llama_index.callbacks import (
 )
 from llama_index.chat_engine.types import BaseChatEngine, ChatMode
 from llama_index.indices.postprocessor import CohereRerank
-from llama_index.indices.postprocessor.types import BaseNodePostprocessor
 from llama_index.llms import ChatMessage, MessageRole
-from llama_index.schema import NodeWithScore
 from llama_index.vector_stores import FaissVectorStore
+from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
+from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
-from wandbot.chat.schemas import ChatRepsonse, ChatRequest
+from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
-from wandbot.utils import Timer, get_logger, load_service_context
+from wandbot.utils import (
+    LanguageFilterPostprocessor,
+    Timer,
+    get_logger,
+    load_service_context,
+)
 
 logger = get_logger(__name__)
 
@@ -56,15 +61,16 @@ def get_chat_history(
 ) -> Optional[List[ChatMessage]]:
     """Generates a list of chat messages from a given chat history.
 
-    This function takes a list of QuestionAnswer objects and transforms them into a list of ChatMessage objects.
-    Each QuestionAnswer object is split into two ChatMessage objects: one for the user's question and one for the assistant's answer.
-    If the chat history is empty or None, the function returns None.
+    This function takes a list of QuestionAnswer objects and transforms them into a list of ChatMessage objects. Each
+    QuestionAnswer object is split into two ChatMessage objects: one for the user's question and one for the
+    assistant's answer. If the chat history is empty or None, the function returns None.
 
-    Args:
-        chat_history: A list of QuestionAnswer objects representing the history of a chat. Each QuestionAnswer object contains a question from the user and an answer from the assistant.
+    Args: chat_history: A list of QuestionAnswer objects representing the history of a chat. Each QuestionAnswer
+    object contains a question from the user and an answer from the assistant.
 
-    Returns:
-        A list of ChatMessage objects representing the chat history. Each ChatMessage object has a role (either 'USER' or 'ASSISTANT') and content (the question or answer text). If the chat history is empty or None, the function returns None.
+    Returns: A list of ChatMessage objects representing the chat history. Each ChatMessage object has a role (either
+    'USER' or 'ASSISTANT') and content (the question or answer text). If the chat history is empty or None,
+    the function returns None.
     """
     if not chat_history:
         return None
@@ -96,8 +102,6 @@ class Chat:
         token_counter: An instance of TokenCountingHandler for counting tokens.
         callback_manager: An instance of CallbackManager for managing callbacks.
         qa_prompt: A string representing the chat prompt.
-        chat_engine: An instance of ChatEngine for generating chat responses.
-        fallback_chat_engine: An instance of ChatEngine for fallback chat responses.
     """
 
     def __init__(self, config: ChatConfig):
@@ -128,14 +132,6 @@ class Chat:
         )
 
         self.qa_prompt = load_chat_prompt(self.config.chat_prompt)
-        self.chat_engine = self._load_chat_engine(
-            self.config.chat_model_name,
-            max_retries=self.config.max_retries,
-        )
-        self.fallback_chat_engine = self._load_chat_engine(
-            self.config.fallback_model_name,
-            max_retries=self.config.max_fallback_retries,
-        )
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
@@ -150,14 +146,19 @@ class Chat:
         """
         artifact = self.run.use_artifact(artifact_url)
         artifact_dir = artifact.download()
+        index_path = f"{artifact_dir}/{DEFAULT_VECTOR_STORE}{NAMESPACE_SEP}{DEFAULT_PERSIST_FNAME}"
         storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore.from_persist_dir(artifact_dir),
+            vector_store=FaissVectorStore.from_persist_path(index_path),
             persist_dir=artifact_dir,
         )
         return storage_context
 
     def _load_chat_engine(
-        self, model_name: str, max_retries: int
+        self,
+        model_name: str,
+        max_retries: int,
+        has_chat_history: bool = False,
+        language: str = "en",
     ) -> BaseChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 
@@ -176,44 +177,19 @@ class Chat:
             callback_manager=self.callback_manager,
         )
 
-        from llama_index.bridge.pydantic import Field
-
-        class LanguageFilterPostprocessor(BaseNodePostprocessor):
-            """Language-based Node processor."""
-
-            languages: List[str] = Field(default=["en", "python"])
-
-            @classmethod
-            def class_name(cls) -> str:
-                return "LanguageFilterPostprocessor"
-
-            def _postprocess_nodes(
-                self,
-                nodes: List[NodeWithScore],
-                query_bundle: Optional[QueryBundle] = None,
-            ) -> List[NodeWithScore]:
-                """Postprocess nodes."""
-
-                new_nodes = []
-                for node in nodes:
-                    if node.metadata["language"] in self.languages:
-                        new_nodes.append(node)
-
-                return new_nodes
-
         chat_engine = self.index.as_chat_engine(
-            chat_mode=ChatMode.CONDENSE_QUESTION,
-            similarity_top_k=25,
+            chat_mode=ChatMode.CONDENSE_QUESTION
+            if has_chat_history
+            else ChatMode.CONTEXT,
+            similarity_top_k=50,
             response_mode="compact",
             service_context=service_context,
             text_qa_template=self.qa_prompt,
             node_postprocessors=[
-                LanguageFilterPostprocessor(
-                    languages=[
-                        "ja",
-                    ]
-                ),
-                CohereRerank(top_n=5, model="rerank-multilingual-v2.0"),
+                LanguageFilterPostprocessor(languages=[language, "python"]),
+                CohereRerank(top_n=5, model="rerank-multilingual-v2.0")
+                if language == "ja"
+                else CohereRerank(top_n=5, model="rerank-english-v2.0"),
             ],
             storage_context=self.storage_context,
         )
@@ -277,19 +253,26 @@ class Chat:
         self,
         query: str,
         chat_history: Optional[List[ChatMessage]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Gets the answer for the given query and chat history.
 
         Args:
             query: A string representing the query.
             chat_history: A list of ChatMessage representing the chat history.
+            language: A string representing the language of the query.
 
         Returns:
             A formatted response dictionary.
         """
         try:
-            response = self.chat_engine.chat(
+            chat_engine = self._load_chat_engine(
+                self.config.chat_model_name,
+                max_retries=self.config.max_retries,
+                language=language,
+                has_chat_history=bool(chat_history),
+            )
+            response = chat_engine.chat(
                 message=query, chat_history=chat_history
             )
             result = {
@@ -303,8 +286,15 @@ class Chat:
                 f"Falling back to {self.config.fallback_model_name} model"
             )
             try:
-                response = self.fallback_chat_engine.chat(
-                    message=query, chat_history=chat_history
+                fallback_chat_engine = self._load_chat_engine(
+                    self.config.fallback_model_name,
+                    max_retries=self.config.max_fallback_retries,
+                    language=language,
+                    has_chat_history=bool(chat_history),
+                )
+                response = fallback_chat_engine.chat(
+                    message=query,
+                    chat_history=chat_history,
                 )
                 result = {
                     "answer": response.response,
@@ -324,7 +314,7 @@ class Chat:
                 }
         return self.format_response(result)
 
-    def __call__(self, chat_request: ChatRequest) -> ChatRepsonse:
+    def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
 
         Args:
@@ -343,8 +333,9 @@ class Chat:
                 }
             else:
                 result = self.get_answer(
-                    query,
+                    query=query,
                     chat_history=get_chat_history(chat_request.chat_history),
+                    language=chat_request.language,
                 )
                 usage_stats = {
                     "total_tokens": self.token_counter.total_llm_token_count,
@@ -366,7 +357,7 @@ class Chat:
         )
         self.run.log(usage_stats)
         result["system_prompt"] = self.qa_prompt.message_templates[0].content
-        return ChatRepsonse(**result)
+        return ChatResponse(**result)
 
 
 def main():
