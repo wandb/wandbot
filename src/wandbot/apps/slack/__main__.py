@@ -9,13 +9,14 @@ It also communicates with an external API for processing queries and storing cha
 
 """
 import argparse
+import asyncio
 import logging
 from functools import partial
 
-from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp
 from slack_sdk.web import SlackResponse
-from wandbot.api.client import APIClient
+from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
@@ -41,21 +42,23 @@ else:
     config = SlackAppEnConfig()
 
 
-app = App(token=config.SLACK_APP_TOKEN)
-api_client = APIClient(url=config.WANDBOT_API_URL)
+app = AsyncApp(token=config.SLACK_APP_TOKEN)
+api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-def send_message(
+async def send_message(
     say: callable, message: str, thread: str = None
 ) -> SlackResponse:
     if thread is not None:
-        return say(text=message, thread_ts=thread)
+        return await say(text=message, thread_ts=thread)
     else:
-        return say(text=message)
+        return await say(text=message)
 
 
 @app.event("app_mention")
-def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
+async def command_handler(
+    body: dict, say: callable, logger: logging.Logger
+) -> None:
     """
     Handles the command when the app is mentioned in a message.
 
@@ -75,19 +78,19 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
         )
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = api_client.get_chat_history(
+        chat_history = await api_client.get_chat_history(
             application=config.APPLICATION, thread_id=thread_id
         )
 
         if not chat_history:
             # send out the intro message
-            send_message(
+            await send_message(
                 say=say,
                 message=config.INTRO_MESSAGE.format(user=user),
                 thread=thread_id,
             )
         # process the query through the api
-        api_response = api_client.query(
+        api_response = await api_client.query(
             question=query, chat_history=chat_history
         )
         response = format_response(
@@ -97,15 +100,17 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
         )
 
         # send the response
-        sent_message = send_message(say=say, message=response, thread=thread_id)
+        sent_message = await send_message(
+            say=say, message=response, thread=thread_id
+        )
 
-        app.client.reactions_add(
+        await app.client.reactions_add(
             channel=body["event"]["channel"],
             timestamp=sent_message["ts"],
             name="thumbsup",
             token=config.SLACK_BOT_TOKEN,
         )
-        app.client.reactions_add(
+        await app.client.reactions_add(
             channel=body["event"]["channel"],
             timestamp=sent_message["ts"],
             name="thumbsdown",
@@ -113,7 +118,7 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
         )
 
         #  save the question answer to the database
-        api_client.create_question_answer(
+        await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
             **api_response.model_dump(),
@@ -142,7 +147,7 @@ def parse_reaction(reaction: str) -> int:
 
 
 @app.event("reaction_added")
-def handle_reaction_added(event: dict, say: callable) -> None:
+async def handle_reaction_added(event: dict, say: callable) -> None:
     """
     Handles the event when a reaction is added to a message.
 
@@ -153,7 +158,7 @@ def handle_reaction_added(event: dict, say: callable) -> None:
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
 
-    conversation = app.client.conversations_replies(
+    conversation = await app.client.conversations_replies(
         channel=channel_id,
         ts=message_ts,
         inclusive=True,
@@ -167,13 +172,23 @@ def handle_reaction_added(event: dict, say: callable) -> None:
         thread_ts = messages[0].get("thread_ts")
         if thread_ts:
             rating = parse_reaction(event["reaction"])
-            api_client.create_feedback(
+            await api_client.create_feedback(
                 feedback_id=event["event_ts"],
                 question_answer_id=message_ts,
                 rating=rating,
             )
 
 
+async def main():
+    handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
+    await handler.start_async()
+
+
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, config.SLACK_APP_TOKEN)
-    handler.start()
+    # handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
+    # asyncio.run(handler.start_async())
+    # Create a new task with the main() coroutine
+    asyncio.run(main())
+
+    # Run the task until it completes
+    # asyncio.run(task)
