@@ -42,6 +42,32 @@ poetry run python -m src.wandbot.ingestion
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot-dev).
 
+#### Custom Dataset
+
+To run the Data Ingestion with a custom dataset you can use the following command:
+
+```bash
+poetry run python -m src.wandbot.ingestion --custom --custom_dataset_config_yaml <path_to_yaml>
+```
+
+where
+
+- `--custom` -> Flag for ingesting a custom dataset. If this flag is not set, the default wandbot data flow is used.
+- `--custom_dataset_config_yaml` -> Path to the custom dataset config yaml file. An example is provided in `src/wandbot/ingestion/custom_dataset_config.yaml`
+
+The YAML is structured as follows:
+```yaml
+- CustomConfig:
+    name: "custom_store"
+    data_source:
+      remote_path: "https://docs.wandb.ai/"
+      repo_path: "https://github.com/wandb/docodile"
+      base_path: "docs"
+      file_pattern: "*.md"
+      is_git_repo: true
+    language: "en"
+    docstore_dir: "custom_store_en"
+```
 
 ### Running the Q&A Bot
 
@@ -65,6 +91,8 @@ WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY="wandbot"
 ```
 
+Note, ensure that you have a git identity file which points to the credentials created for ssh access to repositories. The git identity file is typically located located at `~/.ssh/id_rsa` and the corresponding public key should be added to the github account.
+
 Once these environment variables are set, you can start the Q&A bot application using the following commands:
 
 ```bash
@@ -77,6 +105,14 @@ Once these environment variables are set, you can start the Q&A bot application 
 For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
+
+#### Custom Dataset
+
+To load an index based on the custom dataset as defined above, you can set the following environment variable to an artifact path:
+
+```bash
+WANDB_INDEX_ARTIFACT="{ENTITY}/{PROJECT}/custom_index:latest" 
+```
 
 ### Evaluation
 

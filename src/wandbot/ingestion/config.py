@@ -41,6 +41,7 @@ class DataStoreConfig(BaseModel):
     name: str = "docstore"
     data_source: DataSource = DataSource()
     docstore_dir: pathlib.Path = pathlib.Path("docstore")
+    language: Optional[str] = None
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
@@ -59,6 +60,7 @@ class DataStoreConfig(BaseModel):
                     data_source.cache_dir / values.name / local_path
                 )
             if data_source.is_git_repo:
+                # TODO: Remove this for public repos and credentialless access
                 if data_source.git_id_file is None:
                     logger.debug(
                         "The source data is a git repo but no git_id_file is set."
@@ -70,6 +72,14 @@ class DataStoreConfig(BaseModel):
         values.data_source = data_source
 
         return values
+    
+    @classmethod
+    def from_dict(cls, config_dict: dict) -> "DataStoreConfig":
+        return cls(
+            name=config_dict.get("name"),
+            data_source=DataSource(**config_dict.get("data_source")),
+            docstore_dir=pathlib.Path(config_dict.get("docstore_dir")),
+        )
 
 
 class DocodileEnglishStoreConfig(DataStoreConfig):

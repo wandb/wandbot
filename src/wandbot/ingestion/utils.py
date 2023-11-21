@@ -9,6 +9,7 @@ The module includes the following functions:
 - `fetch_repo_metadata`: Fetches the metadata of the git repository.
 - `fetch_git_repo`: Fetches the git repository.
 - `concatenate_cells`: Combines cells information in a readable format.
+- `load_custom_dataset_configs_from_yaml`: Loads the config from a yaml file.
 
 The module also includes the following constants:
 - `EXTENSION_MAP`: A dictionary mapping file extensions to programming languages.
@@ -36,6 +37,8 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
+import yaml
+
 
 from wandbot.utils import get_logger
 
@@ -51,6 +54,7 @@ def get_git_command(id_file: Path) -> str:
     Returns:
         The git command with the id file.
     """
+    print(id_file)
     assert id_file.is_file()
 
     git_command = f"ssh -v -i /{id_file}"
@@ -276,3 +280,8 @@ def clean_contents(contents: str) -> str:
     cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
 
     return cleaned_document
+
+def load_custom_dataset_configs_from_yaml(file_path: str) -> list:
+    with open(file_path, 'r') as file:
+        config_list = yaml.safe_load(file)
+    return [next(iter(config.values())) for config in config_list]

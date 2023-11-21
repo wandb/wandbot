@@ -17,6 +17,7 @@ Typical usage example:
 import json
 import os
 import pathlib
+from pathlib import Path
 from typing import Iterator
 from urllib.parse import urljoin
 
@@ -35,6 +36,7 @@ from wandbot.ingestion.config import (
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
 )
+from wandbot.ingestion.typings import DataStoreConfigDict
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
     clean_contents,
@@ -320,6 +322,70 @@ def load(
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
+    ]:
+        loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
+
+        with (loader.config.docstore_dir / "config.json").open("w") as f:
+            f.write(loader.config.model_dump_json())
+
+        with (loader.config.docstore_dir / "documents.jsonl").open("w") as f:
+            for document in loader.load():
+                document_json = {
+                    "page_content": document.page_content,
+                    "metadata": document.metadata,
+                }
+                f.write(json.dumps(document_json) + "\n")
+        with (loader.config.docstore_dir / "metadata.json").open("w") as f:
+            json.dump(loader.metadata, f)
+
+        artifact.add_dir(
+            str(loader.config.docstore_dir),
+            name=loader.config.docstore_dir.name,
+        )
+    run.log_artifact(artifact)
+    run.finish()
+    return f"{entity}/{project}/{result_artifact_name}:latest"
+
+def load_custom(
+    project: str,
+    entity: str,
+    result_artifact_name: str = "custom_raw_dataset",
+    custom_dataset_args: DataStoreConfigDict = {},
+    dataset_type: str = "docodile",
+):
+    """Load and prepare data for a chatbot system.
+
+    This function initializes a Wandb run, creates an artifact for a defined dataset,
+    and loads and prepares the data from the appropriate loader. The prepared data is then saved
+    in the docstore directory and added to the artifact.
+
+    Args:
+        project: The name of the Wandb project.
+        entity: The name of the Wandb entity.
+        result_artifact_name: The name of the result artifact. Default is "custom_raw_dataset".
+        custom_dataset_args: The arguments for the custom dataset to load into the config and loader
+        dataloader_type: The type of dataloader to use for the custom dataset
+
+    Returns:
+        The latest version of the prepared dataset artifact in the format "{entity}/{project}/{result_artifact_name}:latest".
+    """
+    run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
+    artifact = wandb.Artifact(
+        result_artifact_name,
+        type="dataset",
+        description="Raw documents for custom dataset",
+    )
+
+    #TODO: Allow for an arbitrary amount of custom datasets mapped to the proper config and loader based on appropriate popped args
+    if dataset_type == "docodile":
+        CustomDataLoader = DocodileDataLoader
+    elif dataset_type == "code":
+        CustomDataLoader = CodeDataLoader
+    else:
+        raise ValueError(f"Dataset type {dataset_type} not supported")
+    custom_dataset_loader = CustomDataLoader(DataStoreConfig.from_dict(custom_dataset_args))
+    for loader in [
+        custom_dataset_loader
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 
