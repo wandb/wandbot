@@ -30,8 +30,6 @@ class ChatThread(Base):
 class QuestionAnswer(Base):
     __tablename__ = "question_answers"
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
-    language_code = Column(String)
-    user = Column(String)
     question_answer_id = Column(String, primary_key=True, index=True)
     system_prompt = Column(String)
     question = Column(String)
@@ -49,6 +47,7 @@ class QuestionAnswer(Base):
     total_cost = Column(Float)
     chat_thread = relationship("ChatThread", back_populates="question_answers")
     feedback = relationship("FeedBack", back_populates="question_answer")
+    language = Column(String)
 
 
 class FeedBack(Base):

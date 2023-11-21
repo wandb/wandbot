@@ -16,7 +16,6 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
-
 from wandbot.api.schemas import (
     APIFeedbackRequest,
     APIFeedbackResponse,
@@ -138,6 +137,7 @@ class APIClient:
         time_taken: float | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        language: str | None = None,
     ) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 
@@ -158,6 +158,7 @@ class APIClient:
             time_taken: The time taken.
             start_time: The start time.
             end_time: The end time.
+            language: The language of the question answer.
 
         Returns:
             The response from the API.
@@ -179,6 +180,7 @@ class APIClient:
             time_taken=time_taken,
             start_time=start_time,
             end_time=end_time,
+            language=language,
         )
         response = self._create_question_answer(request)
         return response
@@ -357,6 +359,7 @@ class AsyncAPIClient(APIClient):
         time_taken: float | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        language: str | None = None,
     ) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 
@@ -377,6 +380,7 @@ class AsyncAPIClient(APIClient):
             time_taken: The time taken.
             start_time: The start time.
             end_time: The end time.
+            language: The language of the question answer.
 
         Returns:
             The response from the API, or None if the status code is not 201.

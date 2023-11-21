@@ -15,7 +15,7 @@ Typical usage example:
 import pathlib
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ChatConfig(BaseSettings):
@@ -25,7 +25,11 @@ class ChatConfig(BaseSettings):
     max_fallback_retries: int = 6
     chat_temperature: float = 0.1
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")
-    index_artifact: str = "wandbot/wandbot-dev/wandbot_index:latest"
+    index_artifact: str = Field(
+        "wandbot/wandbot-dev/wandbot_index:latest",
+        env="WANDB_INDEX_ARTIFACT",
+        validation_alias="wandb_index_artifact",
+    )
     embeddings_cache: pathlib.Path = Field(
         pathlib.Path("data/cache/embeddings"), env="EMBEDDINGS_CACHE_PATH"
     )
@@ -35,7 +39,6 @@ class ChatConfig(BaseSettings):
     include_sources: bool = True
     query_tokens_threshold: int = 1024
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
