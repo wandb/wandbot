@@ -3,10 +3,11 @@ from pydantic_settings import BaseSettings
 
 ZDGROUPID = "360016040851"
 
-class ZDAppConfig(BaseSettings):
-    ZENDESK_EMAIL: str = Field(..., env="ZENDESK_EMAIL"),
-    ZENDESK_PASSWORD: str = Field(..., env="ZENDESK_PASSWORD"), 
-    ZENDESK_SUBDOMAIN: str = Field(..., env="ZENDESK_SUBDOMAIN"),
+
+class ZendeskAppConfig(BaseSettings):
+    ZENDESK_EMAIL: str = (Field(..., env="ZENDESK_EMAIL"),)
+    ZENDESK_PASSWORD: str = (Field(..., env="ZENDESK_PASSWORD"),)
+    ZENDESK_SUBDOMAIN: str = (Field(..., env="ZENDESK_SUBDOMAIN"),)
 
     WANDB_API_KEY: str = Field(..., env="WANDB_API_KEY")
     ZDGROUPID: str = ZDGROUPID

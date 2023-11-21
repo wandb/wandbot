@@ -1,13 +1,13 @@
 import asyncio
 
 from wandbot.api.client import APIClient
-from wandbot.apps.zendesk.config import ZDAppConfig
+from wandbot.apps.zendesk.config import ZendeskAppConfig
 from wandbot.utils import get_logger
 from zenpy import Zenpy
 from zenpy.lib.api_objects import Comment, Ticket
 
 logger = get_logger(__name__)
-config = ZDAppConfig()
+config = ZendeskAppConfig()
 
 
 class ZendeskAIResponseSystem:
