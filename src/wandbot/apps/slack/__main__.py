@@ -91,7 +91,7 @@ async def command_handler(
             )
         # process the query through the api
         api_response = await api_client.query(
-            question=query, chat_history=chat_history
+            question=query, chat_history=chat_history, language=config.language
         )
         response = format_response(
             config,
@@ -121,6 +121,7 @@ async def command_handler(
         await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
+            language=config.language,
             **api_response.model_dump(),
         )
 

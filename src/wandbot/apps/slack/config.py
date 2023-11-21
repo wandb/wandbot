@@ -73,7 +73,7 @@ class SlackAppEnConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
-    lang_code: str = "en"
+    language: str = "en"
 
 
 class SlackAppJaConfig(BaseSettings):
@@ -95,4 +95,4 @@ class SlackAppJaConfig(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
 
-    lang_code: str = "ja"
+    language: str = "ja"

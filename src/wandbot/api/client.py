@@ -402,6 +402,7 @@ class AsyncAPIClient(APIClient):
             time_taken=time_taken,
             start_time=start_time,
             end_time=end_time,
+            language=language,
         )
         response = await self._create_question_answer(request)
         return response
@@ -469,12 +470,14 @@ class AsyncAPIClient(APIClient):
         self,
         question: str,
         chat_history: List[QuestionAnswer] = None,
+        language: str | None = None,
     ) -> APIQueryResponse:
         """Queries the API.
 
         Args:
             question: The question to query.
             chat_history: The chat history.
+            language: The language of the question.
 
         Returns:
             The response from the API.
@@ -482,6 +485,7 @@ class AsyncAPIClient(APIClient):
         request = APIQueryRequest(
             question=question,
             chat_history=chat_history,
+            language=language,
         )
         response = await self._query(request)
 
