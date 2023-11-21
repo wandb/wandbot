@@ -56,7 +56,7 @@ logger = get_logger(__name__)
 
 Base.metadata.create_all(bind=engine)
 chat: Chat | None = None
-app = FastAPI(name="wandbot", version="0.2.0")
+app = FastAPI(name="wandbot", version="1.0.0")
 db_client: DatabaseClient | None = None
 last_backup = datetime.now()
 
@@ -177,7 +177,9 @@ async def query(
     """
     result = chat(
         ChatRequest(
-            question=request.question, chat_history=request.chat_history
+            question=request.question,
+            chat_history=request.chat_history,
+            language=request.language,
         ),
     )
     result = APIQueryResponse(**result.model_dump())
