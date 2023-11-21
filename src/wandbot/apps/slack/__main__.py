@@ -14,6 +14,7 @@ from functools import partial
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_sdk.web import SlackResponse
 from wandbot.api.client import APIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.utils import format_response
@@ -44,7 +45,9 @@ app = App(token=config.SLACK_APP_TOKEN)
 api_client = APIClient(url=config.WANDBOT_API_URL)
 
 
-def send_message(say: callable, message: str, thread: str = None) -> None:
+def send_message(
+    say: callable, message: str, thread: str = None
+) -> SlackResponse:
     if thread is not None:
         return say(text=message, thread_ts=thread)
     else:
