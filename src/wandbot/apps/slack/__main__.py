@@ -185,10 +185,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    # handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
-    # asyncio.run(handler.start_async())
-    # Create a new task with the main() coroutine
     asyncio.run(main())
-
-    # Run the task until it completes
-    # asyncio.run(task)
