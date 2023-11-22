@@ -8,6 +8,7 @@
       is_git_repo: true
     language: "en"
     docstore_dir: "custom_store_en"
+    dataloader_type: "docodile"
 - CustomConfig2:
     name: "custom_store2"
     data_source:
@@ -18,3 +19,4 @@
       is_git_repo: true
     language: "en"
     docstore_dir: "custom_store_en2"
+    dataloader_type: "docodile"

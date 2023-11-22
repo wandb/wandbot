@@ -13,3 +13,6 @@ DataSourceDict["file_pattern"] = Union[str, List[str]]
 
 DataStoreConfigDict["data_source"] = DataSourceDict
 DataStoreConfigDict["docstore_dir"] = str
+
+# Add additional fields to the type hints for custom fields
+DataSourceDict["dataloader_type"] = str

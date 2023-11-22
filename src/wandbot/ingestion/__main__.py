@@ -15,10 +15,7 @@ def main(custom: bool, custom_dataset_config_yaml: pathlib.Path):
 
     if custom and custom_dataset_config_yaml.is_file():
         configs = load_custom_dataset_configs_from_yaml(custom_dataset_config_yaml)
-        #TODO: Add the full list of configs as opposed to limiting to one
-        #TODO: Add the ability to define which dataloader to use in the config yaml itself
-        config = configs[0]
-        raw_artifact = prepare_data.load_custom(project, entity, "custom_raw_dataset", config, "docodile")
+        raw_artifact = prepare_data.load_custom(project, entity, "custom_raw_dataset", configs)
     else:
         raw_artifact = prepare_data.load(project, entity)
     vectorstore_artifact = vectorstores.load(project, entity, raw_artifact)

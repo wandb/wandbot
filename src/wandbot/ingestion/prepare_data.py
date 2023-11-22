@@ -350,8 +350,8 @@ def load_custom(
     project: str,
     entity: str,
     result_artifact_name: str = "custom_raw_dataset",
-    custom_dataset_args: DataStoreConfigDict = {},
-    dataset_type: str = "docodile",
+    #TODO: Rename
+    custom_datasets_args: DataStoreConfigDict = {}
 ):
     """Load and prepare data for a chatbot system.
 
@@ -375,18 +375,17 @@ def load_custom(
         type="dataset",
         description="Raw documents for custom dataset",
     )
-
-    #TODO: Allow for an arbitrary amount of custom datasets mapped to the proper config and loader based on appropriate popped args
-    if dataset_type == "docodile":
-        CustomDataLoader = DocodileDataLoader
-    elif dataset_type == "code":
-        CustomDataLoader = CodeDataLoader
-    else:
-        raise ValueError(f"Dataset type {dataset_type} not supported")
-    custom_dataset_loader = CustomDataLoader(DataStoreConfig.from_dict(custom_dataset_args))
-    for loader in [
-        custom_dataset_loader
-    ]:
+    
+    for custom_dataset_args in custom_datasets_args:
+        dataloader_type = custom_dataset_args.pop("dataloader_type")
+        if dataloader_type == "docodile":
+            CustomDataLoader = DocodileDataLoader
+        elif dataloader_type == "code":
+            CustomDataLoader = CodeDataLoader
+        else:
+            raise ValueError(f"Dataset type {dataloader_type} not supported")
+        
+        loader = CustomDataLoader(DataStoreConfig.from_dict(custom_dataset_args))
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 
         with (loader.config.docstore_dir / "config.json").open("w") as f:
