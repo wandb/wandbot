@@ -42,6 +42,7 @@ from llama_index.llms import ChatMessage, MessageRole
 from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
+
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRequest, ChatResponse

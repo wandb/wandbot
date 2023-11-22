@@ -1,6 +1,7 @@
 """This module defines the SQLAlchemy models for the ChatThread, QuestionAnswer, and FeedBack tables.
 
-Each class represents a table in the database and includes columns and relationships. The Base class is a declarative base that stores a catalog of classes and mapped tables in the Declarative system.
+Each class represents a table in the database and includes columns and relationships. The Base class is a declarative
+base that stores a catalog of classes and mapped tables in the Declarative system.
 
 Typical usage example:
 

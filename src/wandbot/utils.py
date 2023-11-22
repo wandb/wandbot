@@ -1,7 +1,7 @@
 """This module contains utility functions and classes for the Wandbot system.
 
 The module includes the following functions:
-- `get_logger`: Creates and returns a logger with the specified name.
+- `get_logger`: Creates and returns a slack_logger with the specified name.
 - `load_embeddings`: Loads embeddings from cache or creates new ones if not found.
 - `load_llm`: Loads a language model with the specified parameters.
 - `load_service_context`: Loads a service context with the specified parameters.
@@ -13,7 +13,7 @@ The module also includes the following classes:
 
 Typical usage example:
 
-    logger = get_logger("my_logger")
+    slack_logger = get_logger("my_logger")
     embeddings = load_embeddings("/path/to/cache")
     llm = load_llm("gpt-3", 0.5, 3)
     service_context = load_service_context(llm, 0.5, "/path/to/cache", 3)
@@ -42,13 +42,13 @@ from llama_index.vector_stores import FaissVectorStore
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Creates and returns a logger with the specified name.
+    """Creates and returns a slack_logger with the specified name.
 
     Args:
-        name: The name of the logger.
+        name: The name of the slack_logger.
 
     Returns:
-        A logger instance with the specified name.
+        A slack_logger instance with the specified name.
     """
     logging.basicConfig(
         format="%(asctime)s : %(levelname)s : %(message)s",

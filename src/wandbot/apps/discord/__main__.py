@@ -11,6 +11,7 @@ import uuid
 
 import discord
 from discord.ext import commands
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.discord.config import DiscordAppConfig
 from wandbot.apps.utils import format_response
@@ -131,8 +132,10 @@ async def on_message(message: discord.Message):
                 await sent_message.add_reaction("👎")
 
             # # Wait for reactions
-            def check(reaction, user):
-                return user == message.author and str(reaction.emoji) in [
+            def check(user_reaction, author):
+                return author == message.author and str(
+                    user_reaction.emoji
+                ) in [
                     "👍",
                     "👎",
                 ]

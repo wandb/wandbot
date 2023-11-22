@@ -25,7 +25,7 @@ It also sets up and interacts with the database through:
 The server runs periodic backup of the data to wandb using the backup_db method which runs as a coroutine.
 The backup data is transformed into a Pandas DataFrame and saved as a wandb.Table.
 
-It uses logger from the utils module for logging purposes.
+It uses slack_logger from the utils module for logging purposes.
 """
 
 import asyncio
@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import wandb
 from fastapi import FastAPI, Response, status
+
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,

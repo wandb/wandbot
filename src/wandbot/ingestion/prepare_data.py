@@ -27,6 +27,7 @@ from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
+
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -86,6 +87,29 @@ class DataLoader(BaseLoader):
         self.metadata.update({"num_documents": len(documents)})
         return documents
 
+    def _get_local_paths(self):
+        if self.config.data_source.is_git_repo:
+            self.metadata = fetch_git_repo(
+                self.config.data_source, self.config.data_source.git_id_file
+            )
+
+        local_paths = []
+        file_patterns = (
+            [self.config.data_source.file_pattern]
+            if isinstance(self.config.data_source.file_pattern, str)
+            else self.config.data_source.file_pattern
+        )
+        for file_pattern in file_patterns:
+            local_paths.extend(
+                list(
+                    (
+                        self.config.data_source.local_path
+                        / self.config.data_source.base_path
+                    ).rglob(file_pattern)
+                )
+            )
+        return local_paths
+
 
 class DocodileDataLoader(DataLoader):
     """A data loader for Docodile documents.
@@ -97,7 +121,8 @@ class DocodileDataLoader(DataLoader):
         config: The configuration for the data store.
     """
 
-    def extract_slug(self, file_path: pathlib.Path) -> str:
+    @staticmethod
+    def extract_slug(file_path: pathlib.Path) -> str:
         """Extracts the slug from a file.
 
         Args:
@@ -167,26 +192,7 @@ class DocodileDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-        if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(
-                self.config.data_source, self.config.data_source.git_id_file
-            )
-
-        local_paths = []
-        file_patterns = (
-            [self.config.data_source.file_pattern]
-            if isinstance(self.config.data_source.file_pattern, str)
-            else self.config.data_source.file_pattern
-        )
-        for file_pattern in file_patterns:
-            local_paths.extend(
-                list(
-                    (
-                        self.config.data_source.local_path
-                        / self.config.data_source.base_path
-                    ).rglob(file_pattern)
-                )
-            )
+        local_paths = self._get_local_paths()
         document_files = {
             local_path: self.generate_site_url(
                 self.config.data_source.local_path
@@ -224,26 +230,7 @@ class CodeDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-        if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(
-                self.config.data_source, self.config.data_source.git_id_file
-            )
-
-        local_paths = []
-        file_patterns = (
-            [self.config.data_source.file_pattern]
-            if isinstance(self.config.data_source.file_pattern, str)
-            else self.config.data_source.file_pattern
-        )
-        for file_pattern in file_patterns:
-            local_paths.extend(
-                list(
-                    (
-                        self.config.data_source.local_path
-                        / self.config.data_source.base_path
-                    ).rglob(file_pattern)
-                )
-            )
+        local_paths = self._get_local_paths()
 
         paths = list(local_paths)
         local_paths = list(map(lambda x: str(x), paths))
@@ -313,7 +300,8 @@ def load(
         result_artifact_name: The name of the result artifact. Default is "raw_dataset".
 
     Returns:
-        The latest version of the prepared dataset artifact in the format "{entity}/{project}/{result_artifact_name}:latest".
+        The latest version of the prepared dataset artifact in the format
+        "{entity}/{project}/{result_artifact_name}:latest".
     """
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
     artifact = wandb.Artifact(

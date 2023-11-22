@@ -16,6 +16,7 @@ from collections import OrderedDict
 from typing import Any, List
 
 from pydantic_settings import BaseSettings
+
 from wandbot.api.schemas import APIQueryResponse
 
 
@@ -40,7 +41,7 @@ def format_response(
     """Formats the response from the API query.
 
     Args:
-        :param config: The config object for the app.
+        config: The config object for the app.
         response: The response from the API query.
         outro_message: The outro message to append to the formatted response.
         is_last: Whether the response is the last in a series.

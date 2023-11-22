@@ -1,8 +1,10 @@
 """This module provides a Database and DatabaseClient class for managing database operations.
 
-The Database class provides a connection to the database and manages the session. It also provides methods for getting and setting the current session object and the name of the database.
+The Database class provides a connection to the database and manages the session. It also provides methods for
+getting and setting the current session object and the name of the database.
 
-The DatabaseClient class uses an instance of the Database class to perform operations such as getting and creating chat threads, question answers, and feedback from the database.
+The DatabaseClient class uses an instance of the Database class to perform operations such as getting and creating
+chat threads, question answers, and feedback from the database.
 
 Typical usage example:
 
@@ -24,6 +26,9 @@ from wandbot.database.schemas import Feedback as FeedbackSchema
 from wandbot.database.schemas import (
     QuestionAnswerCreate as QuestionAnswerCreateSchema,
 )
+from wandbot.utils import get_logger
+
+logger = get_logger(__name__)
 
 
 class Database:
@@ -148,6 +153,7 @@ class DatabaseClient:
             self.database.refresh(chat_thread)
 
         except Exception as e:
+            logger.error(f"Create chat thread failed with error: {e}")
             self.database.rollback()
 
         return chat_thread
@@ -187,13 +193,14 @@ class DatabaseClient:
         """
         try:
             question_answer: QuestionAnswerModel = QuestionAnswerModel(
-                **question_answer.dict()
+                **question_answer.model_dump()
             )
             self.database.add(question_answer)
             self.database.flush()
             self.database.commit()
             self.database.refresh(question_answer)
         except Exception as e:
+            logger.error(f"Create question answer failed with error: {e}")
             self.database.rollback()
         return question_answer
 
@@ -224,12 +231,13 @@ class DatabaseClient:
         """
         if feedback.rating:
             try:
-                feedback: FeedBackModel = FeedBackModel(**feedback.dict())
+                feedback: FeedBackModel = FeedBackModel(**feedback.model_dump())
                 self.database.add(feedback)
                 self.database.flush()
                 self.database.commit()
                 self.database.refresh(feedback)
             except Exception as e:
+                logger.error(f"Create feedback failed with error: {e}")
                 self.database.rollback()
 
             return feedback

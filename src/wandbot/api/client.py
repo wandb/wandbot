@@ -9,13 +9,13 @@ Classes:
 """
 
 import json
-import uuid
 from datetime import datetime
 from typing import List, Optional
 from urllib.parse import urljoin
 
 import aiohttp
 import requests
+
 from wandbot.api.schemas import (
     APIFeedbackRequest,
     APIFeedbackResponse,
@@ -114,7 +114,7 @@ class APIClient:
         with requests.Session() as session:
             with session.post(
                 self.chat_question_answer_endpoint,
-                json=json.loads(request.json()),
+                json=json.loads(request.model_dump_json()),
             ) as response:
                 if response.status_code == 201:
                     return APIQuestionAnswerResponse(**response.json())
@@ -198,7 +198,7 @@ class APIClient:
         """
         with requests.Session() as session:
             with session.post(
-                self.feedback_endpoint, json=request.dict()
+                self.feedback_endpoint, json=request.model_dump()
             ) as response:
                 if response.status_code == 201:
                     return APIFeedbackResponse(**response.json())
@@ -234,7 +234,7 @@ class APIClient:
             The response from the API, or None if the status code is not 200.
         """
         with requests.Session() as session:
-            payload = json.loads(request.json())
+            payload = json.loads(request.model_dump_json())
             with session.post(self.query_endpoint, json=payload) as response:
                 if response.status_code == 200:
                     return APIQueryResponse(**response.json())
@@ -335,7 +335,7 @@ class AsyncAPIClient(APIClient):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 self.chat_question_answer_endpoint,
-                json=json.loads(request.json()),
+                json=json.loads(request.model_dump_json()),
             ) as response:
                 if response.status == 201:
                     response = await response.json()
@@ -420,7 +420,8 @@ class AsyncAPIClient(APIClient):
         """
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                self.feedback_endpoint, json=json.loads(request.json())
+                self.feedback_endpoint,
+                json=json.loads(request.model_dump_json()),
             ) as response:
                 if response.status == 201:
                     response = await response.json()
@@ -458,7 +459,7 @@ class AsyncAPIClient(APIClient):
         """
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                self.query_endpoint, json=json.loads(request.json())
+                self.query_endpoint, json=json.loads(request.model_dump_json())
             ) as response:
                 if response.status == 200:
                     response = await response.json()
@@ -490,76 +491,3 @@ class AsyncAPIClient(APIClient):
         response = await self._query(request)
 
         return response
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    async def run():
-        from wandbot.ingestion.utils import Timer
-
-        with Timer() as timer:
-            api_client = AsyncAPIClient(url="http://localhost:8000")
-
-            application = "test"
-            # thread_id = str(uuid.uuid4())
-            thread_id = "300d9a8c-ea55-4bb1-94e6-d3e3ed2df8bd"
-            chat_history = await api_client.get_chat_history(
-                application=application, thread_id=thread_id
-            )
-
-            if not chat_history:
-                print("No chat history found")
-            else:
-                print(
-                    json.dumps(
-                        [json.loads(item.json()) for item in chat_history],
-                        indent=2,
-                    )
-                )
-                # chat_history = [(item.question, item.answer) for item in chat_history]
-
-            # query the api and get the chat response
-            question = "Hi @wandbot, How about openai?"
-            chat_response = await api_client.query(
-                question=question, chat_history=chat_history
-            )
-            # save the chat response to the database
-            question_answer_id = str(uuid.uuid4())
-
-            await api_client.create_question_answer(
-                question_answer_id=question_answer_id,
-                thread_id=thread_id,
-                **chat_response.dict(),
-            )
-
-            # get the chat history again
-            chat_history = await api_client.get_chat_history(
-                application=application, thread_id=thread_id
-            )
-            print(
-                json.dumps(
-                    [json.loads(item.json()) for item in chat_history], indent=2
-                )
-            )
-
-            # add feedback
-            feedback_id = str(uuid.uuid4())
-            await api_client.create_feedback(
-                feedback_id=feedback_id,
-                question_answer_id=question_answer_id,
-                rating=1,
-            )
-
-            # get the chat history again
-            chat_history = await api_client.get_chat_history(
-                application=application, thread_id=thread_id
-            )
-            print(
-                json.dumps(
-                    [json.loads(item.json()) for item in chat_history], indent=2
-                )
-            )
-        print(timer.start, timer.start, timer.elapsed)
-
-    asyncio.run(run())

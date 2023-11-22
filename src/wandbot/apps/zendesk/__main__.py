@@ -23,11 +23,12 @@ ZendeskAIResponseSystem object and runs it in an event loop.
 import asyncio
 from typing import List
 
+from zenpy import Zenpy
+from zenpy.lib.api_objects import Comment, Ticket
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.zendesk.config import ZendeskAppConfig
 from wandbot.utils import get_logger
-from zenpy import Zenpy
-from zenpy.lib.api_objects import Comment, Ticket
 
 logger = get_logger(__name__)
 config = ZendeskAppConfig()

@@ -16,6 +16,7 @@ from functools import partial
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.web import SlackResponse
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.utils import format_response
@@ -57,7 +58,7 @@ async def send_message(
 
 @app.event("app_mention")
 async def command_handler(
-    body: dict, say: callable, logger: logging.Logger
+    body: dict, say: callable, slack_logger: logging.Logger
 ) -> None:
     """
     Handles the command when the app is mentioned in a message.
@@ -65,7 +66,7 @@ async def command_handler(
     Args:
         body (dict): The event body containing the message details.
         say (function): The function to send a message.
-        logger (Logger): The logger instance for logging errors.
+        slack_logger (Logger): The logger instance for logging errors.
 
     Raises:
         Exception: If there is an error posting the message.
@@ -126,7 +127,7 @@ async def command_handler(
         )
 
     except Exception as e:
-        logger.error(f"Error posting message: {e}")
+        slack_logger.error(f"Error posting message: {e}")
 
 
 def parse_reaction(reaction: str) -> int:
@@ -148,13 +149,13 @@ def parse_reaction(reaction: str) -> int:
 
 
 @app.event("reaction_added")
-async def handle_reaction_added(event: dict, say: callable) -> None:
+async def handle_reaction_added(event: dict) -> None:
     """
     Handles the event when a reaction is added to a message.
 
     Args:
         event (dict): The event details.
-        say (callable): The function to send a message.
+
     """
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
