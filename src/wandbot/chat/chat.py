@@ -41,6 +41,7 @@ from llama_index.llms import ChatMessage, MessageRole
 from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
+from weave.monitoring import StreamTable
 
 import wandb
 from wandbot.chat.config import ChatConfig
@@ -116,6 +117,9 @@ class Chat:
             project=self.config.wandb_project,
             entity=self.config.wandb_entity,
             job_type="chat",
+        )
+        self.chat_table = StreamTable(
+            f"{self.config.wandb_entity}/{self.config.wandb_project}/chat_logs"
         )
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
@@ -358,6 +362,7 @@ class Chat:
         )
         self.run.log(usage_stats)
         result["system_prompt"] = self.qa_prompt.message_templates[0].content
+        self.chat_table.log(result)
         return ChatResponse(**result)
 
 
