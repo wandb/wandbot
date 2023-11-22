@@ -90,9 +90,8 @@ class SlackAppJaConfig(BaseSettings):
     WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
     include_sources: bool = True
+    language: str = "ja"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
-
-    language: str = "ja"
