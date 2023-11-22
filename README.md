@@ -42,12 +42,12 @@ poetry run python -m src.wandbot.ingestion
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot-dev).
 
-#### Custom Dataset
+### Custom Dataset
 
-To run the Data Ingestion with a custom dataset you can use the following command:
+To run the Data Ingestion with a custom dataset you can use the following command where the below path can be replaced with your <path_to_custom_dataset_config_yaml>:
 
 ```bash
-poetry run python -m src.wandbot.ingestion --custom --custom_dataset_config_yaml <path_to_yaml>
+poetry run python -m src.wandbot.ingestion --custom --custom_dataset_config_yaml="./src/wandbot/ingestion/custom_dataset.yaml"
 ```
 
 where
@@ -67,7 +67,31 @@ The YAML is structured as follows:
       is_git_repo: true
     language: "en"
     docstore_dir: "custom_store_en"
+- CustomConfig2:
+    ...
 ```
+
+To load an index based on the custom dataset as defined above, you can set the following environment variable to an artifact path:
+
+```bash
+WANDB_INDEX_ARTIFACT="{ENTITY}/{PROJECT}/custom_index:latest" 
+```
+
+#### Custom Prompt
+
+To load an prompt based on a custom prompt in the format of the [chat_prompt.json](data/prompts/chat_prompt.json) file, you can set the following environment variable to an artifact path:
+
+```bash
+CHAT_PROMPT_PATH="./data/prompts/example_custom_prompt.json"
+```
+
+### Running Chat Locally
+
+To run the chat locally, you can use the following command:
+
+```bash
+poetry run python -m src.wandbot.chat.chat
+```  
 
 ### Running the Q&A Bot
 
@@ -106,13 +130,6 @@ For more detailed instructions on installing and running the bot, please refer t
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
 
-#### Custom Dataset
-
-To load an index based on the custom dataset as defined above, you can set the following environment variable to an artifact path:
-
-```bash
-WANDB_INDEX_ARTIFACT="{ENTITY}/{PROJECT}/custom_index:latest" 
-```
 
 ### Evaluation
 

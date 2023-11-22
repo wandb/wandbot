@@ -8,3 +8,13 @@
       is_git_repo: true
     language: "en"
     docstore_dir: "custom_store_en"
+- CustomConfig2:
+    name: "custom_store2"
+    data_source:
+      remote_path: "https://docs.wandb.ai/"
+      repo_path: "https://github.com/wandb/docodile"
+      base_path: "docs"
+      file_pattern: "*.md"
+      is_git_repo: true
+    language: "en"
+    docstore_dir: "custom_store_en2"

@@ -24,7 +24,11 @@ class ChatConfig(BaseSettings):
     fallback_model_name: str = "gpt-3.5-turbo-16k-0613"
     max_fallback_retries: int = 6
     chat_temperature: float = 0.1
-    chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")
+    chat_prompt: pathlib.Path = Field(
+        "data/prompts/chat_prompt.json",
+        env="CHAT_PROMPT_PATH",
+        validation_alias="chat_prompt_path"
+    )
     index_artifact: str = Field(
         "wandbot/wandbot-dev/wandbot_index:latest",
         env="WANDB_INDEX_ARTIFACT",

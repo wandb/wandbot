@@ -26,8 +26,8 @@ def main(custom: bool, custom_dataset_config_yaml: pathlib.Path):
     print(vectorstore_artifact)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--custom', type=bool, default=True,
+    parser = argparse.ArgumentParser(description='Ingest data into wandb')
+    parser.add_argument('--custom', action='store_true',
                         help='Flag for ingesting a custom dataset')
     parser.add_argument('--custom_dataset_config_yaml', type=pathlib.Path, 
                         default=pathlib.Path(__file__).parent / "custom_dataset.yaml",
