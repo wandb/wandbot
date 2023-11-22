@@ -21,6 +21,7 @@ ZendeskAIResponseSystem object and runs it in an event loop.
 
 """
 import asyncio
+from typing import List
 
 from wandbot.api.client import APIClient
 from wandbot.apps.zendesk.config import ZendeskAppConfig
@@ -32,7 +33,7 @@ logger = get_logger(__name__)
 config = ZendeskAppConfig()
 
 
-def extract_question(ticket):
+def extract_question(ticket: Ticket) -> str:
     """Extracts the question from a given ticket.
 
     This function performs the following steps:
@@ -60,7 +61,7 @@ def extract_question(ticket):
 
 
 # TODO: add the necessary format we want to depending on ticket type
-def format_response(response):
+def format_response(response: str) -> str:
     """Formats the response to be sent as a ticket comment.
 
     This function performs the following steps:
@@ -96,7 +97,7 @@ class ZendeskAIResponseSystem:
         api_client (APIClient): The client for interacting with the WandBot API.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initializes the ZendeskAIResponseSystem with the necessary clients.
 
         The Zenpy client is initialized with the user credentials from the configuration. The APIClient is initialized
@@ -111,7 +112,7 @@ class ZendeskAIResponseSystem:
         self.zenpy_client = Zenpy(**user_creds)
         self.api_client = APIClient(url=config.WANDBOT_API_URL)
 
-    def create_new_ticket(self, question_text):
+    def create_new_ticket(self, question_text: str) -> None:
         """Creates a new ticket in the Zendesk system.
 
         This method uses the Zenpy client to create a new ticket in the Zendesk system. The ticket is created with a
@@ -135,7 +136,7 @@ class ZendeskAIResponseSystem:
             )
         )
 
-    def fetch_new_tickets(self):
+    def fetch_new_tickets(self) -> List[Ticket]:
         """Fetches new tickets from the Zendesk system.
 
         This method uses the Zenpy client to fetch new tickets from the Zendesk system. It filters the fetched
@@ -163,7 +164,7 @@ class ZendeskAIResponseSystem:
 
         return filtered_tickets_not_answered
 
-    async def generate_response(self, question):
+    async def generate_response(self, question: str) -> str:
         """Generates a response to a given question.
 
         This method uses the APIClient to query the WandBot API with the provided question and an empty chat history.
@@ -189,7 +190,7 @@ class ZendeskAIResponseSystem:
 
         return response.answer
 
-    def update_ticket(self, ticket, response):
+    def update_ticket(self, ticket: Ticket, response: str) -> None:
         """Updates a ticket in the Zendesk system with a response.
 
         This method uses the Zenpy client to update a ticket in the Zendesk system. The ticket's comment is updated
@@ -213,7 +214,7 @@ class ZendeskAIResponseSystem:
             logger.error(f"Error: {e}")
 
     # TODO add feedback gathering
-    def gather_feedback(self, ticket):
+    def gather_feedback(self, ticket: Ticket) -> None:
         """Gathers feedback for a given ticket.
 
         This method uses the Zenpy client to update a ticket in the Zendesk system. The ticket's comment is updated
@@ -232,7 +233,7 @@ class ZendeskAIResponseSystem:
         except Exception as e:
             logger.error(f"Error: {e}")
 
-    async def run(self):
+    async def run(self) -> None:
         """Runs the Zendesk AI Response System.
 
         This method performs the following steps:
