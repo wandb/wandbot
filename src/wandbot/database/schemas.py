@@ -19,7 +19,7 @@ Typical usage example:
 from datetime import datetime
 from enum import IntEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Rating(IntEnum):
@@ -33,9 +33,7 @@ class FeedbackBase(BaseModel):
 
 
 class Feedback(FeedbackBase):
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class FeedbackCreate(Feedback):
@@ -61,9 +59,7 @@ class QuestionAnswerBase(BaseModel):
 
 
 class QuestionAnswer(QuestionAnswerBase):
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class QuestionAnswerCreate(QuestionAnswer):
@@ -77,10 +73,7 @@ class ChatThreadBase(BaseModel):
 
 class ChatThread(ChatThreadBase):
     application: str
-
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class ChatThreadCreate(ChatThread):

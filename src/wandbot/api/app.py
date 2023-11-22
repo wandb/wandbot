@@ -29,7 +29,7 @@ It uses logger from the utils module for logging purposes.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import wandb
@@ -58,7 +58,7 @@ Base.metadata.create_all(bind=engine)
 chat: Chat | None = None
 app = FastAPI(name="wandbot", version="1.0.0")
 db_client: DatabaseClient | None = None
-last_backup = datetime.now()
+last_backup = datetime.now().astimezone(timezone.utc)
 
 
 async def backup_db():
@@ -78,7 +78,7 @@ async def backup_db():
             chat_table = pd.DataFrame(
                 [chat_thread for chat_thread in chat_threads]
             )
-            last_backup = datetime.now()
+            last_backup = datetime.now().astimezone(timezone.utc)
             logger.info(f"Backing up database to Table at {last_backup}")
             wandb.log(
                 {"question_answers_db": wandb.Table(dataframe=chat_table)}
