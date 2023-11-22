@@ -78,7 +78,7 @@ async def on_message(message: discord.Message):
             response = await api_client.query(
                 question=str(message.clean_content),
                 chat_history=chat_history,
-                language=config.language,
+                language=config.bot_language,
             )
             if response is None:
                 await thread.send(
@@ -124,7 +124,7 @@ async def on_message(message: discord.Message):
                 await api_client.create_question_answer(
                     thread_id=str(thread.id),
                     question_answer_id=str(sent_message.id),
-                    language=config.language,
+                    language=config.bot_language,
                     **response.model_dump(),
                 )
                 # # Add reactions for feedback

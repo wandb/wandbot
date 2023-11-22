@@ -46,7 +46,7 @@ class DiscordAppConfig(BaseSettings):
     ERROR_MESSAGE: str = Field(EN_ERROR_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(..., env="WANDBOT_API_URL")
     include_sources: bool = True
-    language: str = "en"
+    bot_language: str = "en"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"

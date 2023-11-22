@@ -58,7 +58,7 @@ async def send_message(
 
 @app.event("app_mention")
 async def command_handler(
-    body: dict, say: callable, slack_logger: logging.Logger
+    body: dict, say: callable, logger: logging.Logger
 ) -> None:
     """
     Handles the command when the app is mentioned in a message.
@@ -66,7 +66,7 @@ async def command_handler(
     Args:
         body (dict): The event body containing the message details.
         say (function): The function to send a message.
-        slack_logger (Logger): The logger instance for logging errors.
+        logger (Logger): The logger instance for logging errors.
 
     Raises:
         Exception: If there is an error posting the message.
@@ -92,7 +92,9 @@ async def command_handler(
             )
         # process the query through the api
         api_response = await api_client.query(
-            question=query, chat_history=chat_history, language=config.language
+            question=query,
+            chat_history=chat_history,
+            language=config.bot_language,
         )
         response = format_response(
             config,
@@ -122,12 +124,12 @@ async def command_handler(
         await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
-            language=config.language,
+            language=config.bot_language,
             **api_response.model_dump(),
         )
 
     except Exception as e:
-        slack_logger.error(f"Error posting message: {e}")
+        logger.error(f"Error posting message: {e}")
 
 
 def parse_reaction(reaction: str) -> int:

@@ -69,11 +69,11 @@ class SlackAppEnConfig(BaseSettings):
     WARNING_MESSAGE: str = Field(EN_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
     include_sources: bool = True
+    bot_language: str = "en"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
-    language: str = "en"
 
 
 class SlackAppJaConfig(BaseSettings):
@@ -90,7 +90,7 @@ class SlackAppJaConfig(BaseSettings):
     WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
     include_sources: bool = True
-    language: str = "ja"
+    bot_language: str = "ja"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"

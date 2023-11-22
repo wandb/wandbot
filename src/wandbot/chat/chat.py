@@ -29,7 +29,6 @@ import json
 from typing import Any, Dict, List, Optional
 
 import tiktoken
-import wandb
 from llama_index import StorageContext, load_index_from_storage
 from llama_index.callbacks import (
     CallbackManager,
@@ -43,6 +42,7 @@ from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 
+import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRequest, ChatResponse

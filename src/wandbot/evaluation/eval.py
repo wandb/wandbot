@@ -3,12 +3,12 @@ import time
 from pathlib import Path
 
 import pandas as pd
-import wandb
 from fuzzywuzzy import fuzz
 from langchain.chat_models import ChatOpenAI
 from langchain.evaluation.qa import QAEvalChain
 from tqdm.auto import tqdm
 
+import wandb
 from wandbot.chat.chat import Chat
 from wandbot.chat.prompts import load_eval_prompt
 from wandbot.evaluation.config import EvalConfig

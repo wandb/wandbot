@@ -22,12 +22,12 @@ from urllib.parse import urljoin
 
 import markdown
 import nbformat
-import wandb
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
 
+import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,

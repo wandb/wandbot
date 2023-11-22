@@ -181,7 +181,7 @@ class ZendeskAIResponseSystem:
 
         try:
             response = await self.api_client.query(
-                question=question, chat_history=[]
+                question=question, chat_history=[], language=config.bot_language
             )
             if response is None:
                 raise Exception("Received no response")

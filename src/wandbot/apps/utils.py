@@ -68,7 +68,7 @@ def format_response(
             )
             if len(sources_list) > 0:
                 items = min(len(sources_list), 3)
-                if config.lang_code == "ja":
+                if config.bot_language == "ja":
                     result = (
                         f"{result}\n\n*参考文献*\n\n>"
                         + "\n> ".join(sources_list[:items])

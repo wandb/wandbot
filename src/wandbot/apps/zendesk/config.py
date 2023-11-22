@@ -1,5 +1,5 @@
 from pydantic import AnyHttpUrl, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ZDGROUPID = "360016040851"
 
@@ -13,8 +13,8 @@ class ZendeskAppConfig(BaseSettings):
     ZDGROUPID: str = ZDGROUPID
     WANDBOT_API_URL: AnyHttpUrl = Field(..., env="WANDBOT_API_URL")
     include_sources: bool = True
+    bot_language: str = "en"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
