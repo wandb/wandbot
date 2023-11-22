@@ -23,7 +23,7 @@ ZendeskAIResponseSystem object and runs it in an event loop.
 import asyncio
 from typing import List
 
-from wandbot.api.client import APIClient
+from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.zendesk.config import ZendeskAppConfig
 from wandbot.utils import get_logger
 from zenpy import Zenpy
@@ -90,18 +90,18 @@ class ZendeskAIResponseSystem:
     """Handles the interaction with the Zendesk system.
 
     This class is responsible for creating and updating tickets in the Zendesk system. It uses the Zenpy client for
-    interacting with the Zendesk API and the APIClient for interacting with the WandBot API.
+    interacting with the Zendesk API and the AsyncAPIClient for interacting with the WandBot API.
 
     Attributes:
         zenpy_client (Zenpy): The client for interacting with the Zendesk API.
-        api_client (APIClient): The client for interacting with the WandBot API.
+        api_client (AsyncAPIClient): The client for interacting with the WandBot API.
     """
 
     def __init__(self) -> None:
         """Initializes the ZendeskAIResponseSystem with the necessary clients.
 
-        The Zenpy client is initialized with the user credentials from the configuration. The APIClient is initialized
-        with the WandBot API URL from the configuration.
+        The Zenpy client is initialized with the user credentials from the configuration. The AsyncAPIClient is
+        initialized with the WandBot API URL from the configuration.
         """
 
         user_creds = {
@@ -110,7 +110,7 @@ class ZendeskAIResponseSystem:
             "subdomain": config.ZENDESK_SUBDOMAIN,
         }
         self.zenpy_client = Zenpy(**user_creds)
-        self.api_client = APIClient(url=config.WANDBOT_API_URL)
+        self.api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
     def create_new_ticket(self, question_text: str) -> None:
         """Creates a new ticket in the Zendesk system.
@@ -179,7 +179,9 @@ class ZendeskAIResponseSystem:
         """
 
         try:
-            response = self.api_client.query(question=question, chat_history=[])
+            response = await self.api_client.query(
+                question=question, chat_history=[]
+            )
             if response is None:
                 raise Exception("Received no response")
 
