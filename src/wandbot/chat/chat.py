@@ -118,6 +118,7 @@ class Chat:
             entity=self.config.wandb_entity,
             job_type="chat",
         )
+        self.run._label(repo="wandbot")
         self.chat_table = StreamTable(
             f"{self.config.wandb_entity}/{self.config.wandb_project}/chat_logs"
         )

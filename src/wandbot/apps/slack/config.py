@@ -62,7 +62,6 @@ class SlackAppEnConfig(BaseSettings):
     SLACK_SIGNING_SECRET: str = Field(
         ..., validation_alias="SLACK_EN_SIGNING_SECRET"
     )
-    WANDB_API_KEY: str = Field(..., validation_alias="WANDB_API_KEY")
     INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(EN_ERROR_MESSAGE)
@@ -83,7 +82,6 @@ class SlackAppJaConfig(BaseSettings):
     SLACK_SIGNING_SECRET: str = Field(
         ..., validation_alias="SLACK_JA_SIGNING_SECRET"
     )
-    WANDB_API_KEY: str = Field(..., validation_alias="WANDB_API_KEY")
     INTRO_MESSAGE: str = Field(JA_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(JA_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(JA_ERROR_MESSAGE)

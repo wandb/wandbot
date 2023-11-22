@@ -8,8 +8,6 @@ class ZendeskAppConfig(BaseSettings):
     ZENDESK_EMAIL: str = (Field(..., env="ZENDESK_EMAIL"),)
     ZENDESK_PASSWORD: str = (Field(..., env="ZENDESK_PASSWORD"),)
     ZENDESK_SUBDOMAIN: str = (Field(..., env="ZENDESK_SUBDOMAIN"),)
-
-    WANDB_API_KEY: str = Field(..., env="WANDB_API_KEY")
     ZDGROUPID: str = ZDGROUPID
     WANDBOT_API_URL: AnyHttpUrl = Field(..., env="WANDBOT_API_URL")
     include_sources: bool = True
