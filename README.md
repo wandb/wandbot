@@ -50,9 +50,12 @@ Before running the Q&A bot, ensure the following environment variables are set:
 ```bash
 OPENAI_API_KEY
 COHERE_API_KEY
-SLACK_APP_TOKEN
-SLACK_BOT_TOKEN
-SLACK_SIGNING_SECRET
+SLACK_EN_APP_TOKEN
+SLACK_EN_BOT_TOKEN
+SLACK_EN_SIGNING_SECRET
+SLACK_JA_APP_TOKEN
+SLACK_JA_BOT_TOKEN
+SLACK_JA_SIGNING_SECRET
 WANDB_API_KEY
 DISCORD_BOT_TOKEN
 COHERE_API_KEY
@@ -66,7 +69,8 @@ Once these environment variables are set, you can start the Q&A bot application 
 
 ```bash
 (poetry run uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 > api.log 2>&1) & \
-(poetry run python -m wandbot.apps.slack > slack_app.log 2>&1) & \
+(poetry run python -m wandbot.apps.slack -l en > slack_en_app.log 2>&1) & \
+(poetry run python -m wandbot.apps.slack -l ja > slack_ja_app.log 2>&1) & \
 (poetry run python -m wandbot.apps.discord > discord_app.log 2>&1)
 ```
 
