@@ -193,9 +193,9 @@ class Chat:
             text_qa_template=self.qa_prompt,
             node_postprocessors=[
                 LanguageFilterPostprocessor(languages=[language, "python"]),
-                CohereRerank(top_n=5, model="rerank-multilingual-v2.0")
-                if language == "ja"
-                else CohereRerank(top_n=5, model="rerank-english-v2.0"),
+                CohereRerank(top_n=5, model="rerank-english-v2.0")
+                if language == "en"
+                else CohereRerank(top_n=5, model="rerank-multilingual-v2.0"),
             ],
             storage_context=self.storage_context,
         )
