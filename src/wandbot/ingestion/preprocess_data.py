@@ -25,7 +25,7 @@ import tiktoken
 from langchain.schema import Document as LcDocument
 from llama_index import Document as LlamaDocument
 from llama_index.node_parser import CodeSplitter, MarkdownNodeParser
-
+from llama_index.schema import BaseNode, TextNode
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -61,6 +61,19 @@ def make_texts_tokenization_safe(documents: List[str]) -> List[str]:
         cleaned_document = remove_special_tokens(document)
         cleaned_documents.append(cleaned_document)
     return cleaned_documents
+
+
+class CustomMarkdownNodeParser(MarkdownNodeParser):
+    def _build_node_from_split(
+        self,
+        text_split: str,
+        node: BaseNode,
+        metadata: dict,
+    ) -> TextNode:
+        """Build node from single text split."""
+        text_splits = make_texts_tokenization_safe([text_split])
+        text_split = text_splits[0]
+        return super()._build_node_from_split(text_split, node, metadata)
 
 
 class CustomCodeSplitter(CodeSplitter):
@@ -100,7 +113,7 @@ def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
     Returns:
         A list of nodes.
     """
-    md_parser = MarkdownNodeParser()
+    md_parser = CustomMarkdownNodeParser()
     code_parser = CustomCodeSplitter(language="python", max_chars=chunk_size)
 
     llama_docs: List[LlamaDocument] = list(
