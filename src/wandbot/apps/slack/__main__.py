@@ -8,35 +8,58 @@ The bot uses the Slack Bolt framework for handling events and the langdetect lib
 It also communicates with an external API for processing queries and storing chat history and feedback.
 
 """
-
+import argparse
+import asyncio
 import logging
 from functools import partial
 
-import langdetect
-from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp
+from slack_sdk.web import SlackResponse
 
-from wandbot.api.client import APIClient
-from wandbot.apps.slack.config import SlackAppConfig
+from wandbot.api.client import AsyncAPIClient
+from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-config = SlackAppConfig()
-app = App(token=config.SLACK_APP_TOKEN)
-api_client = APIClient(url=config.WANDBOT_API_URL)
+parser = argparse.ArgumentParser()
+
+parser.add_argument(
+    "-l",
+    "--language",
+    default="en",
+    help="Language of the bot",
+    type=str,
+    choices=["en", "ja"],
+)
+
+args = parser.parse_args()
+
+if args.language == "ja":
+    config = SlackAppJaConfig()
+else:
+    config = SlackAppEnConfig()
 
 
-def send_message(say: callable, message: str, thread: str = None) -> None:
+app = AsyncApp(token=config.SLACK_APP_TOKEN)
+api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
+
+
+async def send_message(
+    say: callable, message: str, thread: str = None
+) -> SlackResponse:
     if thread is not None:
-        return say(text=message, thread_ts=thread)
+        return await say(text=message, thread_ts=thread)
     else:
-        return say(text=message)
+        return await say(text=message)
 
 
 @app.event("app_mention")
-def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
+async def command_handler(
+    body: dict, say: callable, logger: logging.Logger
+) -> None:
     """
     Handles the command when the app is mentioned in a message.
 
@@ -50,54 +73,47 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
     """
     try:
         query = body["event"].get("text")
-        lang_code = langdetect.detect(query)
         user = body["event"].get("user")
         thread_id = body["event"].get("thread_ts", None) or body["event"].get(
             "ts", None
         )
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = api_client.get_chat_history(
+        chat_history = await api_client.get_chat_history(
             application=config.APPLICATION, thread_id=thread_id
         )
 
         if not chat_history:
             # send out the intro message
-            if lang_code == "ja":
-                send_message(
-                    say=say,
-                    message=f"こんにちは <@{user}>:\n\n{config.JA_INTRO_MESSAGE}",
-                    thread=thread_id,
-                )
-            else:
-                send_message(
-                    say=say,
-                    message=f"Hi <@{user}>:\n\n{config.EN_INTRO_MESSAGE}",
-                    thread=thread_id,
-                )
+            await send_message(
+                say=say,
+                message=config.INTRO_MESSAGE.format(user=user),
+                thread=thread_id,
+            )
         # process the query through the api
-        api_response = api_client.query(
-            question=query, chat_history=chat_history
+        api_response = await api_client.query(
+            question=query,
+            chat_history=chat_history,
+            language=config.bot_language,
         )
-        if lang_code == "ja":
-            response = format_response(
-                config, api_response, config.JA_OUTRO_MESSAGE, lang_code
-            )
-        else:
-            response = format_response(
-                config, api_response, config.EN_OUTRO_MESSAGE
-            )
+        response = format_response(
+            config,
+            api_response,
+            config.OUTRO_MESSAGE,
+        )
 
         # send the response
-        sent_message = send_message(say=say, message=response, thread=thread_id)
+        sent_message = await send_message(
+            say=say, message=response, thread=thread_id
+        )
 
-        app.client.reactions_add(
+        await app.client.reactions_add(
             channel=body["event"]["channel"],
             timestamp=sent_message["ts"],
             name="thumbsup",
             token=config.SLACK_BOT_TOKEN,
         )
-        app.client.reactions_add(
+        await app.client.reactions_add(
             channel=body["event"]["channel"],
             timestamp=sent_message["ts"],
             name="thumbsdown",
@@ -105,9 +121,10 @@ def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
         )
 
         #  save the question answer to the database
-        api_client.create_question_answer(
+        await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
+            language=config.bot_language,
             **api_response.model_dump(),
         )
 
@@ -134,18 +151,18 @@ def parse_reaction(reaction: str) -> int:
 
 
 @app.event("reaction_added")
-def handle_reaction_added(event: dict, say: callable) -> None:
+async def handle_reaction_added(event: dict) -> None:
     """
     Handles the event when a reaction is added to a message.
 
     Args:
         event (dict): The event details.
-        say (callable): The function to send a message.
+
     """
     channel_id = event["item"]["channel"]
     message_ts = event["item"]["ts"]
 
-    conversation = app.client.conversations_replies(
+    conversation = await app.client.conversations_replies(
         channel=channel_id,
         ts=message_ts,
         inclusive=True,
@@ -159,13 +176,17 @@ def handle_reaction_added(event: dict, say: callable) -> None:
         thread_ts = messages[0].get("thread_ts")
         if thread_ts:
             rating = parse_reaction(event["reaction"])
-            api_client.create_feedback(
+            await api_client.create_feedback(
                 feedback_id=event["event_ts"],
                 question_answer_id=message_ts,
                 rating=rating,
             )
 
 
+async def main():
+    handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
+    await handler.start_async()
+
+
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, config.SLACK_APP_TOKEN)
-    handler.start()
+    asyncio.run(main())

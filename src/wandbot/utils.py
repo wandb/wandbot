@@ -23,7 +23,7 @@ Typical usage example:
 import datetime
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import faiss
 from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
@@ -34,7 +34,10 @@ from llama_index import (
     VectorStoreIndex,
     load_index_from_storage,
 )
+from llama_index.bridge.pydantic import Field
 from llama_index.llms import OpenAI
+from llama_index.postprocessor.types import BaseNodePostprocessor
+from llama_index.schema import NodeWithScore, QueryBundle
 from llama_index.vector_stores import FaissVectorStore
 
 
@@ -118,7 +121,7 @@ def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
 
 
 def load_service_context(
-    llm: OpenAI,
+    llm: str,
     temperature: float,
     embeddings_cache: str,
     max_retries: int,
@@ -196,3 +199,27 @@ def load_index(
         )
         index.storage_context.persist(persist_dir=persist_dir)
     return index
+
+
+class LanguageFilterPostprocessor(BaseNodePostprocessor):
+    """Language-based Node processor."""
+
+    languages: List[str] = Field(default=["en", "python"])
+
+    @classmethod
+    def class_name(cls) -> str:
+        return "LanguageFilterPostprocessor"
+
+    def _postprocess_nodes(
+        self,
+        nodes: List[NodeWithScore],
+        query_bundle: Optional[QueryBundle] = None,
+    ) -> List[NodeWithScore]:
+        """Postprocess nodes."""
+
+        new_nodes = []
+        for node in nodes:
+            if node.metadata["language"] in self.languages:
+                new_nodes.append(node)
+
+        return new_nodes

@@ -9,7 +9,7 @@ Typical usage example:
 
   chat_thread = ChatThread(thread_id="123", application="app1")
   chat_request = ChatRequest(question="What is the weather?", chat_history=None)
-  chat_response = ChatRepsonse(system_prompt="Weather is sunny", question="What is the weather?", 
+  chat_response = ChatResponse(system_prompt="Weather is sunny", question="What is the weather?",
                                answer="It's sunny", model="model1", sources="source1", 
                                source_documents="doc1", total_tokens=10, prompt_tokens=2, 
                                completion_tokens=8, time_taken=1.0, 
@@ -44,9 +44,10 @@ class ChatThread(ChatThreadCreate):
 class ChatRequest(BaseModel):
     question: str
     chat_history: List[QuestionAnswer] | None = None
+    language: str = "en"
 
 
-class ChatRepsonse(BaseModel):
+class ChatResponse(BaseModel):
     system_prompt: str
     question: str
     answer: str

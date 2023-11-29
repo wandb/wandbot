@@ -16,7 +16,7 @@ Classes:
     APIFeedbackResponse: Response schema for feedback.
 """
 
-from wandbot.chat.schemas import ChatRepsonse, ChatRequest
+from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import (
     ChatThread,
     ChatThreadCreate,
@@ -51,7 +51,7 @@ class APIQueryRequest(ChatRequest):
     pass
 
 
-class APIQueryResponse(ChatRepsonse):
+class APIQueryResponse(ChatResponse):
     pass
 
 

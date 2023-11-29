@@ -1,6 +1,7 @@
 """This module provides a DataBaseConfig class for managing database configuration.
 
-The DataBaseConfig class uses the BaseSettings class from pydantic_settings to define and manage the database configuration settings. It includes the SQLAlchemy database URL and connection arguments.
+The DataBaseConfig class uses the BaseSettings class from pydantic_settings to define and manage the database
+configuration settings. It includes the SQLAlchemy database URL and connection arguments.
 
 Typical usage example:
 

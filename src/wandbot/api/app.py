@@ -29,12 +29,12 @@ It uses logger from the utils module for logging purposes.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
 from fastapi import FastAPI, Response, status
 
+import wandb
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -57,9 +57,9 @@ logger = get_logger(__name__)
 
 Base.metadata.create_all(bind=engine)
 chat: Chat | None = None
-app = FastAPI(name="wandbot", version="0.2.0")
+app = FastAPI(name="wandbot", version="1.0.0")
 db_client: DatabaseClient | None = None
-last_backup = datetime.now()
+last_backup = datetime.now().astimezone(timezone.utc)
 
 
 async def backup_db():
@@ -79,7 +79,7 @@ async def backup_db():
             chat_table = pd.DataFrame(
                 [chat_thread for chat_thread in chat_threads]
             )
-            last_backup = datetime.now()
+            last_backup = datetime.now().astimezone(timezone.utc)
             logger.info(f"Backing up database to Table at {last_backup}")
             wandb.log(
                 {"question_answers_db": wandb.Table(dataframe=chat_table)}
@@ -178,7 +178,9 @@ async def query(
     """
     result = chat(
         ChatRequest(
-            question=request.question, chat_history=request.chat_history
+            question=request.question,
+            chat_history=request.chat_history,
+            language=request.language,
         ),
     )
     result = APIQueryResponse(**result.model_dump())

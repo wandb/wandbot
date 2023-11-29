@@ -1,8 +1,9 @@
 """This module defines the configuration for data sources and stores in the Wandbot ingestion system.
 
-This module contains classes that define the configuration for various data sources and stores used in the Wandbot ingestion system. 
-Each class represents a different type of data source or store, such as English and Japanese documentation, example code, SDK code, 
-and more. Each class is defined with various attributes like name, data source, docstore directory, etc. 
+This module contains classes that define the configuration for various data sources and stores used in the Wandbot
+ingestion system. Each class represents a different type of data source or store, such as English and Japanese
+documentation, example code, SDK code, and more. Each class is defined with various attributes like name,
+data source, docstore directory, etc.
 
 Typical usage example:
 

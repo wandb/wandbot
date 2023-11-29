@@ -10,7 +10,6 @@ import logging
 import uuid
 
 import discord
-import langdetect
 from discord.ext import commands
 
 from wandbot.api.client import AsyncAPIClient
@@ -44,7 +43,6 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
     if bot.user is not None and bot.user.mentioned_in(message):
-        lang_code = langdetect.detect(message.clean_content)
         mention = f"<@{message.author.id}>"
         thread = None
         is_following = None
@@ -72,37 +70,23 @@ async def on_message(message: discord.Message):
             else:
                 chat_history = None
             if not chat_history:
-                if lang_code == "ja":
-                    await thread.send(
-                        f"🤖 {mention}: {config.JA_INTRO_MESSAGE}",
-                        mention_author=True,
-                    )
-                else:
-                    await thread.send(
-                        f"🤖 Hi {mention}: {config.EN_INTRO_MESSAGE}",
-                        mention_author=True,
-                    )
+                await thread.send(
+                    config.INTRO_MESSAGE.format(mention=mention),
+                    mention_author=True,
+                )
 
             response = await api_client.query(
                 question=str(message.clean_content),
                 chat_history=chat_history,
+                language=config.bot_language,
             )
             if response is None:
-                if lang_code == "ja":
-                    await thread.send(
-                        f"🤖 {mention}: {config.JA_ERROR_MESSAGE}",
-                        mention_author=True,
-                    )
-                else:
-                    await thread.send(
-                        f"🤖 {mention}: {config.EN_ERROR_MESSAGE}",
-                        mention_author=True,
-                    )
+                await thread.send(
+                    config.ERROR_MESSAGE.format(mention=mention),
+                    mention_author=True,
+                )
                 return
-            if lang_code == "ja":
-                outro_message = config.JA_OUTRO_MESSAGE
-            else:
-                outro_message = config.EN_OUTRO_MESSAGE
+            outro_message = config.OUTRO_MESSAGE
             sent_message = None
             if len(response.answer) > 2000:
                 answer_chunks = []
@@ -117,7 +101,6 @@ async def on_message(message: discord.Message):
                                 config,
                                 response_copy,
                                 outro_message,
-                                lang_code,
                             ),
                         )
                     else:
@@ -126,7 +109,6 @@ async def on_message(message: discord.Message):
                                 config,
                                 response_copy,
                                 "",
-                                lang_code,
                                 is_last=False,
                             ),
                         )
@@ -136,13 +118,13 @@ async def on_message(message: discord.Message):
                         config,
                         response,
                         outro_message,
-                        lang_code,
                     ),
                 )
             if sent_message is not None:
                 await api_client.create_question_answer(
                     thread_id=str(thread.id),
                     question_answer_id=str(sent_message.id),
+                    language=config.bot_language,
                     **response.model_dump(),
                 )
                 # # Add reactions for feedback
@@ -150,8 +132,10 @@ async def on_message(message: discord.Message):
                 await sent_message.add_reaction("👎")
 
             # # Wait for reactions
-            def check(reaction, user):
-                return user == message.author and str(reaction.emoji) in [
+            def check(user_reaction, author):
+                return author == message.author and str(
+                    user_reaction.emoji
+                ) in [
                     "👍",
                     "👎",
                 ]

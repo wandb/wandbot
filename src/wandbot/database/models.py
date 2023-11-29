@@ -1,6 +1,7 @@
 """This module defines the SQLAlchemy models for the ChatThread, QuestionAnswer, and FeedBack tables.
 
-Each class represents a table in the database and includes columns and relationships. The Base class is a declarative base that stores a catalog of classes and mapped tables in the Declarative system.
+Each class represents a table in the database and includes columns and relationships. The Base class is a declarative
+base that stores a catalog of classes and mapped tables in the Declarative system.
 
 Typical usage example:
 
@@ -29,7 +30,6 @@ class ChatThread(Base):
 
 class QuestionAnswer(Base):
     __tablename__ = "question_answers"
-
     thread_id = Column(String, ForeignKey("chat_thread.thread_id"))
     question_answer_id = Column(String, primary_key=True, index=True)
     system_prompt = Column(String)
@@ -48,6 +48,7 @@ class QuestionAnswer(Base):
     total_cost = Column(Float)
     chat_thread = relationship("ChatThread", back_populates="question_answers")
     feedback = relationship("FeedBack", back_populates="question_answer")
+    language = Column(String)
 
 
 class FeedBack(Base):

@@ -9,7 +9,7 @@ Typical usage example:
 
   chat_thread = ChatThread(thread_id="123", application="app1")
   chat_request = ChatRequest(question="What is the weather?", chat_history=None)
-  chat_response = ChatRepsonse(system_prompt="Weather is sunny", question="What is the weather?", 
+  chat_response = ChatResponse(system_prompt="Weather is sunny", question="What is the weather?",
                                answer="It's sunny", model="model1", sources="source1", 
                                source_documents="doc1", total_tokens=10, prompt_tokens=2, 
                                completion_tokens=8, time_taken=1.0, 
@@ -19,7 +19,7 @@ Typical usage example:
 from datetime import datetime
 from enum import IntEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Rating(IntEnum):
@@ -33,9 +33,7 @@ class FeedbackBase(BaseModel):
 
 
 class Feedback(FeedbackBase):
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class FeedbackCreate(Feedback):
@@ -57,12 +55,11 @@ class QuestionAnswerBase(BaseModel):
     start_time: datetime | None = None
     end_time: datetime | None = None
     feedback: list[Feedback] | None = []
+    language: str | None = None
 
 
 class QuestionAnswer(QuestionAnswerBase):
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class QuestionAnswerCreate(QuestionAnswer):
@@ -76,10 +73,7 @@ class ChatThreadBase(BaseModel):
 
 class ChatThread(ChatThreadBase):
     application: str
-
-    class Config:
-        use_enum_values = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class ChatThreadCreate(ChatThread):

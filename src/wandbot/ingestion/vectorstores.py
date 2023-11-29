@@ -14,11 +14,12 @@ Typical usage example:
 
 import json
 import pathlib
+from typing import Any, Dict, List
 
-import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
 
+import wandb
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import (
@@ -62,12 +63,12 @@ def load(
     )
     artifact_dir: str = artifact.download()
     storage_context = load_storage_context(
-        config.embedding_dim, config.persist_dir
+        config.embedding_dim, str(config.persist_dir)
     )
     service_context = load_service_context(
         config.chat_model_name,
         config.temperature,
-        config.embeddings_cache,
+        str(config.embeddings_cache),
         config.max_retries,
     )
 
@@ -84,12 +85,13 @@ def load(
                 doc: LcDocument = LcDocument(**doc_dict)
                 documents.append(doc)
         transformed_documents.extend(preprocess_data.load(documents))
-
+    unique_objects = {obj.hash: obj for obj in transformed_documents}
+    transformed_documents = list(unique_objects.values())
     index = load_index(
         transformed_documents,
         service_context,
         storage_context,
-        persist_dir=config.persist_dir,
+        persist_dir=str(config.persist_dir),
     )
     wandb_callback: WandbCallbackHandler = WandbCallbackHandler()
 

@@ -18,8 +18,9 @@ import json
 import pathlib
 from datetime import datetime
 
-import wandb
 import wandb.apis.reports as wr
+
+import wandb
 
 
 def log_raw_counts(metadata: dict[str, dict[str, int]]) -> list[str]:

@@ -1,6 +1,8 @@
 """This module provides the setup for the SQLAlchemy database engine and session.
 
-It imports the create_engine and sessionmaker modules from SQLAlchemy, and the DataBaseConfig class from the config module. It then creates an instance of DataBaseConfig, sets up the engine with the SQLAlchemy database URL and connection arguments, and creates a sessionmaker bound to this engine.
+It imports the create_engine and sessionmaker modules from SQLAlchemy, and the DataBaseConfig class from the config
+module. It then creates an instance of DataBaseConfig, sets up the engine with the SQLAlchemy database URL and
+connection arguments, and creates a sessionmaker bound to this engine.
 
 Typical usage example:
 
