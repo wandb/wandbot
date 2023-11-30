@@ -82,9 +82,9 @@ Executing these commands will launch the API, Slackbot, and Discord bot applicat
 
 We evaluated the performance of the Q&A bot manually and using auto eval strategies. The following W&B reports document the steps taken to evaluate the Q&A bot:
 
-- [How to evaluate an LLM Part 1: Building an Evaluation Dataset for our LLM System](http://wandb.me/wandbot-eval-part1): The report dive into the steps taken to build a gold-standard evaluation set.
-- [How to evaluate an LLM Part 2: Manual Evaluation of our LLM System](http://wandb.me/wandbot-eval-part2): The report talks about the throught process and steps taken to perform manual evaluation.
-- [How to evaluate an LLM Part 3: Auto-Evaluation; LLMs evaluating LLMs](http://wandb.me/wandbot-eval-part3): We used various LLM eval LLM startegies documented in this report.
+- [How to evaluate an LLM Part 1: Building an Evaluation Dataset for our LLM System](http://wandb.me/wandbot-eval-part1): The report dives into the steps taken to build a gold-standard evaluation set.
+- [How to evaluate an LLM Part 2: Manual Evaluation of our LLM System](http://wandb.me/wandbot-eval-part2): The report talks about the thought process and steps taken to perform manual evaluation.
+- [How to evaluate an LLM Part 3: Auto-Evaluation; LLMs evaluating LLMs](http://wandb.me/wandbot-eval-part3): Various LLM auto-eval startegies are documented in this report.
 
 ### Evaluation Results
 
