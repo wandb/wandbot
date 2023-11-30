@@ -78,18 +78,36 @@ For more detailed instructions on installing and running the bot, please refer t
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
 
-### Evaluation
+## Evaluation
 
-To evaluate the performance of the Q&A bot, the provided evaluation script (…) can be used. This script utilizes a separate dataset for evaluation, which can be stored as a W&B Artifact. The evaluation script calculates retrieval accuracy, average string distance, and chat model accuracy.
+We evaluated the performance of the Q&A bot manually and using auto eval strategies. The following W&B reports document the steps taken to evaluate the Q&A bot:
 
-The evaluation script downloads the evaluation dataset from the specified W&B Artifact, performs the evaluation using the Q&A bot, and then logs the results, such as retrieval accuracy, average string distance, and chat model accuracy, back to W&B. The logged results can be viewed on the W&B dashboard.
+- [How to evaluate an LLM Part 1: Building an Evaluation Dataset for our LLM System](http://wandb.me/wandbot-eval-part1): The report dive into the steps taken to build a gold-standard evaluation set.
+- [How to evaluate an LLM Part 2: Manual Evaluation of our LLM System](http://wandb.me/wandbot-eval-part2): The report talks about the throught process and steps taken to perform manual evaluation.
+- [How to evaluate an LLM Part 3: Auto-Evaluation; LLMs evaluating LLMs](http://wandb.me/wandbot-eval-part3): We used various LLM eval LLM startegies documented in this report.
 
-To run the evaluation script, use the following commands:
+### Evaluation Results
 
-```bash
-cd wandbot
-poetry run python -m eval
-```
+**Manual Evaluation**
+
+We manually evaluated the Q&A bot's responses to establish a basline score.
+
+| Evaluation Metric  | Comment  | Score |
+|---|---|---|
+| Accurary | measure the correctness of Q&A bot responses |  66.67 % |
+| URL Hallucination | measure the validity and relevancy of the links | 10.61 %  | 
+| Query Relevancy | measure if the query is relevant to W&B | 88.64 % |
+
+**Auto Evaluation (LLM evaluate LLM)**
+
+We employed a few auto evaluation strategies to speed up the iteration process of the bot's development
+
+| Evaluation Metric  | Comment  | Score |
+|---|---|---|
+| Faithfulness Accuracy | measures if the response from a RAG pipeline matches any retrieved chunk | 53.78 % |
+| Relevancy Accuracy | measures is the generated response is in-line with the context | 61.36 % |
+| Hit Rate | measures if the correct chunk is present in the retrieved chunks | 0.79 |
+| Mean Reciprocal Ranking (MRR) | measures the quality of the retriever | 0.74 |
 
 ## Overview of the Implementation
 
