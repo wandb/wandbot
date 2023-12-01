@@ -56,7 +56,7 @@ JA_FALLBACK_WARNING_MESSAGE = (
 
 
 class SlackAppEnConfig(BaseSettings):
-    APPLICATION: str = Field("Slack")
+    APPLICATION: str = Field("Slack_EN")
     SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_EN_APP_TOKEN")
     SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_EN_BOT_TOKEN")
     SLACK_SIGNING_SECRET: str = Field(
@@ -76,7 +76,7 @@ class SlackAppEnConfig(BaseSettings):
 
 
 class SlackAppJaConfig(BaseSettings):
-    APPLICATION: str = Field("Slack")
+    APPLICATION: str = Field("Slack_JA")
     SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_JA_APP_TOKEN")
     SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_JA_BOT_TOKEN")
     SLACK_SIGNING_SECRET: str = Field(

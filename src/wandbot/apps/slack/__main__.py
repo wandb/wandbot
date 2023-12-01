@@ -95,6 +95,7 @@ async def command_handler(
             question=query,
             chat_history=chat_history,
             language=config.bot_language,
+            application=config.APPLICATION,
         )
         response = format_response(
             config,

@@ -79,6 +79,7 @@ async def on_message(message: discord.Message):
                 question=str(message.clean_content),
                 chat_history=chat_history,
                 language=config.bot_language,
+                application=config.APPLICATION,
             )
             if response is None:
                 await thread.send(
