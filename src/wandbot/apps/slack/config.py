@@ -17,8 +17,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
-    f"Please note that *wandbot* and will experience frequent updates.\n\n"
-    f"Please do not share any private or sensitive information in your query at this time.\n\n"
+    f"Please note that *wandbot* will experience frequent updates.\n\n"
+    f"Please do not share any private or sensitive information in your query.\n\n"
     f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
 
