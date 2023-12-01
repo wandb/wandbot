@@ -44,6 +44,7 @@ class ChatThread(ChatThreadCreate):
 class ChatRequest(BaseModel):
     question: str
     chat_history: List[QuestionAnswer] | None = None
+    application: str | None = None
     language: str = "en"
 
 

@@ -32,9 +32,9 @@ import asyncio
 from datetime import datetime, timezone
 
 import pandas as pd
+import wandb
 from fastapi import FastAPI, Response, status
 
-import wandb
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -181,6 +181,7 @@ async def query(
             question=request.question,
             chat_history=request.chat_history,
             language=request.language,
+            application=request.application,
         ),
     )
     result = APIQueryResponse(**result.model_dump())

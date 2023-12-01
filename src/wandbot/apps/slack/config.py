@@ -17,8 +17,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
-    f"Please note that *wandbot* and will experience frequent updates.\n\n"
-    f"Please do not share any private or sensitive information in your query at this time.\n\n"
+    f"Please note that *wandbot* will experience frequent updates.\n\n"
+    f"Please do not share any private or sensitive information in your query.\n\n"
     f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
 
@@ -56,7 +56,7 @@ JA_FALLBACK_WARNING_MESSAGE = (
 
 
 class SlackAppEnConfig(BaseSettings):
-    APPLICATION: str = Field("Slack")
+    APPLICATION: str = Field("Slack_EN")
     SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_EN_APP_TOKEN")
     SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_EN_BOT_TOKEN")
     SLACK_SIGNING_SECRET: str = Field(
@@ -76,7 +76,7 @@ class SlackAppEnConfig(BaseSettings):
 
 
 class SlackAppJaConfig(BaseSettings):
-    APPLICATION: str = Field("Slack")
+    APPLICATION: str = Field("Slack_JA")
     SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_JA_APP_TOKEN")
     SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_JA_BOT_TOKEN")
     SLACK_SIGNING_SECRET: str = Field(

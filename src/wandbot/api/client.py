@@ -245,6 +245,8 @@ class APIClient:
         self,
         question: str,
         chat_history: Optional[List[QuestionAnswer]] = None,
+        language: str | None = None,
+        application: str | None = None,
     ) -> APIQueryResponse:
         """Queries the API.
 
@@ -258,6 +260,8 @@ class APIClient:
         request = APIQueryRequest(
             question=question,
             chat_history=chat_history,
+            language=language,
+            application=application,
         )
         response = self._query(request)
 
@@ -472,6 +476,7 @@ class AsyncAPIClient(APIClient):
         question: str,
         chat_history: List[QuestionAnswer] = None,
         language: str | None = None,
+        application: str | None = None,
     ) -> APIQueryResponse:
         """Queries the API.
 
@@ -487,6 +492,7 @@ class AsyncAPIClient(APIClient):
             question=question,
             chat_history=chat_history,
             language=language,
+            application=application,
         )
         response = await self._query(request)
 
