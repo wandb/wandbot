@@ -29,6 +29,8 @@ from zenpy.lib.api_objects import Comment, Ticket
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.zendesk.config import ZendeskAppConfig
 from wandbot.utils import get_logger
+from wandbot.apps.zendesk.extract_by_type import *
+
 
 logger = get_logger(__name__)
 config = ZendeskAppConfig()
@@ -51,12 +53,14 @@ def extract_question(ticket: Ticket) -> str:
     """
 
     description = ticket.description
-    # Convert the description to lower case and replace newline and carriage return characters with a space
-    question = description.lower().replace("\n", " ").replace("\r", "")
-    # Remove the string "[discourse post]" from the description
-    question = question.replace("[discourse post]", "")
-    # Truncate the description to a maximum length of 4095 characters
-    question = question[:4095]
+    if "forum" in ticket.tags:
+        return discourseExt(description)
+
+    elif "zopim_offline_message" in ticket.tags:
+        return offlineMessageExt(description)
+
+    elif "add_cc_note" in ticket.tags:
+        return emailMsgExt(description)
 
     return question
 
@@ -105,12 +109,12 @@ class ZendeskAIResponseSystem:
         initialized with the WandBot API URL from the configuration.
         """
 
-        user_creds = {
+        self.user_creds = {
             "email": config.ZENDESK_EMAIL,
             "password": config.ZENDESK_PASSWORD,
             "subdomain": config.ZENDESK_SUBDOMAIN,
         }
-        self.zenpy_client = Zenpy(**user_creds)
+        self.zenpy_client = Zenpy(**self.user_creds)
         self.api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
     def create_new_ticket(self, question_text: str) -> None:
@@ -133,6 +137,24 @@ class ZendeskAIResponseSystem:
                 description=question_text,
                 status="new",
                 priority="low",
+                tags=["botTest", "zopim_offline_message"],
+            )
+        )
+        self.zenpy_client.tickets.create(
+            Ticket(
+                subject="WandbotTest4",
+                description=question_text,
+                status="new",
+                priority="low",
+                tags=["botTest", "zopim_offline_message"],
+            )
+        )
+        self.zenpy_client.tickets.create(
+            Ticket(
+                subject="WandbotTest4",
+                description=question_text,
+                status="new",
+                priority="low",
                 tags=["botTest", "forum"],
             )
         )
@@ -141,29 +163,21 @@ class ZendeskAIResponseSystem:
         """Fetches new tickets from the Zendesk system.
 
         This method uses the Zenpy client to fetch new tickets from the Zendesk system. It filters the fetched
-        tickets based on specific requirements. The tickets are filtered if they have the tag "forum" and do not have
-        the tag "answered_by_bot".
+        tickets based on specific requirements. The tickets are filtered if they have the tags "forum", "zopim_offline_message" and do not have
+        the tag "answered_by_bot", "zopim_chat", "picked_up_by_bot".
 
         Returns:
             list: A list of filtered tickets that are new and have not been answered by the bot.
         """
 
+        exclude_tags = ["answered_by_bot", "zopim_chat", "picked_up_by_bot"]
         new_tickets = self.zenpy_client.search(
-            type="ticket", status="new", group_id=config.ZDGROUPID
+            type="ticket",
+            status="new",
+            tags=["forum", "zopim_offline_message"],
+            minus=["tags:{}".format(tag) for tag in exclude_tags],
         )
-        # Filtering based on specific requirements
-        filtered_tickets = [
-            ticket for ticket in new_tickets if "forum" in ticket.tags
-        ]
-        # filtered_tickets = [ticket for ticket in new_tickets if 'bottest' in ticket.tags]
-        # for testing purposes only
-        filtered_tickets_not_answered = [
-            ticket
-            for ticket in filtered_tickets
-            if "answered_by_bot" not in ticket.tags
-        ]  # for testing purposes only
-
-        return filtered_tickets_not_answered
+        return new_tickets
 
     async def generate_response(self, question: str) -> str:
         """Generates a response to a given question.
@@ -237,6 +251,8 @@ class ZendeskAIResponseSystem:
             logger.error(f"Error: {e}")
 
     async def run(self) -> None:
+        logger.info(f"WandBot + zendesk is running")
+
         """Runs the Zendesk AI Response System.
 
         This method performs the following steps:
@@ -252,18 +268,20 @@ class ZendeskAIResponseSystem:
         """
 
         # Create a new ticket with a predefined question
-        self.create_new_ticket(
-            "Is there a way to programmatically list all projects for a given entity?"
-        )
+        # self.create_new_ticket(
+        #     "Is there a way to programmatically list all projects for a given entity?"
+        # )
 
-        # Enter a loop where it fetches new tickets every 120 seconds
+        # Enter a loop where it fetches new tickets every 600 seconds
         while True:
-            await asyncio.sleep(120)
+            await asyncio.sleep(600)
+
+            # restart the zenpy client because it times out after 3 minutes
+            self.zenpy_client = Zenpy(**self.user_creds)
 
             # Fetch new tickets
-            new_tickets = self.fetch_new_tickets()
-            logger.info(f"New unanswered Tickets: {len(new_tickets)}")
-
+            new_tickets = list(self.fetch_new_tickets())
+            logger.info(f"New unanswered Zendesk tickets: {new_tickets}")
             # For each new ticket, extract the question, generate a response, format the response,
             # and update the ticket with the response
             for ticket in new_tickets:
@@ -272,6 +290,9 @@ class ZendeskAIResponseSystem:
 
                 formatted_response = format_response(response)
                 self.update_ticket(ticket, formatted_response)
+
+            if len(new_tickets) > 0:
+                logger.info(f"Done processing tickets: {len(new_tickets)}")
 
 
 if __name__ == "__main__":
