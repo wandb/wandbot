@@ -69,6 +69,7 @@ def format_response(response: str) -> str:
     This function performs the following steps:
     1. Converts the response to a string.
     2. Appends a signature at the end of the response.
+    3. Appends a warning saying that this is wandbot talking in the front
 
     Args:
         response (str): The response to be formatted.
