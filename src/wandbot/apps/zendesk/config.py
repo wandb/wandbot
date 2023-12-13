@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ZDGROUPID = "360016040851"
 
 
-class ZendeskAppConfig(BaseSettings):
+class zendesk_app_config(BaseSettings):
     DISCBOTINTRO: str = (
         "Thank you for reaching out to W&B Technical Support!\n\n"
     f"This is an automated reply from our support bot designed to assist you with your WandB-related queries.\n"

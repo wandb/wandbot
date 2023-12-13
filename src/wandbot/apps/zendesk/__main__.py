@@ -27,13 +27,13 @@ from zenpy import Zenpy
 from zenpy.lib.api_objects import Comment, Ticket
 
 from wandbot.api.client import AsyncAPIClient
-from wandbot.apps.zendesk.config import ZendeskAppConfig
+from wandbot.apps.zendesk.config import zendesk_app_config
 from wandbot.utils import get_logger
 from wandbot.apps.zendesk.extract_by_type import *
 
 
 logger = get_logger(__name__)
-config = ZendeskAppConfig()
+config = zendesk_app_config()
 
 
 def extract_question(ticket: Ticket) -> str:
