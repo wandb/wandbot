@@ -10,14 +10,14 @@ The system performs the following steps:
  with the response.
 
 This module contains the following classes:
-- ZendeskAIResponseSystem: Handles the interaction with the Zendesk system.
+- zendesk_wandbot_response_system: Handles the interaction with the Zendesk system.
 
 This module contains the following functions:
 - extract_question(ticket): Extracts the question from a given ticket.
 - format_response(response): Formats the response to be sent as a ticket comment.
 
 This module is meant to be run as a script and not imported as a module. When run as a script, it initializes a
-ZendeskAIResponseSystem object and runs it in an event loop.
+zendesk_wandbot_response_system object and runs it in an event loop.
 
 """
 import asyncio
@@ -69,7 +69,7 @@ def format_response(response: str) -> str:
     This function performs the following steps:
     1. Converts the response to a string.
     2. Appends a signature at the end of the response.
-    3. Appends a warning saying that this is wandbot talking in the front
+    3. Appends a warning saying that this is wandbot talking in the front of the reply
 
     Args:
         response (str): The response to be formatted.
@@ -78,12 +78,12 @@ def format_response(response: str) -> str:
         str: The formatted response.
     """
 
-    responseStr = str(response)
-    finalResponse = config.DISCBOTINTRO + responseStr
-    return finalResponse + "\n\n-WandBot 🤖"
+    response_str = str(response)
+    final_response = config.DISCBOTINTRO + response_str
+    return final_response + "\n\n-WandBot 🤖"
 
 
-class ZendeskAIResponseSystem:
+class zendesk_wandbot_response_system:
     """Handles the interaction with the Zendesk system.
 
     This class is responsible for creating and updating tickets in the Zendesk system. It uses the Zenpy client for
@@ -96,7 +96,7 @@ class ZendeskAIResponseSystem:
     """
 
     def __init__(self) -> None:
-        """Initializes the ZendeskAIResponseSystem with the necessary clients.
+        """Initializes the zendesk_wandbot_response_system with the necessary clients.
 
         The Zenpy client is initialized with the user credentials from the configuration. The AsyncAPIClient is
         initialized with the WandBot API URL from the configuration.
@@ -217,10 +217,10 @@ class ZendeskAIResponseSystem:
             None
         """
 
-        # after semLimit number of tickets, have a timeout
-        semLimit = config.MAX_WANDBOT_REQUESTS
+        # after set_limit number of tickets, have a timeout
+        set_limit = config.MAX_WANDBOT_REQUESTS
         logger.info(f"WandBot + zendesk is running")
-        sem = asyncio.Semaphore(semLimit)
+        sem = asyncio.Semaphore(set_limit)
 
         while True:
             await asyncio.sleep(config.INTERVAL_TO_FETCH_TICKETS)
@@ -232,10 +232,10 @@ class ZendeskAIResponseSystem:
             new_tickets = list(self.fetch_new_tickets())
             logger.info(f"New unanswered Zendesk tickets: {new_tickets}")
 
-            # For every semLimit new tickets, extract the question, generate a response, format the response,
+            # For every set_limit new tickets, extract the question, generate a response, format the response,
             # and update the ticket with the response
-            for i in range(0, len(new_tickets), semLimit):
-                batch = new_tickets[i : i + semLimit]
+            for i in range(0, len(new_tickets), set_limit):
+                batch = new_tickets[i : i + set_limit]
                 for ticket in batch:
                     async with sem:
                         question = extract_question(ticket)
@@ -245,7 +245,7 @@ class ZendeskAIResponseSystem:
                         self.update_ticket(ticket, formatted_response)
 
                 # Timeout after a certain amount of tickets, 5 in this case
-                if i + semLimit < len(new_tickets):
+                if i + set_limit < len(new_tickets):
                     await asyncio.sleep(config.REQUEST_INTERVAL)
 
             if len(new_tickets) > 0:
@@ -253,5 +253,5 @@ class ZendeskAIResponseSystem:
 
 
 if __name__ == "__main__":
-    zd = ZendeskAIResponseSystem()
+    zd = zendesk_wandbot_response_system()
     asyncio.run(zd.run())
