@@ -10,14 +10,14 @@ The system performs the following steps:
  with the response.
 
 This module contains the following classes:
-- zendesk_wandbot_response_system: Handles the interaction with the Zendesk system.
+- ZendeskWandBotResponseSystem: Handles the interaction with the Zendesk system.
 
 This module contains the following functions:
 - extract_question(ticket): Extracts the question from a given ticket.
 - format_response(response): Formats the response to be sent as a ticket comment.
 
 This module is meant to be run as a script and not imported as a module. When run as a script, it initializes a
-zendesk_wandbot_response_system object and runs it in an event loop.
+ZendeskWandBotResponseSystem object and runs it in an event loop.
 
 """
 import asyncio
@@ -41,7 +41,7 @@ def extract_question(ticket: Ticket) -> str:
 
     This function performs the following steps:
     1. Extracts the description from the ticket.
-    2. Chooses what type of ticket we are looking at, and then extracts the ticket depending on the ticket type
+    2. Chooses what type of ticket we are looking at, and then extracts the ticket depending on the ticket type.
 
     Args:
         ticket (Ticket): The ticket object from which the question is to be extracted.
@@ -49,14 +49,11 @@ def extract_question(ticket: Ticket) -> str:
     Returns:
         str: The extracted question from the ticket's description.
     """
-
     description = ticket.description
     if "forum" in ticket.tags:
         return discourse_ext(description)
-
     elif "zopim_offline_message" in ticket.tags:
         return offline_msg_ext(description)
-
     elif "add_cc_note" in ticket.tags:
         return email_msg_ext(description)
 
@@ -69,7 +66,7 @@ def format_response(response: str) -> str:
     This function performs the following steps:
     1. Converts the response to a string.
     2. Appends a signature at the end of the response.
-    3. Appends a warning saying that this is wandbot talking in the front of the reply
+    3. Appends a warning saying that this is wandbot talking in the front of the reply.
 
     Args:
         response (str): The response to be formatted.
@@ -77,13 +74,12 @@ def format_response(response: str) -> str:
     Returns:
         str: The formatted response.
     """
-
     response_str = str(response)
     final_response = config.DISCBOTINTRO + response_str
-    return final_response + "\n\n-WandBot 🤖"
+    return f"{final_response}\n\n-WandBot 🤖"
 
 
-class zendesk_wandbot_response_system:
+class ZendeskWandBotResponseSystem:
     """Handles the interaction with the Zendesk system.
 
     This class is responsible for creating and updating tickets in the Zendesk system. It uses the Zenpy client for
@@ -94,14 +90,12 @@ class zendesk_wandbot_response_system:
         api_client (AsyncAPIClient): The client for interacting with the WandBot API.
         semaphore (Semaphore): Use semaphore to control how many api calls to wandbot we make
     """
-
     def __init__(self) -> None:
-        """Initializes the zendesk_wandbot_response_system with the necessary clients.
+        """Initializes the ZendeskWandBotResponseSystem with the necessary clients.
 
         The Zenpy client is initialized with the user credentials from the configuration. The AsyncAPIClient is
         initialized with the WandBot API URL from the configuration.
         """
-
         self.user_creds = {
             "email": config.ZENDESK_EMAIL,
             "password": config.ZENDESK_PASSWORD,
@@ -117,21 +111,21 @@ class zendesk_wandbot_response_system:
         """Fetches new tickets from the Zendesk system.
 
         This method uses the Zenpy client to fetch new tickets from the Zendesk system. It filters the fetched
-        tickets based on specific requirements. The tickets are filtered if they have the tags "forum", "zopim_offline_message" and do not have
-        the tag "answered_by_bot", "zopim_chat", "picked_up_by_bot".
+        tickets based on specific requirements. The tickets are filtered if they have the tags "forum",
+        "zopim_offline_message" and do not have the tag "answered_by_bot", "zopim_chat", "picked_up_by_bot".
 
         Returns:
             list: A list of filtered tickets that are new and have not been answered by the bot.
         """
-
         exclude_tags = ["answered_by_bot", "zopim_chat", "picked_up_by_bot"]
         new_tickets = self.zenpy_client.search(
             type="ticket",
             status="new",
             tags=["forum", "zopim_offline_message"],
-            minus=["tags:{}".format(tag) for tag in exclude_tags],
+            minus=[f"tags:{tag}" for tag in exclude_tags],
         )
         return new_tickets
+
 
     async def generate_response(self, question: str) -> str:
         """Generates a response to a given question.
@@ -253,5 +247,5 @@ class zendesk_wandbot_response_system:
 
 
 if __name__ == "__main__":
-    zd = zendesk_wandbot_response_system()
+    zd = ZendeskWandBotResponseSystem()
     asyncio.run(zd.run())
