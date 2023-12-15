@@ -50,6 +50,13 @@ Example Response 2:
     "score": 1,
     "decision": "inconsistent"
 }}
+
+Example Response 3:
+{{
+    "reason": "The generated answer shows methods not present in the provided documentation. The documentation does not mention these methods, thus the answer contains information that cannot be inferred from the provided documentation.",
+    "score": 2,
+    "decision": "inconsistent"
+}}
 """
 
 USER_TEMPLATE = """

@@ -38,8 +38,8 @@ Output your final verdict by strictly following JSON format:
 
 Example Response 1:
 {{
-    "reason": "The generated answer mostly matches the the reference answer, but it is not as concise and comprehensive",
-    "score": 2,
+    "reason": "The generated answer is relevant and provides a similar level of detail as the reference answer. It also provides information that is relevant to the user's query.",
+    "score": 3,
     "decision": "relevant"
 }}
 
@@ -47,6 +47,13 @@ Example Response 2:
 {{
     "reason": "The generated answer deviates significantly from the reference answer, and is not directly answering the user's query",
     "score": 1,
+    "decision": "irrelevant"
+}}
+
+Example Response 3:
+{{
+    "reason": "The generated answer is relevant and provides a similar level of detail as the reference answer. However, it introduces variations in the code example that are not mentioned in the documentation. This could potentially confuse users if the method is not part of the documented API.
+    "score": 2,
     "decision": "irrelevant"
 }}
 """

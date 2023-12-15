@@ -52,6 +52,13 @@ Example Response 2:
     "score": 1,
     "decision": "incorrect"
 }}
+
+Example Response 3:
+{{
+    "reason": "The generated answer follows the same steps as the reference answer. However, it includes assumptions about methods that are not mentioned in the documentation.",
+    "score": 2,
+    "decision": "incorrect"
+}}
 """
 
 
