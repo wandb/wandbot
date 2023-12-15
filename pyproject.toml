@@ -36,6 +36,7 @@ zenpy = "^2.0.41"
 openai = "^1.3.2"
 weave = "^0.30.0"
 langchain = "^0.0.344"
+cachew = "^0.15.20231019"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
