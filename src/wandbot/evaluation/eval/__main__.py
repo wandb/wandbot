@@ -1,10 +1,5 @@
-from typing import Any, Hashable, Tuple
-
-import dotenv
-
-dotenv.load_dotenv()
-
 import json
+from typing import Any, Hashable
 
 import nest_asyncio
 import pandas as pd
@@ -27,6 +22,9 @@ from wandbot.evaluation.eval.relevancy import (
     RELEVANCY_EVAL_TEMPLATE,
     WandbRelevancyEvaluator,
 )
+from wandbot.utils import get_logger
+
+logger = get_logger(__name__)
 
 nest_asyncio.apply()
 
@@ -47,11 +45,9 @@ relevancy_evaluator = WandbRelevancyEvaluator(
 )
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_answer(
-    question: str, application: str = "api-eval-bharat"
-) -> dict[str, Any]:
+def get_answer(question: str, application: str = "api-eval-bharat") -> str:
     url = "http://0.0.0.0:8000/query"
     payload = {
         "question": question,
@@ -59,21 +55,22 @@ def get_answer(
         "application": application,
     }
     response = requests.post(url, data=json.dumps(payload))
-    return response.json()
+    response = response.json()
+    return json.dumps(response)
 
 
-@cachew(cache_path=EVAL_CACHE)
-def get_eval_record(
-    row: pd.Series, application: str = "api-eval-bharat"
-) -> dict[str, Any]:
-    row = row.to_dict()
+@cachew(cache_path=EVAL_CACHE, logger=logger)
+def get_eval_record(row_str: str, application: str = "api-eval-bharat") -> str:
+    row = json.loads(row_str)
     response = get_answer(row["question"], application=application)
+    response = json.loads(response)
     response["ground_truths"] = row["answer"]
     response["reference_notes"] = row["notes"]
     response["contexts"] = [
         "\nSource: " + source["source"] + " \n " + source["text"]
         for source in json.loads(response["source_documents"])
     ]
+    response = json.dumps(response)
     return response
 
 
@@ -86,9 +83,10 @@ def parse_answer_eval(metric: str, row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_answer_correctness(row: dict[str, Any]) -> dict[str, Any]:
+def get_answer_correctness(row_str: str) -> str:
+    row = json.loads(row_str)
     result = correctness_evaluator.evaluate(
         query=row["question"],
         response=row["answer"],
@@ -100,12 +98,14 @@ def get_answer_correctness(row: dict[str, Any]) -> dict[str, Any]:
     result[
         "answer_correctness_score_(ragas)"
     ] = metrics.answer_correctness.score_single(row)
+    result = json.dumps(result)
     return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_answer_relevancy(row: dict[str, Any]) -> dict[str, Any]:
+def get_answer_relevancy(row_str: str) -> str:
+    row = json.loads(row_str)
     result = relevancy_evaluator.evaluate(
         query=row["question"],
         response=row["answer"],
@@ -116,12 +116,14 @@ def get_answer_relevancy(row: dict[str, Any]) -> dict[str, Any]:
     result[
         "answer_relevancy_score_(ragas)"
     ] = metrics.answer_relevancy.score_single(row)
+    result = json.dumps(result)
     return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_answer_faithfulness(row: dict[str, Any]) -> dict[str, Any]:
+def get_answer_faithfulness(row_str: str) -> str:
+    row = json.loads(row_str)
     result = faithfulness_evaluator.evaluate(
         query=row["question"],
         response=row["answer"],
@@ -133,52 +135,59 @@ def get_answer_faithfulness(row: dict[str, Any]) -> dict[str, Any]:
     result[
         "answer_faithfulness_score_(ragas)"
     ] = metrics.faithfulness.score_single(row)
+    result = json.dumps(result)
     return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_answer_similarity(row: dict[str, Any]) -> dict[str, Any]:
+def get_answer_similarity(row_str: str) -> str:
+    row = json.loads(row_str)
     result = metrics.answer_similarity.score_single(row)
-    return {"answer_similarity_score_(ragas)": result}
+    result = json.dumps({"answer_similarity_score_(ragas)": result})
+    return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_context_precision(row: dict[str, Any]) -> dict[str, Any]:
+def get_context_precision(row_str: str) -> str:
+    row = json.loads(row_str)
     result = metrics.context_precision.score_single(row)
-    return {"context_precision_score": result}
+    result = json.dumps({"context_precision_score": result})
+    return result
 
 
-@cachew(cache_path=EVAL_CACHE)
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_context_recall(row: dict[str, Any]) -> dict[str, Any]:
+def get_context_recall(row_str: str) -> str:
+    row = json.loads(row_str)
     result = metrics.context_recall.score_single(row)
-    return {"context_recall_score": result}
+    result = json.dumps({"context_recall_score": result})
+    return result
 
 
-@cachew(cache_path=EVAL_CACHE)
-def evaluate_row(idx: Hashable, row: dict[str, Any]) -> dict[str, Any]:
+@cachew(cache_path=EVAL_CACHE, logger=logger)
+def evaluate_row(idx: Hashable, row_str: str) -> str:
     eval_result = {"idx": idx}
+    row = json.loads(row_str)
     eval_result.update(row)
-    eval_result.update(get_answer_correctness(row))
-    eval_result.update(get_answer_relevancy(row))
-    eval_result.update(get_answer_faithfulness(row))
-    eval_result.update(get_answer_similarity(row))
-    eval_result.update(get_context_precision(row))
-    eval_result.update(get_context_recall(row))
+    eval_result.update(json.loads(get_answer_correctness(row_str)))
+    eval_result.update(json.loads(get_answer_relevancy(row_str)))
+    eval_result.update(json.loads(get_answer_faithfulness(row_str)))
+    eval_result.update(json.loads(get_answer_similarity(row_str)))
+    eval_result.update(json.loads(get_context_precision(row_str)))
+    eval_result.update(json.loads(get_context_recall(row_str)))
+    eval_result = json.dumps(eval_result)
     return eval_result
 
 
-@cachew(cache_path=EVAL_CACHE)
+# @cachew(cache_path=EVAL_CACHE, logger=logger)
 def process_row(
-    args: Tuple[Hashable, pd.Series], application: str = "api-eval-bharat"
+    idx: Hashable, row_str: str, application: str = "api-eval-bharat"
 ) -> str:
-    idx, row = args
-    eval_record = get_eval_record(row, application=application)
+    eval_record = get_eval_record(row_str, application=application)
     eval_row = evaluate_row(idx, eval_record)
-    result = json.dumps(eval_row)
-    return result
+    return eval_row
 
 
 def main():
@@ -193,17 +202,19 @@ def main():
         (df["is_wandb_query"] == "YES") & (df["correctness"] == "correct")
     ]
 
-    with open("data/wandbot-gpt-4-eval.jsonl", "w+") as outfile:
+    with open("data/eval/wandbot-gpt-4-eval.jsonl", "w+") as outfile:
         for idx, row in tqdm(
             correct_df.sample(frac=1).iterrows(), total=len(correct_df)
         ):
             try:
+                row_str = row.to_json()
                 eval_row = process_row(
-                    (idx, row), application="gpt-4-eval-bharat"
+                    idx, row_str, application="gpt-4-eval-bharat"
                 )
                 outfile.write(eval_row + "\n")
                 eval_results.append(eval_row)
-            except:
+            except Exception as e:
+                print(e)
                 print(idx)
 
 

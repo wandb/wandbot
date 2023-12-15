@@ -91,7 +91,7 @@ class WandbFactfulnessEvaluator(CorrectnessEvaluator):
             ),
         )
 
-        passing, reasoning, score = await safe_parse_eval_response(
+        passing, reasoning, score = safe_parse_eval_response(
             eval_response, "consistent"
         )
 

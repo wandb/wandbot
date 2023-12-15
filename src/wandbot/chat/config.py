@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ChatConfig(BaseSettings):
-    chat_model_name: str = "gpt-4-1106-preview"
+    chat_model_name: str = "gpt-4"
     max_retries: int = 2
     fallback_model_name: str = "gpt-3.5-turbo-16k-0613"
     max_fallback_retries: int = 6

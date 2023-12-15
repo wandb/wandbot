@@ -102,7 +102,7 @@ class WandbCorrectnessEvaluator(CorrectnessEvaluator):
             reference_notes=kwargs.get("reference_notes", ""),
         )
 
-        passing, reasoning, score = await safe_parse_eval_response(
+        passing, reasoning, score = safe_parse_eval_response(
             eval_response, "correct"
         )
 

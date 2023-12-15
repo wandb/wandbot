@@ -88,7 +88,7 @@ class WandbRelevancyEvaluator(CorrectnessEvaluator):
             reference_answer=reference,
         )
 
-        passing, reasoning, score = await safe_parse_eval_response(
+        passing, reasoning, score = safe_parse_eval_response(
             eval_response, "relevant"
         )
 
