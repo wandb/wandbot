@@ -146,28 +146,20 @@ def load_service_context(
     )
 
 
-def load_storage_context(
-    embed_dimensions: int, persist_dir: str
-) -> StorageContext:
+def load_storage_context(embed_dimensions: int) -> StorageContext:
     """Loads a storage context with the specified parameters.
 
     Args:
         embed_dimensions: The dimensions of the embeddings.
-        persist_dir: The directory where the storage context is persisted.
 
     Returns:
         A storage context instance with the specified parameters.
     """
-    if os.path.isdir(persist_dir):
-        storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore.from_persist_dir(persist_dir),
-            persist_dir=persist_dir,
-        )
-    else:
-        faiss_index = faiss.IndexFlatL2(embed_dimensions)
-        storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore(faiss_index),
-        )
+
+    faiss_index = faiss.IndexFlatL2(embed_dimensions)
+    storage_context = StorageContext.from_defaults(
+        vector_store=FaissVectorStore(faiss_index),
+    )
     return storage_context
 
 
@@ -205,6 +197,7 @@ class LanguageFilterPostprocessor(BaseNodePostprocessor):
     """Language-based Node processor."""
 
     languages: List[str] = Field(default=["en", "python"])
+    min_result_size: int = Field(default=10)
 
     @classmethod
     def class_name(cls) -> str:
@@ -221,5 +214,8 @@ class LanguageFilterPostprocessor(BaseNodePostprocessor):
         for node in nodes:
             if node.metadata["language"] in self.languages:
                 new_nodes.append(node)
+
+        if len(new_nodes) < self.min_result_size:
+            return new_nodes + nodes[: self.min_result_size - len(new_nodes)]
 
         return new_nodes

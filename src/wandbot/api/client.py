@@ -15,7 +15,6 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
-
 from wandbot.api.schemas import (
     APIFeedbackRequest,
     APIFeedbackResponse,
@@ -25,6 +24,8 @@ from wandbot.api.schemas import (
     APIQueryResponse,
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
+    APIRetrievalRequest,
+    APIRetrievalResponse,
 )
 from wandbot.database.schemas import QuestionAnswer
 
@@ -57,6 +58,7 @@ class APIClient:
         self.chat_question_answer_endpoint = urljoin(
             str(self.url), "question_answer"
         )
+        self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
@@ -264,6 +266,49 @@ class APIClient:
             application=application,
         )
         response = self._query(request)
+
+        return response
+
+    def _retrieve(
+        self, request: APIRetrievalRequest
+    ) -> APIRetrievalResponse | None:
+        """Retrieves nodes given query.
+
+        Args:
+            request: The request object containing the query string and language.
+
+        Returns:
+            The response from the API. None if the status code is not 200.
+        """
+        with requests.Session() as session:
+            payload = json.loads(request.model_dump_json())
+            with session.post(self.retrieve_endpoint, json=payload) as response:
+                if response.status_code == 200:
+                    return APIRetrievalResponse(**response.json())
+                else:
+                    return None
+
+    def retrieve(
+        self, query: str, language: str, initial_k: int = 50, top_k: int = 10
+    ) -> APIRetrievalResponse:
+        """Retrieves nodes given query.
+
+        Args:
+            query: The query string.
+            language: The language of the query.
+            initial_k: The number of nodes to retrieve.
+            top_k: The number of nodes to return.
+
+        Returns:
+            List of retrieved nodes with scores and sources
+        """
+        request = APIRetrievalRequest(
+            query=query,
+            language=language,
+            initial_k=initial_k,
+            top_k=top_k,
+        )
+        response = self._retrieve(request)
 
         return response
 
@@ -495,5 +540,51 @@ class AsyncAPIClient(APIClient):
             application=application,
         )
         response = await self._query(request)
+
+        return response
+
+    async def _retrieve(
+        self, request: APIRetrievalRequest
+    ) -> APIRetrievalResponse | None:
+        """Private method to retrieve nodes given query.
+
+        Args:
+            request: The request object containing the query string and language.
+
+        Returns:
+            The response from the API. None if the status code is not 200.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.retrieve_endpoint,
+                json=json.loads(request.model_dump_json()),
+            ) as response:
+                if response.status == 200:
+                    response = await response.json()
+                    return APIRetrievalResponse(**response)
+                else:
+                    return None
+
+    async def retrieve(
+        self, query: str, language: str, initial_k: int = 50, top_k: int = 10
+    ) -> APIRetrievalResponse:
+        """Retrieves nodes given query.
+
+        Args:
+            query: The query string.
+            language: The language of the query.
+            initial_k: The number of nodes to retrieve.
+            top_k: The number of nodes to return.
+
+        Returns:
+            List of retrieved nodes with scores and sources
+        """
+        request = APIRetrievalRequest(
+            query=query,
+            language=language,
+            initial_k=initial_k,
+            top_k=top_k,
+        )
+        response = await self._retrieve(request)
 
         return response

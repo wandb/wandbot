@@ -42,8 +42,6 @@ from llama_index.llms import ChatMessage, MessageRole
 from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
-from weave.monitoring import StreamTable
-
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRequest, ChatResponse
@@ -54,6 +52,7 @@ from wandbot.utils import (
     get_logger,
     load_service_context,
 )
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -366,6 +365,45 @@ class Chat:
         result["system_prompt"] = self.qa_prompt.message_templates[0].content
         self.chat_table.log(result)
         return ChatResponse(**result)
+
+    def retrieve(
+        self, query: str, language="en", initial_k: int = 50, top_k: int = 5
+    ):
+        """Retrieves the top k results from the index for the given query.
+
+        Args:
+            query: A string representing the query.
+            language: A string representing the language of the query.
+            initial_k: An integer representing the number of initial results to retrieve.
+            top_k: An integer representing the number of top results to retrieve.
+
+        Returns:
+            A list of dictionaries representing the retrieved results.
+        """
+        retrieval_engine = self.index.as_retriever(
+            similarity_top_k=initial_k,
+            node_postprocessors=[
+                LanguageFilterPostprocessor(languages=[language, "python"]),
+                CohereRerank(top_n=top_k, model="rerank-english-v2.0")
+                if language == "en"
+                else CohereRerank(
+                    top_n=top_k, model="rerank-multilingual-v2.0"
+                ),
+            ],
+            storage_context=self.storage_context,
+        )
+        results = retrieval_engine.retrieve(query)
+
+        outputs = [
+            {
+                "text": node.get_text(),
+                "source": node.metadata["source"],
+                "score": node.get_score(),
+            }
+            for node in results
+        ]
+
+        return outputs
 
 
 def main():

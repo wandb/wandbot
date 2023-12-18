@@ -16,10 +16,9 @@ import json
 import pathlib
 from typing import Any, Dict, List
 
+import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
-
-import wandb
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import (
@@ -62,9 +61,7 @@ def load(
         source_artifact_path, type="dataset"
     )
     artifact_dir: str = artifact.download()
-    storage_context = load_storage_context(
-        config.embedding_dim, str(config.persist_dir)
-    )
+    storage_context = load_storage_context(config.embedding_dim)
     service_context = load_service_context(
         config.chat_model_name,
         config.temperature,

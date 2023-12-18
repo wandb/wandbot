@@ -34,7 +34,6 @@ from datetime import datetime, timezone
 import pandas as pd
 import wandb
 from fastapi import FastAPI, Response, status
-
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -44,6 +43,9 @@ from wandbot.api.schemas import (
     APIQueryResponse,
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
+    APIRetrievalRequest,
+    APIRetrievalResponse,
+    APIRetrievalResult,
 )
 from wandbot.chat.chat import Chat
 from wandbot.chat.config import ChatConfig
@@ -219,6 +221,40 @@ async def feedback(
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
+
+
+@app.post(
+    "/retrieve",
+    response_model=APIRetrievalResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
+    """Retrieves the top k results for a given query.
+
+    Args:
+        request: The APIRetrievalRequest object containing the query and other parameters.
+
+    Returns:
+        The APIRetrievalResponse object containing the query and top k results.
+    """
+    results = chat.retrieve(
+        query=request.query,
+        language=request.language,
+        initial_k=request.initial_k,
+        top_k=request.top_k,
+    )
+
+    return APIRetrievalResponse(
+        query=request.query,
+        top_k=[
+            APIRetrievalResult(
+                text=result["text"],
+                score=result["score"],
+                source=result["source"],
+            )
+            for result in results
+        ],
+    )
 
 
 @app.on_event("shutdown")
