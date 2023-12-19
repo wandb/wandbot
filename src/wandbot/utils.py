@@ -26,6 +26,7 @@ import os
 from typing import Any, List, Optional
 
 import faiss
+import requests
 from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
 from langchain.storage import LocalFileStore
 from llama_index import (
@@ -35,9 +36,12 @@ from llama_index import (
     load_index_from_storage,
 )
 from llama_index.bridge.pydantic import Field
+from llama_index.callbacks import CallbackManager
+from llama_index.core import BaseRetriever
 from llama_index.llms import OpenAI
 from llama_index.postprocessor.types import BaseNodePostprocessor
-from llama_index.schema import NodeWithScore, QueryBundle
+from llama_index.retrievers import BM25Retriever
+from llama_index.schema import NodeWithScore, QueryBundle, TextNode
 from llama_index.vector_stores import FaissVectorStore
 
 
@@ -219,3 +223,93 @@ class LanguageFilterPostprocessor(BaseNodePostprocessor):
             return new_nodes + nodes[: self.min_result_size - len(new_nodes)]
 
         return new_nodes
+
+
+class YouRetriever(BaseRetriever):
+    """You retriever."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        similarity_top_k: int = 10,
+        callback_manager: Optional[CallbackManager] = None,
+    ) -> None:
+        """Init params."""
+        self._api_key = api_key or os.environ["YOU_API_KEY"]
+        self.similarity_top_k = (
+            similarity_top_k if similarity_top_k <= 20 else 20
+        )
+        super().__init__(callback_manager)
+
+    def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        """Retrieve."""
+        try:
+            headers = {"X-API-Key": self._api_key}
+            url = "https://api.ydc-index.io/search"
+
+            querystring = {
+                "query": query_bundle.query_str,
+                "num_web_results": self.similarity_top_k,
+            }
+            response = requests.get(url, headers=headers, params=querystring)
+            if response.status_code != 200:
+                return []
+            else:
+                results = response.json()
+
+            search_hits = [
+                (
+                    "\n".join(hit["snippets"]),
+                    {"source": hit["url"], "language": "en"},
+                )
+                for hit in results["hits"]
+            ]
+            return [
+                NodeWithScore(
+                    node=TextNode(text=s[0], metadata=s[1]),
+                    score=1.0,
+                )
+                for s in search_hits
+            ]
+        except Exception as e:
+            return []
+
+
+class HybridRetriever(BaseRetriever):
+    def __init__(
+        self,
+        index,
+        storage_context,
+        similarity_top_k=10,
+    ):
+        self.index = index
+        self.similarity_top_k = similarity_top_k
+        self.storage_context = storage_context
+
+        self.vector_retriever = self.index.as_retriever(
+            similarity_top_k=self.similarity_top_k,
+            storage_context=self.storage_context,
+        )
+        self.bm25_retriever = BM25Retriever.from_defaults(
+            docstore=self.index.docstore,
+            similarity_top_k=self.similarity_top_k,
+        )
+        self.you_retriever = YouRetriever(
+            api_key=os.environ.get("YOU_API_KEY"),
+            similarity_top_k=self.similarity_top_k,
+        )
+        super().__init__()
+
+    def _retrieve(self, query, **kwargs):
+        bm25_nodes = self.bm25_retriever.retrieve(query, **kwargs)
+        vector_nodes = self.vector_retriever.retrieve(query, **kwargs)
+        you_nodes = self.you_retriever.retrieve(query, **kwargs)
+
+        # combine the two lists of nodes
+        all_nodes = []
+        node_ids = set()
+        for n in you_nodes + bm25_nodes + vector_nodes:
+            if n.node.node_id not in node_ids:
+                all_nodes.append(n)
+                node_ids.add(n.node.node_id)
+        return all_nodes

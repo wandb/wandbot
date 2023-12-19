@@ -30,15 +30,21 @@ from typing import Any, Dict, List, Optional
 
 import tiktoken
 import wandb
-from llama_index import StorageContext, load_index_from_storage
+from llama_index import QueryBundle, StorageContext, load_index_from_storage
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
     WandbCallbackHandler,
 )
-from llama_index.chat_engine.types import BaseChatEngine, ChatMode
+from llama_index.chat_engine import (
+    CondensePlusContextChatEngine,
+    ContextChatEngine,
+)
+from llama_index.chat_engine.types import BaseChatEngine
 from llama_index.indices.postprocessor import CohereRerank
 from llama_index.llms import ChatMessage, MessageRole
+from llama_index.query_engine import RetrieverQueryEngine
+from llama_index.response_synthesizers import ResponseMode
 from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
@@ -47,6 +53,7 @@ from wandbot.chat.prompts import load_chat_prompt
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import (
+    HybridRetriever,
     LanguageFilterPostprocessor,
     Timer,
     get_logger,
@@ -164,6 +171,8 @@ class Chat:
         max_retries: int,
         has_chat_history: bool = False,
         language: str = "en",
+        initial_k: int = 15,
+        top_k: int = 5,
     ) -> BaseChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 
@@ -182,22 +191,36 @@ class Chat:
             callback_manager=self.callback_manager,
         )
 
-        chat_engine = self.index.as_chat_engine(
-            chat_mode=ChatMode.CONDENSE_QUESTION
-            if has_chat_history
-            else ChatMode.CONTEXT,
-            similarity_top_k=50,
-            response_mode="compact",
+        query_engine = self._load_retriever(
+            service_context=service_context,
+            similarity_top_k=initial_k,
+            language=language,
+            top_k=top_k,
+        )
+        chat_engine_kwargs = dict(
+            retriever=query_engine.retriever,
+            storage_context=self.storage_context,
             service_context=service_context,
             text_qa_template=self.qa_prompt,
+            similarity_top_k=initial_k,
+            response_mode="compact",
             node_postprocessors=[
                 LanguageFilterPostprocessor(languages=[language, "python"]),
-                CohereRerank(top_n=5, model="rerank-english-v2.0")
+                CohereRerank(top_n=top_k, model="rerank-english-v2.0")
                 if language == "en"
-                else CohereRerank(top_n=5, model="rerank-multilingual-v2.0"),
+                else CohereRerank(
+                    top_n=top_k, model="rerank-multilingual-v2.0"
+                ),
             ],
-            storage_context=self.storage_context,
         )
+
+        if has_chat_history:
+            chat_engine = CondensePlusContextChatEngine.from_defaults(
+                **chat_engine_kwargs
+            )
+        else:
+            chat_engine = ContextChatEngine.from_defaults(**chat_engine_kwargs)
+
         return chat_engine
 
     def validate_and_format_question(self, question: str) -> str:
@@ -366,8 +389,36 @@ class Chat:
         self.chat_table.log(result)
         return ChatResponse(**result)
 
+    def _load_retriever(
+        self,
+        service_context,
+        similarity_top_k=15,
+        language="en",
+        top_k=5,
+    ) -> RetrieverQueryEngine:
+        retriever = HybridRetriever(
+            index=self.index,
+            similarity_top_k=similarity_top_k,
+            storage_context=self.storage_context,
+        )
+
+        node_postprocessors = [
+            LanguageFilterPostprocessor(languages=[language, "python"]),
+            CohereRerank(top_n=top_k, model="rerank-english-v2.0")
+            if language == "en"
+            else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
+        ]
+        query_engine = RetrieverQueryEngine.from_args(
+            retriever=retriever,
+            node_postprocessors=node_postprocessors,
+            response_mode=ResponseMode.COMPACT,
+            service_context=service_context,
+            text_qa_template=self.qa_prompt,
+        )
+        return query_engine
+
     def retrieve(
-        self, query: str, language="en", initial_k: int = 50, top_k: int = 5
+        self, query: str, language="en", initial_k: int = 15, top_k: int = 5
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -380,19 +431,14 @@ class Chat:
         Returns:
             A list of dictionaries representing the retrieved results.
         """
-        retrieval_engine = self.index.as_retriever(
-            similarity_top_k=initial_k,
-            node_postprocessors=[
-                LanguageFilterPostprocessor(languages=[language, "python"]),
-                CohereRerank(top_n=top_k, model="rerank-english-v2.0")
-                if language == "en"
-                else CohereRerank(
-                    top_n=top_k, model="rerank-multilingual-v2.0"
-                ),
-            ],
-            storage_context=self.storage_context,
+        retrieval_engine = self._load_retriever(
+            self.index.service_context,
+            initial_k,
+            language,
+            top_k,
         )
-        results = retrieval_engine.retrieve(query)
+        query_bundle = QueryBundle(query_str=query)
+        results = retrieval_engine.retrieve(query_bundle)
 
         outputs = [
             {

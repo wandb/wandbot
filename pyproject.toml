@@ -38,6 +38,7 @@ weave = "^0.30.0"
 langchain = "^0.0.344"
 cachew = "^0.15.20231019"
 colorlog = "^6.8.0"
+rank-bm25 = "^0.2.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
