@@ -38,7 +38,8 @@ from llama_index import (
 from llama_index.bridge.pydantic import Field
 from llama_index.callbacks import CallbackManager
 from llama_index.core import BaseRetriever
-from llama_index.llms import OpenAI
+from llama_index.llms import LiteLLM
+from llama_index.llms.llm import LLM
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.retrievers import BM25Retriever
 from llama_index.schema import NodeWithScore, QueryBundle, TextNode
@@ -104,7 +105,11 @@ def load_embeddings(cache_dir: str) -> CacheBackedEmbeddings:
     return cached_embedder
 
 
-def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
+def load_llm(
+    model_name: str,
+    temperature: float,
+    max_retries: int,
+) -> LLM:
     """Loads a language model with the specified parameters.
 
     Args:
@@ -115,12 +120,18 @@ def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
     Returns:
         An instance of the loaded language model.
     """
-    llm = OpenAI(
+    import litellm
+    from litellm.caching import Cache
+
+    litellm.cache = Cache()
+
+    llm = LiteLLM(
         model=model_name,
         temperature=temperature,
-        streaming=True,
         max_retries=max_retries,
+        caching=True,
     )
+
     return llm
 
 
@@ -143,8 +154,14 @@ def load_service_context(
     Returns:
         A service context instance with the specified parameters.
     """
-    llm = load_llm(llm, temperature, max_retries=max_retries)
+
     embed_model = load_embeddings(embeddings_cache)
+    llm = load_llm(
+        model_name=llm,
+        temperature=temperature,
+        max_retries=max_retries,
+    )
+
     return ServiceContext.from_defaults(
         llm=llm, embed_model=embed_model, callback_manager=callback_manager
     )
