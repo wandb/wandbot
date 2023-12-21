@@ -17,23 +17,28 @@ Typical usage example:
 import json
 import os
 import pathlib
-from typing import Iterator
+from typing import Any, Dict, Iterator
 from urllib.parse import urljoin
 
 import markdown
 import nbformat
+import wandb
+from google.cloud import bigquery
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
-
-import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
+    FCReportsStoreConfig,
+    SDKCodeStoreConfig,
+    SDKTestsStoreConfig,
+    WeaveCodeStoreConfig,
+    WeaveExamplesStoreConfig,
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
@@ -59,8 +64,8 @@ class DataLoader(BaseLoader):
         Args:
             config: The configuration for the data store.
         """
-        self.config = config
-        self.metadata = None
+        self.config: DataStoreConfig = config
+        self.metadata: Dict[str, Any] = {}
 
     def lazy_load(
         self,
@@ -283,6 +288,155 @@ class CodeDataLoader(DataLoader):
                 )
 
 
+class FCReportsDataLoader(DataLoader):
+    def fetch_data(self):
+        client = bigquery.Client(project=self.config.data_source.remote_path)
+
+        query = """
+            SELECT 
+                created_at, 
+                description,
+                display_name, 
+                is_public, 
+                name, 
+                report_id, 
+                report_path, 
+                showcased_at, 
+                spec
+            FROM analytics.dim_reports
+            WHERE showcased_at IS NOT NULL and is_public = true
+            ORDER BY showcased_at DESC
+            """
+
+        fc_spec = client.query(query).to_dataframe()
+        fc_spec.to_json(
+            self.config.data_source.local_path, lines=True, orient="records"
+        )
+        return self.config.data_source.local_path
+
+    @staticmethod
+    def convert_block_to_markdown(block):
+        """
+        Converts a single content block to its Markdown representation.
+        """
+        md_content = ""
+
+        # Handle different types of blocks
+        if block["type"] == "paragraph":
+            for child in block["children"]:
+                if "url" in child:
+                    md_content += (
+                        f"[{child['children'][0]['text']}]({child['url']})"
+                    )
+                elif "inlineCode" in child and child["inlineCode"]:
+                    md_content += f"`{child.get('text', '')}`"
+                else:
+                    md_content += child.get("text", "")
+            md_content += "\n\n"
+
+        elif block["type"] == "heading":
+            md_content += (
+                "#" * block["level"]
+                + " "
+                + "".join(child.get("text", "") for child in block["children"])
+                + "\n\n"
+            )
+
+        elif block["type"] == "list":
+            for item in block["children"]:
+                if item["type"] == "list-item":
+                    md_content += "* "
+                    for child in item["children"]:
+                        if child.get("type") == "paragraph":
+                            for text_block in child["children"]:
+                                if (
+                                    "inlineCode" in text_block
+                                    and text_block["inlineCode"]
+                                ):
+                                    md_content += (
+                                        f"`{text_block.get('text', '')}`"
+                                    )
+                                else:
+                                    md_content += text_block.get("text", "")
+                    md_content += "\n"
+            md_content += "\n"
+
+        elif block["type"] == "code-block":
+            md_content += "```\n"
+            for line in block["children"]:
+                md_content += line["children"][0].get("text", "") + "\n"
+            md_content += "```\n\n"
+
+        elif block["type"] == "block-quote" or block["type"] == "callout-block":
+            md_content += "\n> "
+            for child in block["children"]:
+                md_content += child.get("text", "") + " "
+            md_content += "\n\n"
+
+        elif block["type"] == "horizontal-rule":
+            md_content += "\n---\n"
+
+        elif block["type"] == "latex":
+            # Fetching LaTeX content from 'content' field instead of 'children'
+            latex_content = block.get("content", "")
+            md_content += f"$$\n{latex_content}\n$$\n\n"
+
+        return md_content
+
+    def parse_content(self, content):
+        markdown_content = ""
+        for block in content.get("blocks", []):
+            markdown_content += self.convert_block_to_markdown(block)
+        return markdown_content
+
+    def parse_row(self, row):
+        output = {}
+        row_dict = json.loads(row)
+        if row_dict["is_public"]:
+            spec = row_dict["spec"]
+            content = json.loads(spec)
+            markdown_content = self.parse_content(content)
+            output["content"] = (
+                "\n# "
+                + row_dict.get("display_name", "")
+                + "\n\n## "
+                + row_dict.get("description", "")
+                + "\n\n"
+                + markdown_content
+                if markdown_content
+                else ""
+            )
+            output["source"] = "https://wandb.ai" + row_dict["report_path"]
+
+        return output
+
+    def parse_data_dump(self, data_file):
+        for row in open(data_file):
+            parsed_row = self.parse_row(row)
+            yield parsed_row
+
+    def lazy_load(self) -> Iterator[Document]:
+        """A lazy loader for code documents.
+
+        This method implements the lazy loading behavior for report documents.
+
+        Yields:
+            A Document object.
+        """
+
+        data_dump_fname = self.fetch_data()
+        for parsed_row in self.parse_data_dump(data_dump_fname):
+            document = Document(
+                page_content=parsed_row["content"],
+                metadata={
+                    "source": parsed_row["source"],
+                    "language": "en",
+                    "file_type": ".md",
+                },
+            )
+            yield document
+
+
 def load(
     project: str,
     entity: str,
@@ -314,12 +468,22 @@ def load(
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
     examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
+    sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
+    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
+    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
+    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
+    fc_reports_loader = FCReportsDataLoader(FCReportsStoreConfig())
 
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
+        sdk_code_loader,
+        sdk_tests_loader,
+        weave_code_loader,
+        weave_examples_loader,
+        fc_reports_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 

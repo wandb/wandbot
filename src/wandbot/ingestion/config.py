@@ -10,14 +10,13 @@ Typical usage example:
   data_store_config = DataStoreConfig()
   docodile_english_store_config = DocodileEnglishStoreConfig()
 """
-
+import datetime
 import pathlib
 from typing import List, Optional, Union
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -182,6 +181,34 @@ class WeaveJsStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_js")
 
 
+class FCReportsStoreConfig(DataStoreConfig):
+    name: str = "fc_reports_store"
+    data_source: DataSource = DataSource(
+        remote_path="wandb-production",
+        repo_path="",
+        base_path="reports",
+        file_pattern=["*.json"],
+        is_git_repo=False,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_fc_reports")
+
+    @model_validator(mode="after")
+    def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
+        values.docstore_dir = (
+            values.data_source.cache_dir / values.name / values.docstore_dir
+        )
+        data_source = values.data_source
+
+        data_source.local_path = (
+            data_source.cache_dir
+            / values.name
+            / f"reports_{int(datetime.datetime.now().timestamp())}.json"
+        )
+        values.data_source = data_source
+
+        return values
+
+
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
     embedding_dim: int = 1536
@@ -190,3 +217,7 @@ class VectorStoreConfig(BaseSettings):
     temperature: float = 0.1
     max_retries: int = 3
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
+
+
+if __name__ == "__main__":
+    print(FCReportsStoreConfig().model_dump_json(indent=2))
