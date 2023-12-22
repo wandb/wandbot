@@ -42,6 +42,8 @@ rank-bm25 = "^0.2.2"
 litellm = "^1.15.1"
 google-cloud-bigquery = "^3.14.1"
 db-dtypes = "^1.2.0"
+python-frontmatter = "^1.0.1"
+pymdown-extensions = "^10.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -17,10 +17,9 @@ Typical usage example:
 import json
 import os
 import pathlib
-from typing import Any, Dict, Iterator
-from urllib.parse import urljoin
+from typing import Any, Dict, Iterator, List
+from urllib.parse import urljoin, urlparse
 
-import markdown
 import nbformat
 import wandb
 from google.cloud import bigquery
@@ -43,6 +42,7 @@ from wandbot.ingestion.config import (
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
     clean_contents,
+    extract_frontmatter,
     fetch_git_repo,
 )
 from wandbot.utils import get_logger
@@ -136,12 +136,51 @@ class DocodileDataLoader(DataLoader):
         Returns:
             The extracted slug.
         """
-        with open(file_path, "r") as file:
-            content = file.read()
-            md = markdown.Markdown(extensions=["meta"])
-            md.convert(content)
-            meta = md.Meta.get("slug", [""])
-            return meta[0]
+
+        meta = extract_frontmatter(file_path)
+        output = meta.get("slug", "")
+        return output
+
+    @staticmethod
+    def extract_description(file_path: pathlib.Path) -> str:
+        """Extracts the description from a file.
+
+        Args:
+            file_path: The path to the file.
+
+        Returns:
+            The extracted description.
+        """
+        meta = extract_frontmatter(file_path)
+        output = meta.get("description", "")
+        return output
+
+    @staticmethod
+    def extract_tags(source_url: str) -> List[str]:
+        """Extracts the tags from a source url.
+
+        Args:
+            source_url: The URL of the file.
+
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        parts_mapper = {
+            "ref": ["API Reference", "Technical Specifications"],
+            "guides": ["Guides"],
+            "tutorials": ["Tutorials"],
+        }
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+        return tags + ["Documentation"]
 
     def generate_site_url(
         self, base_path: pathlib.Path, file_path: pathlib.Path
@@ -219,6 +258,12 @@ class DocodileDataLoader(DataLoader):
                     document.metadata["source"]
                 ]
                 document.metadata["language"] = self.config.language
+                document.metadata["description"] = self.extract_description(
+                    f_name
+                )
+                document.metadata["tags"] = self.extract_tags(
+                    document.metadata["source"]
+                )
                 yield document
             except Exception as e:
                 logger.warning(
@@ -227,6 +272,32 @@ class DocodileDataLoader(DataLoader):
 
 
 class CodeDataLoader(DataLoader):
+    @staticmethod
+    def extract_tags(source_url: str) -> List[str]:
+        """Extracts the tags from a source url.
+
+        Args:
+            source_url: The URL of the file.
+
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        tree_slug = parts.index("tree")
+        parts = parts[tree_slug + 2 :]
+        # parts = parts[parts.index("master") + 1 :]
+        parts_mapper = {"__init__.py": [], "__main__.py": []}
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ").replace("_", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+        return tags + ["Code"]
+
     def lazy_load(self) -> Iterator[Document]:
         """A lazy loader for code documents.
 
@@ -281,6 +352,10 @@ class CodeDataLoader(DataLoader):
                 document.metadata["language"] = EXTENSION_MAP[
                     document.metadata["file_type"]
                 ]
+                document.metadata["description"] = ""
+                document.metadata["tags"] = self.extract_tags(
+                    document.metadata["source"]
+                )
                 yield document
             except Exception as e:
                 logger.warning(
@@ -407,6 +482,7 @@ class FCReportsDataLoader(DataLoader):
                 else ""
             )
             output["source"] = "https://wandb.ai" + row_dict["report_path"]
+            output["description"] = row_dict["description"]
 
         return output
 
@@ -432,6 +508,8 @@ class FCReportsDataLoader(DataLoader):
                     "source": parsed_row["source"],
                     "language": "en",
                     "file_type": ".md",
+                    "description": parsed_row["description"],
+                    "tags": ["Reports"],
                 },
             )
             yield document
