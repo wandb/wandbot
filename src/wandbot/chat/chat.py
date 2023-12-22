@@ -50,6 +50,7 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt
+from wandbot.chat.query_handler import QueryHandler
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import (
@@ -142,8 +143,13 @@ class Chat:
         self.callback_manager = CallbackManager(
             [self.wandb_callback, self.token_counter]
         )
-
-        self.qa_prompt = load_chat_prompt(self.config.chat_prompt)
+        self.qa_prompt = load_chat_prompt(
+            f_name=self.config.chat_prompt,
+            system_template=self.config.system_template,
+            # language_code=language,
+            # query_intent=kwargs.get("query_intent", ""),
+        )
+        self.query_handler = QueryHandler()
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
@@ -173,6 +179,7 @@ class Chat:
         language: str = "en",
         initial_k: int = 15,
         top_k: int = 5,
+        **kwargs,
     ) -> BaseChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 
@@ -197,6 +204,14 @@ class Chat:
             language=language,
             top_k=top_k,
         )
+
+        self.qa_prompt = load_chat_prompt(
+            f_name=self.config.chat_prompt,
+            system_template=self.config.system_template,
+            language_code=language,
+            query_intent=kwargs.get("query_intent", ""),
+        )
+        logger.warning(f"\n\n\n\nprompt: {self.qa_prompt}\n\n\n\n")
         chat_engine_kwargs = dict(
             retriever=query_engine.retriever,
             storage_context=self.storage_context,
@@ -282,6 +297,7 @@ class Chat:
         query: str,
         chat_history: Optional[List[ChatMessage]] = None,
         language: str = "en",
+        **kwargs,
     ) -> Dict[str, Any]:
         """Gets the answer for the given query and chat history.
 
@@ -299,6 +315,7 @@ class Chat:
                 max_retries=self.config.max_retries,
                 language=language,
                 has_chat_history=bool(chat_history),
+                **kwargs,
             )
             response = chat_engine.chat(
                 message=query, chat_history=chat_history
@@ -319,6 +336,7 @@ class Chat:
                     max_retries=self.config.max_fallback_retries,
                     language=language,
                     has_chat_history=bool(chat_history),
+                    **kwargs,
                 )
                 response = fallback_chat_engine.chat(
                     message=query,
@@ -354,6 +372,7 @@ class Chat:
         with Timer() as timer:
             try:
                 query = self.validate_and_format_question(chat_request.question)
+                resolved_query = self.query_handler(chat_request)
             except ValueError as e:
                 result = {
                     "answer": str(e),
@@ -361,9 +380,10 @@ class Chat:
                 }
             else:
                 result = self.get_answer(
-                    query=query,
+                    query=resolved_query.cleaned_query,
                     chat_history=get_chat_history(chat_request.chat_history),
-                    language=chat_request.language,
+                    language=resolved_query.language,
+                    query_intent=resolved_query.description,
                 )
                 usage_stats = {
                     "total_tokens": self.token_counter.total_llm_token_count,
