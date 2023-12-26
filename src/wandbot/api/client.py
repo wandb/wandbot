@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
+
 from wandbot.api.schemas import (
     APIFeedbackRequest,
     APIFeedbackResponse,

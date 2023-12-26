@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Optional, Sequence
 
 from llama_index.evaluation import CorrectnessEvaluator, EvaluationResult
+
 from wandbot.evaluation.eval.utils import (
     make_eval_template,
     safe_parse_eval_response,

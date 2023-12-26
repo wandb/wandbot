@@ -18,6 +18,7 @@ Classes:
 from typing import List
 
 from pydantic import BaseModel
+
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import (
     ChatThread,

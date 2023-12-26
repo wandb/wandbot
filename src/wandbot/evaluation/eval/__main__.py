@@ -10,6 +10,7 @@ from llama_index.llms import OpenAI
 from ragas import metrics
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
+
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
