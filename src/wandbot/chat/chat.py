@@ -28,6 +28,7 @@ Typical usage example:
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
@@ -44,9 +45,6 @@ from llama_index.indices.postprocessor import CohereRerank
 from llama_index.llms import ChatMessage, MessageRole
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
-from weave.monitoring import StreamTable
-
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_handler import QueryHandler, ResolvedQuery
@@ -57,8 +55,38 @@ from wandbot.chat.retriever import (
 )
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger, load_service_context
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
+
+
+def rebuild_full_prompt(
+    message_templates: List[ChatMessage], result: Dict[str, Any]
+) -> str:
+    system_template = ""
+    for item in message_templates[:-1]:
+        system_template += f"\n# {item.role}:\n\t{item.content}\n\n"
+
+    query_str = result["question"]
+
+    context = json.loads(result["source_documents"])
+
+    context_str = ""
+    for item in context:
+        context_str += "source: " + item["source"] + "\n\n"
+        context_str += item["text"] + "\n\n"
+        context_str += "---\n\n"
+
+    query_content = partial_format(
+        message_templates[-1].content,
+        query_str=query_str,
+        context_str=context_str,
+    )
+    system_template += (
+        f"\n# {message_templates[-1].role}:\n\t{query_content}\n\n"
+    )
+
+    return system_template
 
 
 class WandbContextChatEngine(ContextChatEngine):
@@ -192,11 +220,7 @@ class Chat:
             callback_manager=self.callback_manager,
         )
 
-        self.qa_prompt = load_chat_prompt(
-            f_name=self.config.chat_prompt,
-            # language_code=language,
-            # query_intent=kwargs.get("query_intent", ""),
-        )
+        self.qa_prompt = load_chat_prompt(f_name=self.config.chat_prompt)
         self.query_handler = QueryHandler()
         self.retriever = Retriever(
             run=self.run,
@@ -339,38 +363,38 @@ class Chat:
             A dictionary representing the answer.
 
         """
-        # try:
-        result = self.get_response(
-            service_context=self.default_service_context,
-            query=resolved_query.cleaned_query,
-            language=resolved_query.language,
-            chat_history=resolved_query.chat_history,
-            query_intent=resolved_query.intent,
-        )
-        # except Exception as e:
-        #     logger.warning(f"{self.config.chat_model_name} failed with {e}")
-        #     logger.warning(
-        #         f"Falling back to {self.config.fallback_model_name} model"
-        #     )
-        #     try:
-        #         result = self.get_response(
-        #             service_context=self.fallback_service_context,
-        #             query=resolved_query.cleaned_query,
-        #             language=resolved_query.language,
-        #             chat_history=resolved_query.chat_history,
-        #             query_intent=resolved_query.intent,
-        #         )
-        #
-        #     except Exception as e:
-        #         logger.error(
-        #             f"{self.config.fallback_model_name} failed with {e}"
-        #         )
-        #         result = {
-        #             "answer": "\uE058"
-        #             + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
-        #             "source_documents": None,
-        #             "model": "None",
-        #         }
+        try:
+            result = self.get_response(
+                service_context=self.default_service_context,
+                query=resolved_query.cleaned_query,
+                language=resolved_query.language,
+                chat_history=resolved_query.chat_history,
+                query_intent=resolved_query.intent,
+            )
+        except Exception as e:
+            logger.warning(f"{self.config.chat_model_name} failed with {e}")
+            logger.warning(
+                f"Falling back to {self.config.fallback_model_name} model"
+            )
+            try:
+                result = self.get_response(
+                    service_context=self.fallback_service_context,
+                    query=resolved_query.cleaned_query,
+                    language=resolved_query.language,
+                    chat_history=resolved_query.chat_history,
+                    query_intent=resolved_query.intent,
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"{self.config.fallback_model_name} failed with {e}"
+                )
+                result = {
+                    "answer": "\uE058"
+                    + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
+                    "source_documents": None,
+                    "model": "None",
+                }
         return self.format_response(result)
 
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
@@ -399,19 +423,23 @@ class Chat:
                 }
                 self.token_counter.reset_counts()
 
-        result.update(
-            dict(
-                **{
-                    "question": chat_request.question,
-                    "time_taken": timer.elapsed,
-                    "start_time": timer.start,
-                    "end_time": timer.stop,
-                    "application": chat_request.application,
-                },
-                **usage_stats,
-            )
+                result.update(
+                    dict(
+                        **{
+                            "question": chat_request.question,
+                            "time_taken": timer.elapsed,
+                            "start_time": timer.start,
+                            "end_time": timer.stop,
+                            "application": chat_request.application,
+                        },
+                        **usage_stats,
+                    )
+                )
+                self.run.log(usage_stats)
+
+        system_template = rebuild_full_prompt(
+            self.qa_prompt.message_templates, result
         )
-        self.run.log(usage_stats)
-        result["system_prompt"] = self.qa_prompt.message_templates[0].content
+        result["system_prompt"] = system_template
         self.chat_table.log(result)
         return ChatResponse(**result)
