@@ -26,32 +26,120 @@ Typical usage example:
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
+import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
     WandbCallbackHandler,
+    trace_method,
 )
 from llama_index.chat_engine import (
     CondensePlusContextChatEngine,
     ContextChatEngine,
 )
-from llama_index.chat_engine.types import BaseChatEngine
+from llama_index.chat_engine.types import AgentChatResponse, BaseChatEngine
 from llama_index.indices.postprocessor import CohereRerank
-from llama_index.llms import ChatMessage
-from weave.monitoring import StreamTable
-
-import wandb
+from llama_index.llms import ChatMessage, MessageRole
+from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
+from llama_index.tools import ToolOutput
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.prompts import load_chat_prompt
+from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_handler import QueryHandler, ResolvedQuery
-from wandbot.chat.retriever import LanguageFilterPostprocessor, Retriever
+from wandbot.chat.retriever import (
+    LanguageFilterPostprocessor,
+    MetadataPostprocessor,
+    Retriever,
+)
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger, load_service_context
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
+
+
+class WandbContextChatEngine(ContextChatEngine):
+    def _generate_context(
+        self, message: str
+    ) -> Tuple[str, List[NodeWithScore]]:
+        """Generate context information from a message."""
+        nodes = self._retriever.retrieve(message)
+        for postprocessor in self._node_postprocessors:
+            nodes = postprocessor.postprocess_nodes(
+                nodes, query_bundle=QueryBundle(message)
+            )
+
+        context_str = "\n\n---\n\n".join(
+            [
+                n.node.get_content(metadata_mode=MetadataMode.LLM).strip()
+                for n in nodes
+            ]
+        )
+
+        return context_str.strip(), nodes
+
+    def _get_prefix_messages_with_context(
+        self, context_str: str
+    ) -> List[ChatMessage]:
+        """Get the prefix messages with context."""
+        prefix_messages = self._prefix_messages
+
+        context_str_w_sys_prompt = partial_format(
+            prefix_messages[-1].content, context_str=context_str
+        )
+        return [
+            *prefix_messages[:-1],
+            ChatMessage(
+                content=context_str_w_sys_prompt,
+                role=MessageRole.USER,
+                metadata={},
+            ),
+        ]
+
+    @trace_method("chat")
+    def chat(
+        self, message: str, chat_history: Optional[List[ChatMessage]] = None
+    ) -> AgentChatResponse:
+        if chat_history is not None:
+            self._memory.set(chat_history)
+
+        context_str_template, nodes = self._generate_context(message)
+        prefix_messages = self._get_prefix_messages_with_context(
+            context_str_template
+        )
+        prefix_messages_token_count = len(
+            self._memory.tokenizer_fn(
+                " ".join([(m.content or "") for m in prefix_messages])
+            )
+        )
+
+        prefix_messages[-1] = ChatMessage(
+            content=partial_format(
+                prefix_messages[-1].content, query_str=message
+            ),
+            role="user",
+        )
+
+        self._memory.put(prefix_messages[-1])
+        all_messages = prefix_messages
+        chat_response = self._llm.chat(all_messages)
+        ai_message = chat_response.message
+        self._memory.put(ai_message)
+
+        return AgentChatResponse(
+            response=str(chat_response.message.content),
+            sources=[
+                ToolOutput(
+                    tool_name="retriever",
+                    content=str(prefix_messages[0]),
+                    raw_input={"message": message},
+                    raw_output=prefix_messages[0],
+                )
+            ],
+            source_nodes=nodes,
+        )
 
 
 class Chat:
@@ -105,7 +193,6 @@ class Chat:
 
         self.qa_prompt = load_chat_prompt(
             f_name=self.config.chat_prompt,
-            system_template=self.config.system_template,
             # language_code=language,
             # query_intent=kwargs.get("query_intent", ""),
         )
@@ -120,16 +207,20 @@ class Chat:
         self,
         service_context: ServiceContext,
         has_chat_history: bool = False,
+        query_intent: str = "\n",
         language: str = "en",
         initial_k: int = 15,
         top_k: int = 5,
-        **kwargs,
     ) -> BaseChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 
         Args:
-            model_name: A string representing the name of the model.
-            max_retries: An integer representing the maximum number of retries.
+            service_context: An instance of ServiceContext.
+            has_chat_history: A boolean indicating whether the chat history is empty.
+            query_intent: A string representing the query intent.
+            language: A string representing the language.
+            initial_k: An integer representing the initial number of documents to retrieve.
+            top_k: An integer representing the number of documents to retrieve after reranking.
 
         Returns:
             An instance of ChatEngine.
@@ -143,9 +234,8 @@ class Chat:
 
         self.qa_prompt = load_chat_prompt(
             f_name=self.config.chat_prompt,
-            system_template=self.config.system_template,
             language_code=language,
-            query_intent=kwargs.get("query_intent", ""),
+            query_intent=query_intent,
         )
         chat_engine_kwargs = dict(
             retriever=query_engine.retriever,
@@ -161,7 +251,10 @@ class Chat:
                 else CohereRerank(
                     top_n=top_k, model="rerank-multilingual-v2.0"
                 ),
+                MetadataPostprocessor(),
             ],
+            prefix_messages=self.qa_prompt.message_templates,
+            context_template="",
         )
 
         if has_chat_history:
@@ -169,7 +262,9 @@ class Chat:
                 **chat_engine_kwargs
             )
         else:
-            chat_engine = ContextChatEngine.from_defaults(**chat_engine_kwargs)
+            chat_engine = WandbContextChatEngine.from_defaults(
+                **chat_engine_kwargs
+            )
 
         return chat_engine
 
@@ -213,13 +308,13 @@ class Chat:
         query: str,
         language: str,
         chat_history: List[ChatMessage],
-        **kwargs,
+        query_intent: str,
     ) -> Dict[str, Any]:
         chat_engine = self._load_chat_engine(
             service_context=service_context,
             language=language,
             has_chat_history=bool(chat_history),
-            **kwargs,
+            query_intent=query_intent,
         )
         response = chat_engine.chat(message=query, chat_history=chat_history)
         result = {
@@ -243,38 +338,38 @@ class Chat:
             A dictionary representing the answer.
 
         """
-        try:
-            result = self.get_response(
-                service_context=self.default_service_context,
-                query=resolved_query.cleaned_query,
-                language=resolved_query.language,
-                chat_history=resolved_query.chat_history,
-                **kwargs,
-            )
-        except Exception as e:
-            logger.warning(f"{self.config.chat_model_name} failed with {e}")
-            logger.warning(
-                f"Falling back to {self.config.fallback_model_name} model"
-            )
-            try:
-                result = self.get_response(
-                    service_context=self.fallback_service_context,
-                    query=resolved_query.cleaned_query,
-                    language=resolved_query.language,
-                    chat_history=resolved_query.chat_history,
-                    **kwargs,
-                )
-
-            except Exception as e:
-                logger.error(
-                    f"{self.config.fallback_model_name} failed with {e}"
-                )
-                result = {
-                    "answer": "\uE058"
-                    + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
-                    "source_documents": None,
-                    "model": "None",
-                }
+        # try:
+        result = self.get_response(
+            service_context=self.default_service_context,
+            query=resolved_query.cleaned_query,
+            language=resolved_query.language,
+            chat_history=resolved_query.chat_history,
+            query_intent=resolved_query.intent,
+        )
+        # except Exception as e:
+        #     logger.warning(f"{self.config.chat_model_name} failed with {e}")
+        #     logger.warning(
+        #         f"Falling back to {self.config.fallback_model_name} model"
+        #     )
+        #     try:
+        #         result = self.get_response(
+        #             service_context=self.fallback_service_context,
+        #             query=resolved_query.cleaned_query,
+        #             language=resolved_query.language,
+        #             chat_history=resolved_query.chat_history,
+        #             query_intent=resolved_query.intent,
+        #         )
+        #
+        #     except Exception as e:
+        #         logger.error(
+        #             f"{self.config.fallback_model_name} failed with {e}"
+        #         )
+        #         result = {
+        #             "answer": "\uE058"
+        #             + " Sorry, there seems to be an issue with our LLM service. Please try again in some time.",
+        #             "source_documents": None,
+        #             "model": "None",
+        #         }
         return self.format_response(result)
 
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:

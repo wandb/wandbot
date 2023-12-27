@@ -25,16 +25,33 @@ from string import Formatter
 
 
 def partial_format(s, **kwargs):
+    # Identify the placeholders
     place_holders = set(
         [x[1] for x in Formatter().parse(s) if x[1] is not None]
     )
     replacements = {k: kwargs.get(k, "{" + k + "}") for k in place_holders}
+
+    # Escape all curly braces that are not part of a placeholder
+    for k in place_holders:
+        s = s.replace("{" + k + "}", "TEMP_PLACEHOLDER_" + k)
+    s = s.replace("{", "{{").replace("}", "}}")
+
+    # Replace the placeholders
+    for k in place_holders:
+        s = s.replace("TEMP_PLACEHOLDER_" + k, "{" + k + "}")
+
     return s.format(**replacements)
+
+
+ROLE_MAP = {
+    "system": MessageRole.SYSTEM,
+    "human": MessageRole.USER,
+    "assistant": MessageRole.ASSISTANT,
+}
 
 
 def load_chat_prompt(
     f_name: Union[pathlib.Path, str] = None,
-    system_template: Union[pathlib.Path, str] = None,
     language_code: str = "en",
     query_intent: str = "",
 ) -> ChatPromptTemplate:
@@ -55,19 +72,17 @@ def load_chat_prompt(
     f_name = pathlib.Path(f_name)
 
     template = json.load(f_name.open("r"))
+
     human_template = partial_format(
-        template["human_template"],
+        template["messages"][-1]["human"],
         language_code=language_code,
         query_intent=query_intent,
     )
-    messages = [
-        ChatMessage(
-            role=MessageRole.SYSTEM, content=open(system_template).read()
-        ),
-        ChatMessage(
-            role=MessageRole.USER, content=human_template
-        ),  # template["human_template"]),
-    ]
 
+    messages = []
+    for message in template["messages"][:-1]:
+        for k, v in message.items():
+            messages.append(ChatMessage(role=ROLE_MAP[k], content=v))
+    messages.append(ChatMessage(role=MessageRole.USER, content=human_template))
     prompt = ChatPromptTemplate(messages)
     return prompt

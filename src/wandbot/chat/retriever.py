@@ -3,6 +3,7 @@ import pathlib
 from typing import List, Optional
 
 import requests
+import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -22,8 +23,6 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings
-
-import wandb
 from wandbot.utils import get_logger, load_service_context
 
 logger = get_logger(__name__)
@@ -57,6 +56,27 @@ class LanguageFilterPostprocessor(BaseNodePostprocessor):
         return new_nodes
 
 
+class MetadataPostprocessor(BaseNodePostprocessor):
+    """Metadata-based Node processor."""
+
+    @classmethod
+    def class_name(cls) -> str:
+        return "MetadataPostprocessor"
+
+    def _postprocess_nodes(
+        self,
+        nodes: List[NodeWithScore],
+        query_bundle: Optional[QueryBundle] = None,
+    ) -> List[NodeWithScore]:
+        """Postprocess nodes."""
+
+        for node in nodes:
+            node.node.metadata = {
+                k: v for k, v in node.metadata.items() if k in ["source"]
+            }
+        return nodes
+
+
 class YouRetriever(BaseRetriever):
     """You retriever."""
 
@@ -80,7 +100,8 @@ class YouRetriever(BaseRetriever):
             url = "https://api.ydc-index.io/search"
 
             querystring = {
-                "query": query_bundle.query_str,
+                "query": "Weights & Biases, W&B, wandb or Weave "
+                + query_bundle.query_str,
                 "num_web_results": self.similarity_top_k,
             }
             response = requests.get(url, headers=headers, params=querystring)
@@ -238,6 +259,7 @@ class Retriever:
             CohereRerank(top_n=top_k, model="rerank-english-v2.0")
             if language == "en"
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
+            MetadataPostprocessor(),
         ]
         query_engine = RetrieverQueryEngine.from_args(
             retriever=retriever,
