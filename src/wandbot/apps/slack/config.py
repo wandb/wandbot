@@ -17,7 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
-    f"Please note that *wandbot* will experience frequent updates.\n\n"
+    f"Please note that **wandbot** will experience frequent updates.\n\n"
     f"Please do not share any private or sensitive information in your query.\n\n"
     f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
@@ -33,8 +33,8 @@ EN_ERROR_MESSAGE = (
 )
 
 EN_FALLBACK_WARNING_MESSAGE = (
-    "*Warning: Falling back to {model}*, These results may nor be as good as "
-    "*gpt-4*\n\n"
+    "**Warning: Falling back to {model}**, These results may nor be as good as "
+    "**gpt-4**\n\n"
 )
 
 JA_INTRO_MESSAGE = (
@@ -51,7 +51,7 @@ JA_OUTRO_MESSAGE = (
 JA_ERROR_MESSAGE = "「おっと、問題が発生しました。しばらくしてからもう一度お試しください。」"
 
 JA_FALLBACK_WARNING_MESSAGE = (
-    "*警告: {model}* にフォールバックします。これらの結果は *gpt-4* ほど良くない可能性があります*\n\n"
+    "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
 )
 
 
