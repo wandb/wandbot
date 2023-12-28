@@ -21,26 +21,30 @@ from llama_index.llms import ChatMessage, MessageRole
 logger = logging.getLogger(__name__)
 
 
-from string import Formatter
-
-
 def partial_format(s, **kwargs):
-    # Identify the placeholders
-    place_holders = set(
-        [x[1] for x in Formatter().parse(s) if x[1] is not None]
-    )
+    # Manually parse the string and extract the field names
+    place_holders = set()
+    field_name = ""
+    in_field = False
+    for c in s:
+        if c == "{" and not in_field:
+            in_field = True
+        elif c == "}" and in_field:
+            place_holders.add(field_name)
+            field_name = ""
+            in_field = False
+        elif in_field:
+            field_name += c
     replacements = {k: kwargs.get(k, "{" + k + "}") for k in place_holders}
 
-    # Escape all curly braces that are not part of a placeholder
-    for k in place_holders:
-        s = s.replace("{" + k + "}", "TEMP_PLACEHOLDER_" + k)
+    # Escape all curly braces
     s = s.replace("{", "{{").replace("}", "}}")
 
     # Replace the placeholders
-    for k in place_holders:
-        s = s.replace("TEMP_PLACEHOLDER_" + k, "{" + k + "}")
+    for k, v in replacements.items():
+        s = s.replace("{{" + k + "}}", v)
 
-    return s.format(**replacements)
+    return s
 
 
 ROLE_MAP = {
