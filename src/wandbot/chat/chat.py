@@ -29,20 +29,18 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import wandb
-from llama_index import ServiceContext
+from llama_index import PromptTemplate, ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
     WandbCallbackHandler,
     trace_method,
 )
-from llama_index.chat_engine import (
-    CondensePlusContextChatEngine,
-    ContextChatEngine,
-)
+from llama_index.chat_engine import ContextChatEngine
 from llama_index.chat_engine.types import AgentChatResponse, BaseChatEngine
 from llama_index.indices.postprocessor import CohereRerank
 from llama_index.llms import ChatMessage, MessageRole
+from llama_index.llms.generic_utils import messages_to_history_str
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
 from wandbot.chat.config import ChatConfig
@@ -63,9 +61,7 @@ logger = get_logger(__name__)
 def rebuild_full_prompt(
     message_templates: List[ChatMessage], result: Dict[str, Any]
 ) -> str:
-    system_template = ""
-    for item in message_templates[:-1]:
-        system_template += f"\n# {item.role}:\n\t{item.content}\n\n"
+    system_template = messages_to_history_str(message_templates[:-1])
 
     query_str = result["question"]
 
@@ -89,7 +85,37 @@ def rebuild_full_prompt(
     return system_template
 
 
+CONDENSE_PROMPT_TEMPLATE = (
+    "Given the following conversation between a user and an AI assistant and a follow up "
+    "question from user, rephrase the follow up question to be a standalone question. Ensure "
+    "that the standalone question summarizes the conversation and completes the follow up "
+    "question with all the necessary context."
+    + """
+Chat History:
+  {chat_history}
+Follow Up Input: {question}
+  Standalone question:
+"""
+)
+
+
 class WandbContextChatEngine(ContextChatEngine):
+    def _condense_question(
+        self, chat_history: List[ChatMessage], latest_message: str
+    ) -> str:
+        """Condense a conversation history and latest user message to a standalone question."""
+        if len(chat_history) == 0:
+            return latest_message
+
+        chat_history_str = messages_to_history_str(chat_history)
+        logger.debug(chat_history_str)
+
+        return self._llm.predict(
+            PromptTemplate(CONDENSE_PROMPT_TEMPLATE),
+            question=latest_message,
+            chat_history=chat_history_str,
+        )
+
     def _generate_context(
         self, message: str
     ) -> Tuple[str, List[NodeWithScore]]:
@@ -131,10 +157,12 @@ class WandbContextChatEngine(ContextChatEngine):
     def chat(
         self, message: str, chat_history: Optional[List[ChatMessage]] = None
     ) -> AgentChatResponse:
+        condensed_question = message
         if chat_history is not None:
             self._memory.set(chat_history)
+            condensed_question = self._condense_question(chat_history, message)
 
-        context_str_template, nodes = self._generate_context(message)
+        context_str_template, nodes = self._generate_context(condensed_question)
         prefix_messages = self._get_prefix_messages_with_context(
             context_str_template
         )
@@ -146,7 +174,7 @@ class WandbContextChatEngine(ContextChatEngine):
 
         prefix_messages[-1] = ChatMessage(
             content=partial_format(
-                prefix_messages[-1].content, query_str=message
+                prefix_messages[-1].content, query_str=condensed_question
             ),
             role="user",
         )
@@ -163,7 +191,7 @@ class WandbContextChatEngine(ContextChatEngine):
                 ToolOutput(
                     tool_name="retriever",
                     content=str(prefix_messages[0]),
-                    raw_input={"message": message},
+                    raw_input={"message": condensed_question},
                     raw_output=prefix_messages[0],
                 )
             ],
@@ -266,7 +294,6 @@ class Chat:
             retriever=query_engine.retriever,
             storage_context=self.retriever.storage_context,
             service_context=service_context,
-            text_qa_template=self.qa_prompt,
             similarity_top_k=initial_k,
             response_mode="compact",
             node_postprocessors=[
@@ -279,17 +306,9 @@ class Chat:
                 MetadataPostprocessor(),
             ],
             prefix_messages=self.qa_prompt.message_templates,
-            context_template="",
         )
 
-        if has_chat_history:
-            chat_engine = CondensePlusContextChatEngine.from_defaults(
-                **chat_engine_kwargs
-            )
-        else:
-            chat_engine = WandbContextChatEngine.from_defaults(
-                **chat_engine_kwargs
-            )
+        chat_engine = WandbContextChatEngine.from_defaults(**chat_engine_kwargs)
 
         return chat_engine
 
