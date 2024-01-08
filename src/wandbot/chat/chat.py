@@ -28,7 +28,6 @@ Typical usage example:
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
@@ -43,6 +42,9 @@ from llama_index.llms import ChatMessage, MessageRole
 from llama_index.llms.generic_utils import messages_to_history_str
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
+from weave.monitoring import StreamTable
+
+import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
@@ -53,7 +55,6 @@ from wandbot.chat.retriever import (
 )
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger, load_service_context
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
