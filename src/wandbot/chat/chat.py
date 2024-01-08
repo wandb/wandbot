@@ -29,7 +29,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import wandb
-from llama_index import PromptTemplate, ServiceContext
+from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
     TokenCountingHandler,
@@ -37,7 +37,7 @@ from llama_index.callbacks import (
     trace_method,
 )
 from llama_index.chat_engine import ContextChatEngine
-from llama_index.chat_engine.types import AgentChatResponse, BaseChatEngine
+from llama_index.chat_engine.types import AgentChatResponse
 from llama_index.indices.postprocessor import CohereRerank
 from llama_index.llms import ChatMessage, MessageRole
 from llama_index.llms.generic_utils import messages_to_history_str
@@ -45,7 +45,7 @@ from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
-from wandbot.chat.query_handler import QueryHandler, ResolvedQuery
+from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
 from wandbot.chat.retriever import (
     LanguageFilterPostprocessor,
     MetadataPostprocessor,
@@ -85,42 +85,28 @@ def rebuild_full_prompt(
     return system_template
 
 
-CONDENSE_PROMPT_TEMPLATE = (
-    "Given the following conversation between a user and an AI assistant and a follow up "
-    "question from user, rephrase the follow up question to be a standalone question. Ensure "
-    "that the standalone question summarizes the conversation and completes the follow up "
-    "question with all the necessary context."
-    + """
-Chat History:
-  {chat_history}
-Follow Up Input: {question}
-  Standalone question:
-"""
-)
-
-
 class WandbContextChatEngine(ContextChatEngine):
-    def _condense_question(
-        self, chat_history: List[ChatMessage], latest_message: str
-    ) -> str:
-        """Condense a conversation history and latest user message to a standalone question."""
-        if len(chat_history) == 0:
-            return latest_message
-
-        chat_history_str = messages_to_history_str(chat_history)
-        logger.debug(chat_history_str)
-
-        return self._llm.predict(
-            PromptTemplate(CONDENSE_PROMPT_TEMPLATE),
-            question=latest_message,
-            chat_history=chat_history_str,
-        )
-
     def _generate_context(
-        self, message: str
+        self, message: str, **kwargs
     ) -> Tuple[str, List[NodeWithScore]]:
         """Generate context information from a message."""
-        nodes = self._retriever.retrieve(message)
+
+        keywords = kwargs.get("keywords", [])
+        sub_queries = kwargs.get("sub_queries", [])
+
+        query_nodes = self._retriever.retrieve(message)
+        keywords_nodes = []
+        sub_query_nodes = []
+
+        if keywords:
+            keywords_nodes = self._retriever.retrieve(" ".join(keywords))
+
+        if sub_queries:
+            for sub_query in sub_queries:
+                sub_query_nodes += self._retriever.retrieve(sub_query)
+
+        nodes = query_nodes + keywords_nodes + sub_query_nodes
+
         for postprocessor in self._node_postprocessors:
             nodes = postprocessor.postprocess_nodes(
                 nodes, query_bundle=QueryBundle(message)
@@ -155,26 +141,23 @@ class WandbContextChatEngine(ContextChatEngine):
 
     @trace_method("chat")
     def chat(
-        self, message: str, chat_history: Optional[List[ChatMessage]] = None
+        self,
+        message: str,
+        chat_history: Optional[List[ChatMessage]] = None,
+        **kwargs,
     ) -> AgentChatResponse:
-        condensed_question = message
-        if chat_history is not None:
-            self._memory.set(chat_history)
-            condensed_question = self._condense_question(chat_history, message)
-
-        context_str_template, nodes = self._generate_context(condensed_question)
+        context_str_template, nodes = self._generate_context(
+            message,
+            keywords=kwargs.get("keywords", []),
+            sub_queries=kwargs.get("sub_queries", []),
+        )
         prefix_messages = self._get_prefix_messages_with_context(
             context_str_template
-        )
-        prefix_messages_token_count = len(
-            self._memory.tokenizer_fn(
-                " ".join([(m.content or "") for m in prefix_messages])
-            )
         )
 
         prefix_messages[-1] = ChatMessage(
             content=partial_format(
-                prefix_messages[-1].content, query_str=condensed_question
+                prefix_messages[-1].content, query_str=message
             ),
             role="user",
         )
@@ -191,7 +174,7 @@ class WandbContextChatEngine(ContextChatEngine):
                 ToolOutput(
                     tool_name="retriever",
                     content=str(prefix_messages[0]),
-                    raw_input={"message": condensed_question},
+                    raw_input={"message": message},
                     raw_output=prefix_messages[0],
                 )
             ],
@@ -259,17 +242,15 @@ class Chat:
     def _load_chat_engine(
         self,
         service_context: ServiceContext,
-        has_chat_history: bool = False,
         query_intent: str = "\n",
         language: str = "en",
         initial_k: int = 15,
         top_k: int = 5,
-    ) -> BaseChatEngine:
+    ) -> WandbContextChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 
         Args:
             service_context: An instance of ServiceContext.
-            has_chat_history: A boolean indicating whether the chat history is empty.
             query_intent: A string representing the query intent.
             language: A string representing the language.
             initial_k: An integer representing the initial number of documents to retrieve.
@@ -353,14 +334,20 @@ class Chat:
         language: str,
         chat_history: List[ChatMessage],
         query_intent: str,
+        keywords: List[str] | None = None,
+        sub_queries: List[str] | None = None,
     ) -> Dict[str, Any]:
         chat_engine = self._load_chat_engine(
             service_context=service_context,
             language=language,
-            has_chat_history=bool(chat_history),
             query_intent=query_intent,
         )
-        response = chat_engine.chat(message=query, chat_history=chat_history)
+        response = chat_engine.chat(
+            message=query,
+            chat_history=chat_history,
+            keywords=keywords,
+            sub_queries=sub_queries,
+        )
         result = {
             "answer": response.response,
             "source_documents": response.source_nodes,
@@ -370,7 +357,7 @@ class Chat:
 
     def get_answer(
         self,
-        resolved_query: ResolvedQuery,
+        resolved_query: CompleteQuery,
         **kwargs,
     ) -> Dict[str, Any]:
         """Gets the answer for the given query and chat history.
@@ -385,10 +372,10 @@ class Chat:
         try:
             result = self.get_response(
                 service_context=self.default_service_context,
-                query=resolved_query.cleaned_query,
+                query=resolved_query.condensed_query,
                 language=resolved_query.language,
                 chat_history=resolved_query.chat_history,
-                query_intent=resolved_query.intent,
+                query_intent=resolved_query.intent_hints,
             )
         except Exception as e:
             logger.warning(f"{self.config.chat_model_name} failed with {e}")
@@ -401,7 +388,7 @@ class Chat:
                     query=resolved_query.cleaned_query,
                     language=resolved_query.language,
                     chat_history=resolved_query.chat_history,
-                    query_intent=resolved_query.intent,
+                    query_intent=resolved_query.intent_hints,
                 )
 
             except Exception as e:
@@ -426,14 +413,9 @@ class Chat:
             An instance of `ChatResponse` representing the chat response.
         """
         with Timer() as timer:
+            result = {}
             try:
                 resolved_query = self.query_handler(chat_request)
-            except ValueError as e:
-                result = {
-                    "answer": str(e),
-                    "sources": "",
-                }
-            else:
                 result = self.get_answer(resolved_query)
                 usage_stats = {
                     "total_tokens": self.token_counter.total_llm_token_count,
@@ -441,20 +423,25 @@ class Chat:
                     "completion_tokens": self.token_counter.completion_llm_token_count,
                 }
                 self.token_counter.reset_counts()
+            except ValueError as e:
+                result = {
+                    "answer": str(e),
+                    "sources": "",
+                }
 
-                result.update(
-                    dict(
-                        **{
-                            "question": chat_request.question,
-                            "time_taken": timer.elapsed,
-                            "start_time": timer.start,
-                            "end_time": timer.stop,
-                            "application": chat_request.application,
-                        },
-                        **usage_stats,
-                    )
-                )
-                self.run.log(usage_stats)
+        result.update(
+            dict(
+                **{
+                    "question": chat_request.question,
+                    "time_taken": timer.elapsed,
+                    "start_time": timer.start,
+                    "end_time": timer.stop,
+                    "application": chat_request.application,
+                },
+                **usage_stats,
+            )
+        )
+        self.run.log(usage_stats)
 
         system_template = rebuild_full_prompt(
             self.qa_prompt.message_templates, result

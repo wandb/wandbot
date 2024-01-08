@@ -12,11 +12,11 @@ Typical usage example:
   chat_thread = db_client.get_chat_thread(application='app1', thread_id='123')
   question_answer = db_client.create_question_answer(question_answer=QuestionAnswerCreateSchema())
 """
+import json
 from typing import Any, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
@@ -261,9 +261,11 @@ class DatabaseClient:
         question_answers = question_answers.all()
         if question_answers is not None:
             question_answers = [
-                QuestionAnswerCreateSchema.model_validate(
-                    question_answer
-                ).model_dump()
+                json.loads(
+                    QuestionAnswerCreateSchema.model_validate(
+                        question_answer
+                    ).model_dump_json()
+                )
                 for question_answer in question_answers
             ]
             return question_answers

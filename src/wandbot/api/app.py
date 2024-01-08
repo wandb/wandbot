@@ -32,9 +32,8 @@ import asyncio
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import FastAPI, Response, status
-
 import wandb
+from fastapi import FastAPI, Response, status
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -83,7 +82,9 @@ async def backup_db():
                 [chat_thread for chat_thread in chat_threads]
             )
             last_backup = datetime.now().astimezone(timezone.utc)
-            logger.info(f"Backing up database to Table at {last_backup}")
+            logger.info(
+                f"Backing up database to Table at {last_backup}: Number of chat threads: {len(chat_table)}"
+            )
             wandb.log(
                 {"question_answers_db": wandb.Table(dataframe=chat_table)}
             )
