@@ -61,7 +61,7 @@ class Timer:
 
     def __init__(self) -> None:
         """Initializes the timer."""
-        self.start = datetime.datetime.utcnow()
+        self.start = datetime.datetime.now().astimezone(datetime.timezone.utc)
         self.stop = self.start
 
     def __enter__(self) -> "Timer":
@@ -70,7 +70,7 @@ class Timer:
 
     def __exit__(self, *args: Any) -> None:
         """Stops the timer."""
-        self.stop = datetime.datetime.utcnow()
+        self.stop = datetime.datetime.now().astimezone(datetime.timezone.utc)
 
     @property
     def elapsed(self) -> float:
