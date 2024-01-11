@@ -1,8 +1,9 @@
 import os
 import pathlib
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
+import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -22,8 +23,6 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings
-
-import wandb
 from wandbot.utils import get_logger, load_service_context
 
 logger = get_logger(__name__)
@@ -60,6 +59,10 @@ class LanguageFilterPostprocessor(BaseNodePostprocessor):
 class MetadataPostprocessor(BaseNodePostprocessor):
     """Metadata-based Node processor."""
 
+    min_result_size: int = 10
+    include_tags: List[str] | None = None
+    exclude_tags: List[str] | None = None
+
     @classmethod
     def class_name(cls) -> str:
         return "MetadataPostprocessor"
@@ -71,11 +74,30 @@ class MetadataPostprocessor(BaseNodePostprocessor):
     ) -> List[NodeWithScore]:
         """Postprocess nodes."""
 
+        new_nodes = []
         for node in nodes:
-            node.node.metadata = {
-                k: v for k, v in node.metadata.items() if k in ["source"]
-            }
-        return nodes
+            normalized_tags = [
+                tag.lower().strip() for tag in node.metadata["tags"]
+            ]
+            if self.include_tags:
+                normalized_include_tags = [
+                    tag.lower().strip() for tag in self.include_tags
+                ]
+                if not set(normalized_include_tags).issubset(
+                    set(normalized_tags)
+                ):
+                    continue
+            if self.exclude_tags:
+                normalized_exclude_tags = [
+                    tag.lower().strip() for tag in self.exclude_tags
+                ]
+                if set(normalized_exclude_tags).issubset(set(normalized_tags)):
+                    continue
+            new_nodes.append(node)
+        if len(new_nodes) < self.min_result_size:
+            return new_nodes + nodes[: self.min_result_size - len(new_nodes)]
+
+        return new_nodes
 
 
 class YouRetriever(BaseRetriever):
@@ -114,7 +136,13 @@ class YouRetriever(BaseRetriever):
             search_hits = [
                 (
                     "\n".join(hit["snippets"]),
-                    {"source": hit["url"], "language": "en"},
+                    {
+                        "source": hit["url"],
+                        "language": "en",
+                        "description": hit["description"],
+                        "title": hit["title"],
+                        "tags": ["you.com"],
+                    },
                 )
                 for hit in results["hits"]
             ]
@@ -162,7 +190,7 @@ class HybridRetriever(BaseRetriever):
         # combine the two lists of nodes
         all_nodes = []
         node_ids = set()
-        for n in you_nodes + bm25_nodes + vector_nodes:
+        for n in bm25_nodes + vector_nodes + you_nodes:
             if n.node.node_id not in node_ids:
                 all_nodes.append(n)
                 node_ids.add(n.node.node_id)
@@ -233,6 +261,7 @@ class Retriever:
         artifact = self.run.use_artifact(artifact_url)
         artifact_dir = artifact.download()
         index_path = f"{artifact_dir}/{DEFAULT_VECTOR_STORE}{NAMESPACE_SEP}{DEFAULT_PERSIST_FNAME}"
+        logger.debug(f"Loading index from {index_path}")
         storage_context = StorageContext.from_defaults(
             vector_store=FaissVectorStore.from_persist_path(index_path),
             persist_dir=artifact_dir,
@@ -244,6 +273,8 @@ class Retriever:
         similarity_top_k: int | None = None,
         top_k: int | None = None,
         language: str | None = None,
+        include_tags: List[str] | None = None,
+        exclude_tags: List[str] | None = None,
     ) -> RetrieverQueryEngine:
         similarity_top_k = similarity_top_k or self.config.similarity_top_k
         top_k = top_k or self.config.top_k
@@ -256,11 +287,17 @@ class Retriever:
         )
 
         node_postprocessors = [
-            LanguageFilterPostprocessor(languages=[language, "python"]),
+            MetadataPostprocessor(
+                include_tags=include_tags,
+                exclude_tags=exclude_tags,
+                min_result_size=top_k,
+            ),
+            LanguageFilterPostprocessor(
+                languages=[language, "python"], min_result_size=top_k
+            ),
             CohereRerank(top_n=top_k, model="rerank-english-v2.0")
             if language == "en"
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
-            MetadataPostprocessor(),
         ]
         query_engine = RetrieverQueryEngine.from_args(
             retriever=retriever,
@@ -276,6 +313,8 @@ class Retriever:
         language: str | None = None,
         initial_k: int | None = None,
         top_k: int | None = None,
+        include_tags: List[str] | None = None,
+        exclude_tags: List[str] | None = None,
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -284,6 +323,8 @@ class Retriever:
             language: A string representing the language of the query.
             initial_k: An integer representing the number of initial results to retrieve.
             top_k: An integer representing the number of top results to retrieve.
+            include_tags: A list of strings representing the tags to include in the results.
+            exclude_tags: A list of strings representing the tags to exclude from the results.
 
         Returns:
             A list of dictionaries representing the retrieved results.
@@ -293,9 +334,11 @@ class Retriever:
         language = language or self.config.language
 
         retrieval_engine = self.load_query_engine(
-            initial_k,
-            language,
-            top_k,
+            similarity_top_k=initial_k,
+            top_k=top_k,
+            language=language,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
         )
         query_bundle = QueryBundle(query_str=query)
         results = retrieval_engine.retrieve(query_bundle)
@@ -303,10 +346,16 @@ class Retriever:
         outputs = [
             {
                 "text": node.get_text(),
-                "source": node.metadata["source"],
+                "metadata": node.metadata,
                 "score": node.get_score(),
             }
             for node in results
         ]
 
         return outputs
+
+    def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
+        retrievals = self.retrieve(query, **kwargs)
+        logger.debug(f"Retrieved {len(retrievals)} results.")
+        logger.debug(f"Retrieval: {retrievals[0]}")
+        return retrievals
