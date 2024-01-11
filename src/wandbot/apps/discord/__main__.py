@@ -11,7 +11,6 @@ import uuid
 
 import discord
 from discord.ext import commands
-
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.discord.config import DiscordAppConfig
 from wandbot.apps.utils import format_response
@@ -89,10 +88,10 @@ async def on_message(message: discord.Message):
                 return
             outro_message = config.OUTRO_MESSAGE
             sent_message = None
-            if len(response.answer) > 2000:
+            if len(response.answer) > 1200:
                 answer_chunks = []
-                for i in range(0, len(response.answer), 1900):
-                    answer_chunks.append(response.answer[i : i + 1900])
+                for i in range(0, len(response.answer), 1200):
+                    answer_chunks.append(response.answer[i : i + 1200])
                 for i, answer_chunk in enumerate(answer_chunks):
                     response_copy = response.model_copy()
                     response_copy.answer = answer_chunk

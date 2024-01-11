@@ -115,7 +115,7 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 384) -> List[Any]:
     """Loads documents and returns a list of nodes.
 
     Args:
@@ -126,7 +126,9 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
         A list of nodes.
     """
     md_parser = CustomMarkdownNodeParser(chunk_size=chunk_size)
-    code_parser = CustomCodeSplitter(language="python", max_chars=chunk_size)
+    code_parser = CustomCodeSplitter(
+        language="python", max_chars=chunk_size * 4
+    )
 
     llama_docs: List[LlamaDocument] = list(
         map(lambda x: convert_lc_to_llama(x), documents)
