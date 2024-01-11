@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from pydantic.v1 import BaseModel as BaseModelV1
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from tenacity import retry, stop_after_attempt, wait_random_exponential
-
 from wandbot.chat.schemas import ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import get_logger
@@ -110,7 +109,7 @@ INTENT_DESCRIPTIONS = {
     Labels.INTEGRATIONS.value: "The query is related to integrating Weights & Biases with other tools, frameworks, "
     "or libraries",
     Labels.PRODUCT_FEATURES.value: "The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, "
-    "Reports, Experiments, Tables, Prompts, Weave, StreamTables and more",
+    "Reports, Experiments, Tables, Prompts, Launch, Weave, StreamTables and more",
     Labels.SALES_AND_GTM_RELATED.value: "The query is related to sales, marketing, or other business related topics "
     "such as pricing, billing, or partnerships etc",
     Labels.BEST_PRACTICES.value: "The query is related to best practices for using Weights & Biases",
@@ -131,7 +130,7 @@ QUERY_INTENTS = {
     "or libraries. Help with a detailed code snippet and explanation and ask for more information about the "
     "integration if needed",
     Labels.PRODUCT_FEATURES.value: "The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, "
-    "Reports, Experiments, Tables, Prompts, Weave, StreamTables and more. Provide a link to the relevant "
+    "Reports, Experiments, Tables, Prompts, Launch, Weave, StreamTables and more. Provide a link to the relevant "
     "documentation and explain the feature in detail",
     Labels.SALES_AND_GTM_RELATED.value: "The query is related to sales, marketing, or other business related topics "
     "such as pricing, billing, or partnerships etc. Ask the user to reach out to the relevant team by contacting "
