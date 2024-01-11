@@ -26,7 +26,6 @@ from langchain.schema import Document as LcDocument
 from llama_index import Document as LlamaDocument
 from llama_index.node_parser import CodeSplitter, MarkdownNodeParser
 from llama_index.schema import BaseNode, TextNode
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -101,10 +100,22 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     Returns:
         A Llama document.
     """
-    return LlamaDocument.from_langchain_format(document)
+    llama_document = LlamaDocument.from_langchain_format(document)
+    excluded_embed_metadata_keys = [
+        "file_type",
+        "source",
+        "language",
+    ]
+    excluded_llm_metadata_keys = [
+        "file_type",
+    ]
+    llama_document.excluded_embed_metadata_keys = excluded_embed_metadata_keys
+    llama_document.excluded_llm_metadata_keys = excluded_llm_metadata_keys
+
+    return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
     """Loads documents and returns a list of nodes.
 
     Args:
@@ -114,7 +125,7 @@ def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
     Returns:
         A list of nodes.
     """
-    md_parser = CustomMarkdownNodeParser()
+    md_parser = CustomMarkdownNodeParser(chunk_size=chunk_size)
     code_parser = CustomCodeSplitter(language="python", max_chars=chunk_size)
 
     llama_docs: List[LlamaDocument] = list(
