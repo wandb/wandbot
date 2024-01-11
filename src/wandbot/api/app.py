@@ -32,9 +32,8 @@ import asyncio
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import FastAPI, Response, status
-
 import wandb
+from fastapi import FastAPI, Response, status
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -240,11 +239,13 @@ async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     Returns:
         The APIRetrievalResponse object containing the query and top k results.
     """
-    results = chat.retrieve(
+    results = chat.retriever(
         query=request.query,
         language=request.language,
         initial_k=request.initial_k,
         top_k=request.top_k,
+        include_tags=request.include_tags,
+        exclude_tags=request.exclude_tags,
     )
 
     return APIRetrievalResponse(
@@ -253,7 +254,7 @@ async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
             APIRetrievalResult(
                 text=result["text"],
                 score=result["score"],
-                source=result["source"],
+                metadata=result["metadata"],
             )
             for result in results
         ],
