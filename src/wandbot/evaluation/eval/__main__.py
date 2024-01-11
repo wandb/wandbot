@@ -10,7 +10,6 @@ from llama_index.llms import OpenAI
 from ragas import metrics
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
-
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
@@ -203,12 +202,16 @@ def main():
         (df["is_wandb_query"] == "YES") & (df["correctness"] == "correct")
     ]
 
-    with open("data/eval/wandbot-gpt-4-0613-eval.jsonl", "w+") as outfile:
+    with open(
+        "data/eval/wandbot-gpt-4-1106-preview-eval-v1-1.jsonl", "w+"
+    ) as outfile:
         for idx, row in tqdm(correct_df.iterrows(), total=len(correct_df)):
             try:
                 row_str = row.to_json()
                 eval_row = process_row(
-                    idx, row_str, application="gpt-4-0613-eval-bharat"
+                    idx,
+                    row_str,
+                    application="wandbot-gpt-4-1106-preview-eval-v1.1-bharat",
                 )
                 outfile.write(eval_row + "\n")
                 eval_results.append(eval_row)

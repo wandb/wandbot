@@ -11,7 +11,7 @@ from llama_index import (
     load_index_from_storage,
 )
 from llama_index.callbacks import CallbackManager
-from llama_index.core import BaseRetriever
+from llama_index.core.base_retriever import BaseRetriever
 from llama_index.postprocessor import CohereRerank
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.query_engine import RetrieverQueryEngine
