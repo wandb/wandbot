@@ -35,7 +35,6 @@ uvicorn = "^0.24.0"
 zenpy = "^2.0.41"
 openai = "^1.3.2"
 weave = "^0.31.0"
-langchain = "^0.0.344"
 cachew = "^0.15.20231019"
 colorlog = "^6.8.0"
 rank-bm25 = "^0.2.2"
@@ -45,6 +44,9 @@ db-dtypes = "^1.2.0"
 python-frontmatter = "^1.0.1"
 pymdown-extensions = "^10.5"
 instructor = "^0.4.5"
+langchain-community = "^0.0.11"
+langchain = "^0.1.0"
+langchain-openai = "^0.0.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

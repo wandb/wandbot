@@ -37,7 +37,6 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -217,22 +216,7 @@ def convert_contents_to_soup(contents: str) -> BeautifulSoup:
     markdown_document = markdown.markdown(
         contents,
         extensions=[
-            # "extra",
-            # "abbr",
-            # "attr_list",
-            # "def_list",
-            # "fenced_code",
-            # "footnotes",
-            # "md_in_html",
-            # "admonition",
-            # "legacy_attrs",
-            # "legacy_em",
-            # "meta",
-            # "nl2br",
-            # "sane_lists",
-            # "smarty",
             "toc",
-            # "wikilinks",
             "pymdownx.extra",
             "pymdownx.blocks.admonition",
             "pymdownx.magiclink",

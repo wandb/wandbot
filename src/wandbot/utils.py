@@ -23,17 +23,19 @@ Typical usage example:
 import datetime
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import faiss
-from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
+from langchain.embeddings import CacheBackedEmbeddings
 from langchain.storage import LocalFileStore
+from langchain_openai.embeddings import OpenAIEmbeddings
 from llama_index import (
     ServiceContext,
     StorageContext,
     VectorStoreIndex,
     load_index_from_storage,
 )
+from llama_index.bridge.langchain import Embeddings as LCEmbeddings
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
 from llama_index.vector_stores import FaissVectorStore
@@ -78,7 +80,7 @@ class Timer:
         return (self.stop - self.start).total_seconds()
 
 
-def load_embeddings(cache_dir: str) -> CacheBackedEmbeddings:
+def load_embeddings(cache_dir: str) -> LCEmbeddings:
     """Loads embeddings from cache or creates new ones if not found.
 
     Args:
@@ -95,7 +97,8 @@ def load_embeddings(cache_dir: str) -> CacheBackedEmbeddings:
         embeddings_cache_fs,
         namespace=underlying_embeddings.model + "/",
     )
-    return cached_embedder
+
+    return cast(LCEmbeddings, cached_embedder)
 
 
 def load_llm(
