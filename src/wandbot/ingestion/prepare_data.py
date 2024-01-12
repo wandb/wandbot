@@ -22,13 +22,14 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
-import wandb
 from google.cloud import bigquery
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders.base import BaseLoader
 from langchain.schema import Document
 from nbconvert import MarkdownExporter
 from tqdm import tqdm
+
+import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,

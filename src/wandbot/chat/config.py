@@ -25,9 +25,6 @@ class ChatConfig(BaseSettings):
     max_fallback_retries: int = 6
     chat_temperature: float = 0.1
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")
-    system_template: pathlib.Path = pathlib.Path(
-        "data/prompts/system_prompt.md"
-    )
     index_artifact: str = Field(
         "wandbot/wandbot-dev/wandbot_index:latest",
         env="WANDB_INDEX_ARTIFACT",

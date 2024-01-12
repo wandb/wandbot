@@ -11,6 +11,7 @@ import uuid
 
 import discord
 from discord.ext import commands
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.discord.config import DiscordAppConfig
 from wandbot.apps.utils import format_response

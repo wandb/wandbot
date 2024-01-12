@@ -32,8 +32,9 @@ import asyncio
 from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
 from fastapi import FastAPI, Response, status
+
+import wandb
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
