@@ -778,9 +778,9 @@ def load(
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
-        sdk_code_loader,
+        # sdk_code_loader,
         sdk_tests_loader,
-        weave_code_loader,
+        # weave_code_loader,
         weave_examples_loader,
         fc_reports_loader,
     ]:

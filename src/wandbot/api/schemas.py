@@ -18,7 +18,6 @@ Classes:
 from typing import Any, List
 
 from pydantic import BaseModel
-
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import (
     ChatThread,
@@ -80,7 +79,7 @@ class APIRetrievalResponse(BaseModel):
 class APIRetrievalRequest(BaseModel):
     query: str
     language: str = "en"
-    initial_k: int = 50
+    initial_k: int = 10
     top_k: int = 5
     include_tags: List[str] = []
     exclude_tags: List[str] = []

@@ -23,22 +23,22 @@ Typical usage example:
 import datetime
 import logging
 import os
-from typing import Any, Optional, cast
+import pathlib
+from functools import wraps
+from typing import Any, Optional
 
 import faiss
-from langchain.embeddings import CacheBackedEmbeddings
-from langchain.storage import LocalFileStore
-from langchain_openai.embeddings import OpenAIEmbeddings
 from llama_index import (
     ServiceContext,
     StorageContext,
     VectorStoreIndex,
     load_index_from_storage,
 )
-from llama_index.bridge.langchain import Embeddings as LCEmbeddings
+from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
 from llama_index.vector_stores import FaissVectorStore
+from sqlite3_cache import Cache
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -80,7 +80,7 @@ class Timer:
         return (self.stop - self.start).total_seconds()
 
 
-def load_embeddings(cache_dir: str) -> LCEmbeddings:
+def load_embeddings(cache_dir: str) -> OpenAIEmbedding:
     """Loads embeddings from cache or creates new ones if not found.
 
     Args:
@@ -89,16 +89,18 @@ def load_embeddings(cache_dir: str) -> LCEmbeddings:
     Returns:
         A cached embedder instance.
     """
-    underlying_embeddings = OpenAIEmbeddings()
-
-    embeddings_cache_fs = LocalFileStore(cache_dir)
-    cached_embedder = CacheBackedEmbeddings.from_bytes_store(
-        underlying_embeddings,
-        embeddings_cache_fs,
-        namespace=underlying_embeddings.model + "/",
-    )
-
-    return cast(LCEmbeddings, cached_embedder)
+    # underlying_embeddings = OpenAIEmbeddings()
+    #
+    # embeddings_cache_fs = LocalFileStore(cache_dir)
+    # cached_embedder = CacheBackedEmbeddings.from_bytes_store(
+    #     underlying_embeddings,
+    #     embeddings_cache_fs,
+    #     namespace=underlying_embeddings.model + "/",
+    # )
+    #
+    # return cast(LCEmbeddings, cached_embedder)
+    embeddings = OpenAIEmbedding()
+    return embeddings
 
 
 def load_llm(

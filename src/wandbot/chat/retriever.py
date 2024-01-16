@@ -3,6 +3,7 @@ import pathlib
 from typing import Any, Dict, List, Optional
 
 import requests
+import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -21,9 +22,7 @@ from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
-from pydantic_settings import BaseSettings
-
-import wandb
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from wandbot.utils import get_logger, load_service_context
 
 logger = get_logger(__name__)
@@ -74,7 +73,8 @@ class MetadataPostprocessor(BaseNodePostprocessor):
         query_bundle: Optional[QueryBundle] = None,
     ) -> List[NodeWithScore]:
         """Postprocess nodes."""
-
+        if not self.include_tags and not self.exclude_tags:
+            return nodes
         new_nodes = []
         for node in nodes:
             normalized_tags = [
@@ -218,6 +218,9 @@ class RetrieverConfig(BaseSettings):
     language: str = Field(
         default="en",
         env="RETRIEVER_LANGUAGE",
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
 
 
