@@ -4,7 +4,6 @@ from typing import Any, Hashable
 import nest_asyncio
 import pandas as pd
 import requests
-from cachew import cachew
 from llama_index import ServiceContext
 from llama_index.llms import OpenAI
 from ragas import metrics
@@ -23,14 +22,14 @@ from wandbot.evaluation.eval.relevancy import (
     RELEVANCY_EVAL_TEMPLATE,
     WandbRelevancyEvaluator,
 )
-from wandbot.utils import get_logger
+from wandbot.utils import cachew, get_logger
 
 logger = get_logger(__name__)
 
 nest_asyncio.apply()
 
 
-EVAL_CACHE = "data/cache/eval_cache"
+EVAL_CACHE = "data/cache/eval_cache/cache.db"
 service_context = ServiceContext.from_defaults(llm=OpenAI("gpt-4-1106-preview"))
 correctness_evaluator = WandbCorrectnessEvaluator(
     service_context=service_context,
@@ -46,8 +45,8 @@ relevancy_evaluator = WandbRelevancyEvaluator(
 )
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_answer(question: str, application: str = "api-eval-bharat") -> str:
     url = "http://0.0.0.0:8000/query"
     payload = {
@@ -84,8 +83,8 @@ def parse_answer_eval(metric: str, row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_answer_correctness(row_str: str) -> str:
     row = json.loads(row_str)
     result = correctness_evaluator.evaluate(
@@ -103,8 +102,8 @@ def get_answer_correctness(row_str: str) -> str:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_answer_relevancy(row_str: str) -> str:
     row = json.loads(row_str)
     result = relevancy_evaluator.evaluate(
@@ -121,8 +120,8 @@ def get_answer_relevancy(row_str: str) -> str:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_answer_faithfulness(row_str: str) -> str:
     row = json.loads(row_str)
     result = faithfulness_evaluator.evaluate(
@@ -140,8 +139,8 @@ def get_answer_faithfulness(row_str: str) -> str:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_answer_similarity(row_str: str) -> str:
     row = json.loads(row_str)
     result = metrics.answer_similarity.score_single(row)
@@ -149,8 +148,8 @@ def get_answer_similarity(row_str: str) -> str:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_context_precision(row_str: str) -> str:
     row = json.loads(row_str)
     result = metrics.context_precision.score_single(row)
@@ -158,8 +157,8 @@ def get_context_precision(row_str: str) -> str:
     return result
 
 
-@cachew(cache_path=EVAL_CACHE, logger=logger)
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+@cachew(cache_path=EVAL_CACHE, logger=logger)
 def get_context_recall(row_str: str) -> str:
     row = json.loads(row_str)
     result = metrics.context_recall.score_single(row)

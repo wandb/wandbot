@@ -3,7 +3,6 @@ import pathlib
 from typing import Any, Dict, List, Optional
 
 import requests
-import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -23,6 +22,8 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+import wandb
 from wandbot.utils import get_logger, load_service_context
 
 logger = get_logger(__name__)

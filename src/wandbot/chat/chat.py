@@ -66,7 +66,9 @@ def rebuild_full_prompt(
 
     query_str = result["question"]
 
-    context = json.loads(result["source_documents"])
+    context = json.loads(
+        result.get("source_documents", '[{"text": "", "source": ""}]')
+    )
 
     context_str = ""
     for idx, item in enumerate(context):
@@ -418,9 +420,9 @@ class Chat:
         Returns:
             An instance of `ChatResponse` representing the chat response.
         """
-        with Timer() as timer:
-            result = {}
-            try:
+        try:
+            with Timer() as timer:
+                result = {}
                 resolved_query = self.query_handler(chat_request)
                 result = self.get_answer(resolved_query)
                 usage_stats = {
@@ -429,29 +431,41 @@ class Chat:
                     "completion_tokens": self.token_counter.completion_llm_token_count,
                 }
                 self.token_counter.reset_counts()
-            except ValueError as e:
-                result = {
-                    "answer": str(e),
-                    "sources": "",
-                }
+                result.update(
+                    dict(
+                        **{
+                            "question": chat_request.question,
+                            "time_taken": timer.elapsed,
+                            "start_time": timer.start,
+                            "end_time": timer.stop,
+                            "application": chat_request.application,
+                        },
+                        **usage_stats,
+                    )
+                )
+                self.run.log(usage_stats)
 
-        result.update(
-            dict(
-                **{
+                system_template = rebuild_full_prompt(
+                    self.qa_prompt.message_templates, result
+                )
+                result["system_prompt"] = system_template
+                self.chat_table.log(result)
+                return ChatResponse(**result)
+        except Exception as e:
+            with Timer() as timer:
+                result = {
+                    "system_prompt": "",
                     "question": chat_request.question,
+                    "answer": str(e),
+                    "model": "",
+                    "sources": "",
+                    "source_documents": "",
+                    "total_tokens": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
                     "time_taken": timer.elapsed,
                     "start_time": timer.start,
                     "end_time": timer.stop,
-                    "application": chat_request.application,
-                },
-                **usage_stats,
-            )
-        )
-        self.run.log(usage_stats)
-
-        system_template = rebuild_full_prompt(
-            self.qa_prompt.message_templates, result
-        )
-        result["system_prompt"] = system_template
-        self.chat_table.log(result)
-        return ChatResponse(**result)
+                }
+                usage_stats = {}
+                return ChatResponse(**result)

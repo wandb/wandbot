@@ -46,7 +46,6 @@ instructor = "^0.4.5"
 langchain-community = "^0.0.11"
 langchain = "^0.1.0"
 langchain-openai = "^0.0.2"
-sqlite3-cache = "^0.2.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

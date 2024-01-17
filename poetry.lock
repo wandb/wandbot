@@ -4943,17 +4943,6 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
-name = "sqlite3-cache"
-version = "0.2.2"
-description = "Use SQLite3 as cache."
-optional = false
-python-versions = ">=3.8,<4"
-files = [
-    {file = "sqlite3_cache-0.2.2-py3-none-any.whl", hash = "sha256:dc5a5c8b3715664e4522c279a0c74b28e54f8af17b354f0754a7fa673d4c7749"},
-    {file = "sqlite3_cache-0.2.2.tar.gz", hash = "sha256:3b757ac6dbcf57d20979f01e4321a72ddd2b8b2bc87f7a8196070a24a4f4c5d0"},
-]
-
-[[package]]
 name = "stack-data"
 version = "0.6.3"
 description = "Extract data from python stack frames and tracebacks for informative displays"
@@ -6075,4 +6064,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "f5de4bf0746d1191b29f71d3f9d748fa072c62d6e98f2dd4517e3daa908a041c"
+content-hash = "9a339307b24179fcc759447490225e0a74c961647319ed75ac990c8a0256a2c0"

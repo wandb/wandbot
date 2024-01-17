@@ -21,10 +21,11 @@ Typical usage example:
     index = load_index(nodes, service_context, storage_context, "/path/to/persist")
 """
 import datetime
+import hashlib
+import json
 import logging
 import os
-import pathlib
-from functools import wraps
+import sqlite3
 from typing import Any, Optional
 
 import faiss
@@ -38,7 +39,6 @@ from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
 from llama_index.vector_stores import FaissVectorStore
-from sqlite3_cache import Cache
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -210,3 +210,50 @@ def load_index(
         )
         index.storage_context.persist(persist_dir=persist_dir)
     return index
+
+
+def cachew(cache_path: str = "./cache.db", logger=None):
+    """
+    Memoization decorator that caches the output of a method in a SQLite
+    database.
+    ref: https://www.kevinkatz.io/posts/memoize-to-sqlite
+    """
+    db_conn = sqlite3.connect(cache_path)
+    db_conn.execute(
+        "CREATE TABLE IF NOT EXISTS cache (hash TEXT PRIMARY KEY, result TEXT)"
+    )
+
+    def memoize(func):
+        def wrapped(*args, **kwargs):
+            # Compute the hash of the <function name>:<argument>
+            xs = f"{func.__name__}:{repr(tuple(args))}:{repr(kwargs)}".encode(
+                "utf-8"
+            )
+            arg_hash = hashlib.sha256(xs).hexdigest()
+
+            # Check if the result is already cached
+            cursor = db_conn.cursor()
+            cursor.execute(
+                "SELECT result FROM cache WHERE hash = ?", (arg_hash,)
+            )
+            row = cursor.fetchone()
+            if row is not None:
+                if logger is not None:
+                    logger.debug(
+                        f"Cached result found for {arg_hash}. Returning it."
+                    )
+                return json.loads(row[0])
+
+            # Compute the result and cache it
+            result = func(*args, **kwargs)
+            cursor.execute(
+                "INSERT INTO cache (hash, result) VALUES (?, ?)",
+                (arg_hash, json.dumps(result)),
+            )
+            db_conn.commit()
+
+            return result
+
+        return wrapped
+
+    return memoize
