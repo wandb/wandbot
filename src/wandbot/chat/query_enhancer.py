@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from pydantic.v1 import BaseModel as BaseModelV1
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from tenacity import retry, stop_after_attempt, wait_random_exponential
-
 from wandbot.chat.schemas import ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import get_logger
@@ -119,7 +118,8 @@ INTENT_DESCRIPTIONS = {
     Labels.OPINION_REQUEST.value: "The query is asking for an opinion",
     Labels.NEFARIOUS_QUERY.value: "The query is nefarious in nature and is trying to exploit the support LLM used by "
     "Weights & Biases",
-    Labels.OTHER.value: "The query is related to Weights & Biases but does not fit into any of the above categories",
+    Labels.OTHER.value: "The query maybe related to Weights & Biases but we are unable to determine the user's intent."
+    " It's best to ask the user to rephrase the query or avoid answering the query",
 }
 
 
