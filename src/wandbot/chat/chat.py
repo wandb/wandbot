@@ -431,26 +431,26 @@ class Chat:
                     "completion_tokens": self.token_counter.completion_llm_token_count,
                 }
                 self.token_counter.reset_counts()
-                result.update(
-                    dict(
-                        **{
-                            "question": chat_request.question,
-                            "time_taken": timer.elapsed,
-                            "start_time": timer.start,
-                            "end_time": timer.stop,
-                            "application": chat_request.application,
-                        },
-                        **usage_stats,
-                    )
+            result.update(
+                dict(
+                    **{
+                        "question": chat_request.question,
+                        "time_taken": timer.elapsed,
+                        "start_time": timer.start,
+                        "end_time": timer.stop,
+                        "application": chat_request.application,
+                    },
+                    **usage_stats,
                 )
-                self.run.log(usage_stats)
+            )
+            self.run.log(usage_stats)
 
-                system_template = rebuild_full_prompt(
-                    self.qa_prompt.message_templates, result
-                )
-                result["system_prompt"] = system_template
-                self.chat_table.log(result)
-                return ChatResponse(**result)
+            system_template = rebuild_full_prompt(
+                self.qa_prompt.message_templates, result
+            )
+            result["system_prompt"] = system_template
+            self.chat_table.log(result)
+            return ChatResponse(**result)
         except Exception as e:
             with Timer() as timer:
                 result = {
@@ -463,9 +463,13 @@ class Chat:
                     "total_tokens": 0,
                     "prompt_tokens": 0,
                     "completion_tokens": 0,
+                }
+            result.update(
+                {
                     "time_taken": timer.elapsed,
                     "start_time": timer.start,
                     "end_time": timer.stop,
                 }
-                usage_stats = {}
-                return ChatResponse(**result)
+            )
+            usage_stats = {}
+            return ChatResponse(**result)
