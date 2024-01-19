@@ -623,11 +623,11 @@ class FCReportsDataLoader(DataLoader):
 
         reports_df["content"] = (
             "\n# "
-            + reports_df["display_name"]
+            + reports_df["display_name"].astype(str)
             + "\n\nDescription: "
-            + reports_df["description"]
+            + reports_df["description"].astype(str)
             + "\n\nBody:\n\n"
-            + reports_df["markdown_text"].to_string()
+            + reports_df["markdown_text"].astype(str)
         )
 
         reports_df["character_count"] = reports_df["content"].map(len)
