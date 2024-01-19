@@ -272,6 +272,7 @@ class Chat:
             similarity_top_k=initial_k,
             language=language,
             top_k=top_k,
+            is_avoid_query=True if "avoid" in query_intent.lower() else False,
         )
 
         self.qa_prompt = load_chat_prompt(

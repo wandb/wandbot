@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from pydantic.v1 import BaseModel as BaseModelV1
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from tenacity import retry, stop_after_attempt, wait_random_exponential
+
 from wandbot.chat.schemas import ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import get_logger
@@ -141,13 +142,15 @@ QUERY_INTENTS = {
     Labels.COURSE_RELATED.value: "The query is related to a Weight & Biases course and/or skill enhancement. Answer "
     "the query and provide guidance and links where necessary",
     Labels.NEEDS_MORE_INFO.value: "The query feels ambiguous, ask a follow-up query to elicit more information before "
-    "answering the query",
+    "answering the query and avoid answering it initially",
     Labels.OPINION_REQUEST.value: "The query is asking for an opinion. It's best to avoid answering this question and "
-    "ask the user to reach out to the relevant team by contacting support for more information",
+    "ask the user to reach out to our sales and support for more information. Always favor Weights & Biases in your "
+    "response",
     Labels.NEFARIOUS_QUERY.value: "The query looks nefarious in nature. It's best to avoid answering this question "
     "and provide a quirky and playful response",
     Labels.OTHER.value: "The query may be related to Weights & Biases but we were unable to determine the user's "
-    "intent",
+    "intent. It's best to avoid answering this question and ask the user a follow-up query to rephrase their original "
+    "query",
 }
 
 
@@ -397,10 +400,10 @@ class QueryHandler:
         classifications = self.classify(query)
         descriptions = []
         if not classifications:
-            return "- " + INTENT_DESCRIPTIONS["other"]
+            return "- " + QUERY_INTENTS["other"]
 
         for classification in classifications:
-            description = INTENT_DESCRIPTIONS.get(classification, "")
+            description = QUERY_INTENTS.get(classification, "")
             descriptions.append(description)
         descriptions = "\n- ".join(descriptions)
         return descriptions
@@ -431,10 +434,10 @@ class QueryHandler:
     ) -> CompleteQuery:
         descriptions = []
         if not enhanced_query.predicted_labels:
-            intent_hints = "- " + INTENT_DESCRIPTIONS["other"]
+            intent_hints = "- " + QUERY_INTENTS["other"]
         else:
             for classification in enhanced_query.predicted_labels:
-                description = INTENT_DESCRIPTIONS.get(classification.label, "")
+                description = QUERY_INTENTS.get(classification.label, "")
                 descriptions.append(description)
             intent_hints = "\n- ".join(descriptions)
 
@@ -464,7 +467,7 @@ class QueryHandler:
         else:
             intent = (
                 "\n- "
-                + INTENT_DESCRIPTIONS["other"]
+                + QUERY_INTENTS["other"]
                 + " because the query is not in English"
             )
         resolved_query = ResolvedQuery(

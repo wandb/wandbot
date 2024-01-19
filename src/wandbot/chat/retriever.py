@@ -165,10 +165,12 @@ class HybridRetriever(BaseRetriever):
         index,
         storage_context,
         similarity_top_k=10,
+        is_avoid_query=False,
     ):
         self.index = index
         self.similarity_top_k = similarity_top_k
         self.storage_context = storage_context
+        self.is_avoid_query = is_avoid_query
 
         self.vector_retriever = self.index.as_retriever(
             similarity_top_k=self.similarity_top_k,
@@ -184,10 +186,14 @@ class HybridRetriever(BaseRetriever):
         )
         super().__init__()
 
-    def _retrieve(self, query, **kwargs):
+    def _retrieve(self, query: QueryBundle, **kwargs):
         bm25_nodes = self.bm25_retriever.retrieve(query)
         vector_nodes = self.vector_retriever.retrieve(query, **kwargs)
-        you_nodes = self.you_retriever.retrieve(query)
+        you_nodes = (
+            self.you_retriever.retrieve(query)
+            if not self.is_avoid_query
+            else []
+        )
 
         # combine the two lists of nodes
         all_nodes = []
@@ -280,6 +286,7 @@ class Retriever:
         language: str | None = None,
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
+        is_avoid_query: bool = False,
     ) -> RetrieverQueryEngine:
         similarity_top_k = similarity_top_k or self.config.similarity_top_k
         top_k = top_k or self.config.top_k
@@ -289,6 +296,7 @@ class Retriever:
             index=self.index,
             similarity_top_k=similarity_top_k,
             storage_context=self.storage_context,
+            is_avoid_query=is_avoid_query,
         )
 
         node_postprocessors = [
@@ -320,6 +328,7 @@ class Retriever:
         top_k: int | None = None,
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
+        is_avoid_query: bool = False,
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -344,6 +353,7 @@ class Retriever:
             language=language,
             include_tags=include_tags,
             exclude_tags=exclude_tags,
+            is_avoid_query=is_avoid_query,
         )
         query_bundle = QueryBundle(query_str=query)
         results = retrieval_engine.retrieve(query_bundle)
