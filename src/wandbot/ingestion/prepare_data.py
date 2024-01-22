@@ -687,20 +687,44 @@ class FCReportsDataLoader(DataLoader):
 
         return self.config.data_source.local_path
 
-    @staticmethod
-    def parse_row(row):
+    def clean_invalid_unicode_escapes(self, text):
+        '''
+        clean up invalid unicode escape sequences
+        '''
+        # List of common escape sequences to retain
+        common_escapes = ['\\n', '\\t', '\\r', '\\\\', '\\\'', '\\"']
+
+        # Replace each uncommon escape sequence with a space or other character
+        for i in range(256):
+            escape_sequence = f'\\{chr(i)}'
+            if escape_sequence not in common_escapes:
+                text = text.replace(escape_sequence, '  ')  # replace with a space or any character of your choice
+                text = text.replace('\ ', ' ')  # in case an invalid escape sequence was created above
+        return text
+
+    def parse_row(self, row):
         row_dict = json.loads(row)
         if (
             not (row_dict["is_short_report"] or row_dict["is_buggy"])
             and row_dict["character_count"] > 100
         ):
-            output = {
-                # fix escape characters with raw_unicode_escape
-                "content": (
+            try:
+                content = (
                     row_dict["content"]
                     .encode("raw_unicode_escape")
                     .decode("unicode_escape")
-                ),
+                )
+            except UnicodeDecodeError as e:
+                content = self.clean_invalid_unicode_escapes(row_dict["content"])
+                content = (
+                    content
+                    .encode("raw_unicode_escape")
+                    .decode("unicode_escape")
+                )
+
+            output = {
+                # fix escape characters with raw_unicode_escape
+                "content": content,
                 "source": row_dict["source"],
                 "description": row_dict["description"],
             }
