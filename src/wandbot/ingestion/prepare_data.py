@@ -44,6 +44,7 @@ from wandbot.ingestion.config import (
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
+    LocalLangDetect,
     clean_contents,
     extract_frontmatter,
     fetch_git_repo,
@@ -694,17 +695,23 @@ class FCReportsDataLoader(DataLoader):
             not (row_dict["is_short_report"] or row_dict["is_buggy"])
             and row_dict["character_count"] > 100
         ):
-            output = {
-                # fix escape characters with raw_unicode_escape
-                "content": (
-                    row_dict["content"]
-                    .encode("raw_unicode_escape")
-                    .decode("unicode_escape")
-                ),
-                "source": row_dict["source"],
-                "description": row_dict["description"],
-            }
-
+            try:
+                output = {
+                    # fix escape characters with raw_unicode_escape
+                    "content": (
+                        repr(row_dict["content"])
+                        .encode("raw_unicode_escape")
+                        .decode("unicode_escape")
+                    ),
+                    "source": row_dict["source"],
+                    "description": row_dict["description"],
+                }
+            except UnicodeDecodeError as e:
+                logger.debug(f"UnicodeDecodeError: {e}")
+                logger.warning(
+                    f" Skipping fc-report due to parsing error: {row_dict['source']}"
+                )
+                output = None
             return output
 
     def parse_data_dump(self, data_file):
@@ -721,17 +728,21 @@ class FCReportsDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-
+        lang_detect = LocalLangDetect()
         data_dump_fame = self.fetch_data()
         for parsed_row in self.parse_data_dump(data_dump_fame):
             document = Document(
                 page_content=parsed_row["content"],
                 metadata={
                     "source": parsed_row["source"],
-                    "language": "en",
+                    "language": lang_detect.detect_language(
+                        parsed_row["content"]
+                    ),
                     "file_type": ".md",
                     "description": parsed_row["description"],
-                    "tags": ["FC-Reports"],
+                    "tags": ["FC-Reports"] + ["ml-news"]
+                    if "ml-news" in parsed_row["source"]
+                    else [],
                 },
             )
             yield document

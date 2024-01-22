@@ -31,6 +31,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import fasttext
 import frontmatter
 import giturlparse
 import markdown
@@ -287,3 +288,20 @@ def extract_frontmatter(file_path: pathlib.Path) -> Dict[str, Any]:
     with open(file_path, "r") as f:
         contents = frontmatter.load(f)
         return {k: contents[k] for k in contents.keys()}
+
+
+class LocalLangDetect:
+    # Download this model from https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
+    # and place it in data/cache/models/lid.176.bin
+    # TODO: Make this a wandb artifact
+    def __init__(self, model_path="data/cache/models/lid.176.bin"):
+        self.model_path = model_path
+        self.model = fasttext.load_model(model_path)
+
+    def detect_language(self, text):
+        predictions = self.model.predict(text.replace("\n", " "))
+        return predictions[0][0].replace("__label__", "")
+
+    def detect_language_batch(self, texts):
+        predictions = self.model.predict(texts)
+        return [p[0].replace("__label__", "") for p in predictions[0]]
