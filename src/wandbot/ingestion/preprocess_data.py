@@ -24,7 +24,11 @@ from typing import Any, List
 import tiktoken
 from langchain.schema import Document as LcDocument
 from llama_index import Document as LlamaDocument
-from llama_index.node_parser import CodeSplitter, MarkdownNodeParser
+from llama_index.node_parser import (
+    CodeSplitter,
+    MarkdownNodeParser,
+    SimpleNodeParser,
+)
 from llama_index.schema import BaseNode, TextNode
 
 from wandbot.utils import get_logger
@@ -130,6 +134,10 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
     code_parser = CustomCodeSplitter(
         language="python", max_chars=chunk_size * 2
     )
+    # Define the node parser
+    node_parser = SimpleNodeParser.from_defaults(
+        separator="\n", chunk_size=chunk_size, paragraph_separator="\n\n"
+    )
 
     llama_docs: List[LlamaDocument] = list(
         map(lambda x: convert_lc_to_llama(x), documents)
@@ -142,4 +150,9 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
         else:
             parser = md_parser
         nodes.extend(parser.get_nodes_from_documents([doc]))
+
+    nodes = node_parser.get_nodes_from_documents(nodes)
+
+    nodes = list(filter(lambda x: len(x.get_content()) > 10, nodes))
+
     return nodes
