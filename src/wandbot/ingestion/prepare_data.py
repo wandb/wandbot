@@ -44,6 +44,7 @@ from wandbot.ingestion.config import (
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
+    LocalLangDetect,
     clean_contents,
     extract_frontmatter,
     fetch_git_repo,
@@ -745,17 +746,21 @@ class FCReportsDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-
+        lang_detect = LocalLangDetect()
         data_dump_fame = self.fetch_data()
         for parsed_row in self.parse_data_dump(data_dump_fame):
             document = Document(
                 page_content=parsed_row["content"],
                 metadata={
                     "source": parsed_row["source"],
-                    "language": "en",
+                    "language": lang_detect.detect_language(
+                        parsed_row["content"]
+                    ),
                     "file_type": ".md",
                     "description": parsed_row["description"],
-                    "tags": ["FC-Reports"],
+                    "tags": ["FC-Reports"] + ["ml-news"]
+                    if "ml-news" in parsed_row["source"]
+                    else [],
                 },
             )
             yield document

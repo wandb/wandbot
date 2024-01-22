@@ -46,6 +46,7 @@ instructor = "^0.4.5"
 langchain-community = "^0.0.11"
 langchain = "^0.1.0"
 langchain-openai = "^0.0.2"
+fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
