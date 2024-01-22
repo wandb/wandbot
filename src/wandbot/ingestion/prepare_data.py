@@ -711,7 +711,7 @@ class FCReportsDataLoader(DataLoader):
         ):
             try:
                 content = (
-                    row_dict["content"]
+                    repr(row_dict["content"])
                     .encode("raw_unicode_escape")
                     .decode("unicode_escape")
                 )
