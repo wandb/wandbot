@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wandbot"
-version = "1.0.0"
+version = "1.1.0"
 description = "A Q&A bot for Weights & Biases documentation"
 authors = ["parambharat <bharat.ramanathan@wandb.com>"]
 license = "LICENSE"
