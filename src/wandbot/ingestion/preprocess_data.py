@@ -27,10 +27,9 @@ from llama_index import Document as LlamaDocument
 from llama_index.node_parser import (
     CodeSplitter,
     MarkdownNodeParser,
-    SimpleNodeParser,
+    TokenTextSplitter,
 )
 from llama_index.schema import BaseNode, TextNode
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -135,9 +134,7 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
         language="python", max_chars=chunk_size * 2
     )
     # Define the node parser
-    node_parser = SimpleNodeParser.from_defaults(
-        separator="\n", chunk_size=chunk_size, paragraph_separator="\n\n"
-    )
+    node_parser = TokenTextSplitter.from_defaults(chunk_size=chunk_size)
 
     llama_docs: List[LlamaDocument] = list(
         map(lambda x: convert_lc_to_llama(x), documents)
