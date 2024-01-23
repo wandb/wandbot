@@ -38,8 +38,10 @@ from llama_index.callbacks import (
 from llama_index.chat_engine import ContextChatEngine
 from llama_index.chat_engine.types import AgentChatResponse
 from llama_index.indices.postprocessor import CohereRerank
-from llama_index.llms import ChatMessage, MessageRole
+from llama_index.llms import LLM, ChatMessage, MessageRole
 from llama_index.llms.generic_utils import messages_to_history_str
+from llama_index.memory import BaseMemory
+from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
 from weave.monitoring import StreamTable
@@ -49,6 +51,7 @@ from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
 from wandbot.chat.retriever import (
+    HybridRetriever,
     LanguageFilterPostprocessor,
     MetadataPostprocessor,
     Retriever,
@@ -91,6 +94,27 @@ def rebuild_full_prompt(
 
 
 class WandbContextChatEngine(ContextChatEngine):
+    def __init__(
+        self,
+        retriever: HybridRetriever,
+        llm: LLM,
+        memory: BaseMemory,
+        prefix_messages: List[ChatMessage],
+        node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
+        context_template: Optional[str] = None,
+        callback_manager: Optional[CallbackManager] = None,
+    ) -> None:
+        super().__init__(
+            retriever=retriever,
+            llm=llm,
+            memory=memory,
+            prefix_messages=prefix_messages,
+            node_postprocessors=node_postprocessors,
+            context_template=context_template,
+            callback_manager=callback_manager,
+        )
+        self._retriever: HybridRetriever = retriever
+
     def _generate_context(
         self, message: str, **kwargs
     ) -> Tuple[str, List[NodeWithScore]]:
@@ -99,7 +123,9 @@ class WandbContextChatEngine(ContextChatEngine):
         keywords = kwargs.get("keywords", [])
         sub_queries = kwargs.get("sub_queries", [])
 
-        query_nodes = self._retriever.retrieve(message)
+        query_nodes = self._retriever.retrieve(
+            message, is_avoid_query=kwargs.get("is_avoid_query")
+        )
         keywords_nodes = []
         sub_query_nodes = []
 
@@ -155,6 +181,7 @@ class WandbContextChatEngine(ContextChatEngine):
             message,
             keywords=kwargs.get("keywords", []),
             sub_queries=kwargs.get("sub_queries", []),
+            is_avoid_query=kwargs.get("is_avoid_query"),
         )
         prefix_messages = self._get_prefix_messages_with_context(
             context_str_template
@@ -269,7 +296,6 @@ class Chat:
         """
 
         query_engine = self.retriever.load_query_engine(
-            similarity_top_k=initial_k,
             language=language,
             top_k=top_k,
             is_avoid_query=True if "avoid" in query_intent.lower() else False,
@@ -356,6 +382,7 @@ class Chat:
             chat_history=chat_history,
             keywords=keywords,
             sub_queries=sub_queries,
+            is_avoid_query=True if "avoid" in query_intent.lower() else False,
         )
         result = {
             "answer": response.response,

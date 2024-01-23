@@ -9,14 +9,14 @@ from llama_index import (
     StorageContext,
     load_index_from_storage,
 )
-from llama_index.callbacks import CallbackManager
+from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
 from llama_index.core.base_retriever import BaseRetriever
 from llama_index.postprocessor import CohereRerank
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.query_engine import RetrieverQueryEngine
-from llama_index.response_synthesizers import ResponseMode
+from llama_index.response_synthesizers import BaseSynthesizer, ResponseMode
 from llama_index.retrievers import BM25Retriever
-from llama_index.schema import NodeWithScore, TextNode
+from llama_index.schema import NodeWithScore, QueryType, TextNode
 from llama_index.vector_stores import FaissVectorStore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
@@ -164,34 +164,31 @@ class HybridRetriever(BaseRetriever):
         self,
         index,
         storage_context,
-        similarity_top_k=10,
-        is_avoid_query=False,
+        similarity_top_k: int = 20,
     ):
         self.index = index
-        self.similarity_top_k = similarity_top_k
         self.storage_context = storage_context
-        self.is_avoid_query = is_avoid_query
 
         self.vector_retriever = self.index.as_retriever(
-            similarity_top_k=self.similarity_top_k,
+            similarity_top_k=similarity_top_k,
             storage_context=self.storage_context,
         )
         self.bm25_retriever = BM25Retriever.from_defaults(
             docstore=self.index.docstore,
-            similarity_top_k=self.similarity_top_k,
+            similarity_top_k=similarity_top_k,
         )
         self.you_retriever = YouRetriever(
             api_key=os.environ.get("YOU_API_KEY"),
-            similarity_top_k=self.similarity_top_k,
+            similarity_top_k=similarity_top_k,
         )
         super().__init__()
 
     def _retrieve(self, query: QueryBundle, **kwargs):
         bm25_nodes = self.bm25_retriever.retrieve(query)
-        vector_nodes = self.vector_retriever.retrieve(query, **kwargs)
+        vector_nodes = self.vector_retriever.retrieve(query)
         you_nodes = (
             self.you_retriever.retrieve(query)
-            if not self.is_avoid_query
+            if not kwargs.get("is_avoid_query", False)
             else []
         )
 
@@ -203,6 +200,26 @@ class HybridRetriever(BaseRetriever):
                 all_nodes.append(n)
                 node_ids.add(n.node.node_id)
         return all_nodes
+
+    def retrieve(
+        self, str_or_query_bundle: QueryType, **kwargs
+    ) -> List[NodeWithScore]:
+        self._check_callback_manager()
+
+        if isinstance(str_or_query_bundle, str):
+            query_bundle = QueryBundle(str_or_query_bundle)
+        else:
+            query_bundle = str_or_query_bundle
+        with self.callback_manager.as_trace("query"):
+            with self.callback_manager.event(
+                CBEventType.RETRIEVE,
+                payload={EventPayload.QUERY_STR: query_bundle.query_str},
+            ) as retrieve_event:
+                nodes = self._retrieve(query_bundle, **kwargs)
+                retrieve_event.on_end(
+                    payload={EventPayload.NODES: nodes},
+                )
+        return nodes
 
 
 class RetrieverConfig(BaseSettings):
@@ -219,7 +236,7 @@ class RetrieverConfig(BaseSettings):
         env="RETRIEVER_TOP_K",
     )
     similarity_top_k: int = Field(
-        default=10,
+        default=20,
         env="RETRIEVER_SIMILARITY_TOP_K",
     )
     language: str = Field(
@@ -229,6 +246,28 @@ class RetrieverConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
+
+
+class WandbRetrieverQueryEngine(RetrieverQueryEngine):
+    def __init__(
+        self,
+        retriever: HybridRetriever,
+        response_synthesizer: Optional[BaseSynthesizer] = None,
+        node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
+        callback_manager: Optional[CallbackManager] = None,
+    ) -> None:
+        super().__init__(
+            retriever=retriever,
+            response_synthesizer=response_synthesizer,
+            node_postprocessors=node_postprocessors,
+            callback_manager=callback_manager,
+        )
+
+    def retrieve(
+        self, query_bundle: QueryBundle, **kwargs
+    ) -> List[NodeWithScore]:
+        nodes = self._retriever.retrieve(query_bundle, **kwargs)
+        return self._apply_node_postprocessors(nodes, query_bundle=query_bundle)
 
 
 class Retriever:
@@ -257,6 +296,12 @@ class Retriever:
         )
 
         self.index = load_index_from_storage(self.storage_context)
+        self._retriever = HybridRetriever(
+            index=self.index,
+            similarity_top_k=self.config.similarity_top_k,
+            storage_context=self.storage_context,
+        )
+        self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
@@ -281,23 +326,17 @@ class Retriever:
 
     def load_query_engine(
         self,
-        similarity_top_k: int | None = None,
         top_k: int | None = None,
         language: str | None = None,
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
-        is_avoid_query: bool = False,
-    ) -> RetrieverQueryEngine:
-        similarity_top_k = similarity_top_k or self.config.similarity_top_k
+        is_avoid_query: bool | None = None,
+    ) -> WandbRetrieverQueryEngine:
         top_k = top_k or self.config.top_k
         language = language or self.config.language
 
-        retriever = HybridRetriever(
-            index=self.index,
-            similarity_top_k=similarity_top_k,
-            storage_context=self.storage_context,
-            is_avoid_query=is_avoid_query,
-        )
+        if is_avoid_query is not None:
+            self.is_avoid_query = is_avoid_query
 
         node_postprocessors = [
             MetadataPostprocessor(
@@ -312,10 +351,10 @@ class Retriever:
             if language == "en"
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
         ]
-        query_engine = RetrieverQueryEngine.from_args(
-            retriever=retriever,
+        query_engine = WandbRetrieverQueryEngine.from_args(
+            retriever=self._retriever,
             node_postprocessors=node_postprocessors,
-            response_mode=ResponseMode.COMPACT,
+            response_mode=ResponseMode.NO_TEXT,
             service_context=self.service_context,
         )
         return query_engine
@@ -324,18 +363,16 @@ class Retriever:
         self,
         query: str,
         language: str | None = None,
-        initial_k: int | None = None,
         top_k: int | None = None,
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
-        is_avoid_query: bool = False,
+        is_avoid_query: bool | None = False,
     ):
         """Retrieves the top k results from the index for the given query.
 
         Args:
             query: A string representing the query.
             language: A string representing the language of the query.
-            initial_k: An integer representing the number of initial results to retrieve.
             top_k: An integer representing the number of top results to retrieve.
             include_tags: A list of strings representing the tags to include in the results.
             exclude_tags: A list of strings representing the tags to exclude from the results.
@@ -343,20 +380,22 @@ class Retriever:
         Returns:
             A list of dictionaries representing the retrieved results.
         """
-        initial_k = initial_k or self.config.similarity_top_k
         top_k = top_k or self.config.top_k
         language = language or self.config.language
 
         retrieval_engine = self.load_query_engine(
-            similarity_top_k=initial_k,
             top_k=top_k,
             language=language,
             include_tags=include_tags,
             exclude_tags=exclude_tags,
-            is_avoid_query=is_avoid_query,
         )
+
+        avoid_query = self.is_avoid_query or is_avoid_query
+
         query_bundle = QueryBundle(query_str=query)
-        results = retrieval_engine.retrieve(query_bundle)
+        results = retrieval_engine.retrieve(
+            query_bundle, is_avoid_query=bool(avoid_query)
+        )
 
         outputs = [
             {
@@ -366,7 +405,7 @@ class Retriever:
             }
             for node in results
         ]
-
+        self.is_avoid_query = None
         return outputs
 
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:

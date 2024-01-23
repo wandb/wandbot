@@ -243,7 +243,6 @@ async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     results = chat.retriever(
         query=request.query,
         language=request.language,
-        initial_k=request.initial_k,
         top_k=request.top_k,
         include_tags=request.include_tags,
         exclude_tags=request.exclude_tags,
