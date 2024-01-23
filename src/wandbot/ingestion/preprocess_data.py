@@ -30,6 +30,7 @@ from llama_index.node_parser import (
     TokenTextSplitter,
 )
 from llama_index.schema import BaseNode, TextNode
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -142,11 +143,19 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
 
     nodes: List[Any] = []
     for doc in llama_docs:
-        if doc.metadata["file_type"] == ".py":
-            parser = code_parser
-        else:
-            parser = md_parser
-        nodes.extend(parser.get_nodes_from_documents([doc]))
+        try:
+            if doc.metadata["file_type"] == ".py":
+                parser = code_parser
+            else:
+                parser = md_parser
+            nodes.extend(parser.get_nodes_from_documents([doc]))
+        except Exception as e:
+            logger.error(f"Error parsing document: {e}")
+            logger.warning(
+                f"Unable to parse document: {doc.metadata['source']} with custom parser, using default "
+                f"parser instead."
+            )
+            nodes.extend(node_parser.get_nodes_from_documents([doc]))
 
     nodes = node_parser.get_nodes_from_documents(nodes)
 

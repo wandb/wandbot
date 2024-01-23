@@ -22,7 +22,6 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
-import wandb
 from google.cloud import bigquery
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
@@ -30,6 +29,7 @@ from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from tqdm import tqdm
 
+import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -39,9 +39,9 @@ from wandbot.ingestion.config import (
     FCReportsStoreConfig,
     SDKCodeStoreConfig,
     SDKTestsStoreConfig,
+    WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
     WeaveExamplesStoreConfig,
-    WandbEduCodeStoreConfig,
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
@@ -347,11 +347,11 @@ class CodeDataLoader(DataLoader):
                     document.page_content = cleaned_body
                 elif os.path.splitext(f_name)[-1] == ".md":
                     document = TextLoader(f_name).load()[0]
-                else:
-                    document = TextLoader(f_name).load()[0]
                     contents = document.page_content
                     cleaned_body = clean_contents(contents)
                     document.page_content = cleaned_body
+                else:
+                    document = TextLoader(f_name).load()[0]
 
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
