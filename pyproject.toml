@@ -10,7 +10,7 @@ repository = "https://github.com/wandb/wandbot"
 include = ["src/**/*", "LICENSE", "README.md"]
 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<3.11"
+python = ">=3.10.0,<3.12"
 numpy = "^1.26.1"
 wandb = "<=0.16.1"
 tiktoken = "^0.5.1"
@@ -46,6 +46,9 @@ instructor = "^0.4.5"
 langchain-community = "^0.0.11"
 langchain = "^0.1.0"
 langchain-openai = "^0.0.2"
+setuptools = "69.0.2"  # needed to install on replit (added 2024-23-01)
+
+[tool.poetry.dev-dependencies]
 fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
 
 [build-system]
