@@ -170,6 +170,18 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_examples")
 
 
+class WandbEduCodeStoreConfig(DataStoreConfig):
+    name: str = "wandb_edu_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/edu/tree/main/",
+        repo_path="https://github.com/wandb/edu",
+        base_path="",
+        file_pattern=["*.py", "*.ipynb", ".*md"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_wandb_edu")
+
+
 class WeaveJsStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(

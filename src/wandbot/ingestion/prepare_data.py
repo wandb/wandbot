@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
+import wandb
 from google.cloud import bigquery
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
@@ -29,7 +30,6 @@ from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from tqdm import tqdm
 
-import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -41,6 +41,7 @@ from wandbot.ingestion.config import (
     SDKTestsStoreConfig,
     WeaveCodeStoreConfig,
     WeaveExamplesStoreConfig,
+    WandbEduCodeStoreConfig,
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
@@ -289,7 +290,6 @@ class CodeDataLoader(DataLoader):
         parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
         tree_slug = parts.index("tree")
         parts = parts[tree_slug + 2 :]
-        # parts = parts[parts.index("master") + 1 :]
         parts_mapper = {"__init__.py": [], "__main__.py": []}
         tags = []
         for part in parts:
@@ -345,8 +345,14 @@ class CodeDataLoader(DataLoader):
                     (body, resources) = md_exporter.from_notebook_node(notebook)
                     cleaned_body = clean_contents(body)
                     document.page_content = cleaned_body
+                elif os.path.splitext(f_name)[-1] == ".md":
+                    document = TextLoader(f_name).load()[0]
                 else:
                     document = TextLoader(f_name).load()[0]
+                    contents = document.page_content
+                    cleaned_body = clean_contents(contents)
+                    document.page_content = cleaned_body
+
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
                 )[-1]
@@ -689,18 +695,22 @@ class FCReportsDataLoader(DataLoader):
         return self.config.data_source.local_path
 
     def clean_invalid_unicode_escapes(self, text):
-        '''
+        """
         clean up invalid unicode escape sequences
-        '''
+        """
         # List of common escape sequences to retain
-        common_escapes = ['\\n', '\\t', '\\r', '\\\\', '\\\'', '\\"']
+        common_escapes = ["\\n", "\\t", "\\r", "\\\\", "\\'", '\\"']
 
         # Replace each uncommon escape sequence with a space or other character
         for i in range(256):
-            escape_sequence = f'\\{chr(i)}'
+            escape_sequence = f"\\{chr(i)}"
             if escape_sequence not in common_escapes:
-                text = text.replace(escape_sequence, '  ')  # replace with a space or any character of your choice
-                text = text.replace('\ ', ' ')  # in case an invalid escape sequence was created above
+                text = text.replace(
+                    escape_sequence, "  "
+                )  # replace with a space or any character of your choice
+                text = text.replace(
+                    "\ ", " "
+                )  # in case an invalid escape sequence was created above
         return text
 
     def parse_row(self, row):
@@ -716,11 +726,11 @@ class FCReportsDataLoader(DataLoader):
                     .decode("unicode_escape")
                 )
             except UnicodeDecodeError as e:
-                content = self.clean_invalid_unicode_escapes(row_dict["content"])
-                content = (
-                    content
-                    .encode("raw_unicode_escape")
-                    .decode("unicode_escape")
+                content = self.clean_invalid_unicode_escapes(
+                    row_dict["content"]
+                )
+                content = content.encode("raw_unicode_escape").decode(
+                    "unicode_escape"
                 )
 
             output = {
@@ -801,6 +811,7 @@ def load(
     sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
     weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
     weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
+    wandb_edu_code_loader = CodeDataLoader(WandbEduCodeStoreConfig())
     fc_reports_loader = FCReportsDataLoader(FCReportsStoreConfig())
 
     for loader in [
@@ -812,6 +823,7 @@ def load(
         sdk_tests_loader,
         # weave_code_loader,
         weave_examples_loader,
+        wandb_edu_code_loader,
         fc_reports_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
