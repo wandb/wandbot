@@ -233,9 +233,9 @@ class VectorStoreConfig(BaseSettings):
 
 
 class FasttextModelConfig(BaseSettings):
-    model_path: str = "data/cache/models/lid.176.bin"
-    model_artifact_name: str = 'wandbot/wandbot_public/fasttext-lid.176.bin:v0'
-    model_artifact_type: str = 'fasttext-model'
+    fasttext_path: str = "data/cache/models/lid.176.bin"
+    fasttext_artifact_name: str = 'wandbot/wandbot_public/fasttext-lid.176.bin:v0'
+    fasttext_artifact_type: str = 'fasttext-model'
 
 
 if __name__ == "__main__":
