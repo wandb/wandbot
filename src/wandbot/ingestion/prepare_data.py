@@ -726,6 +726,7 @@ class FCReportsDataLoader(DataLoader):
                     .decode("unicode_escape")
                 )
             except UnicodeDecodeError as e:
+                # fix escape characters with raw_unicode_escape
                 content = self.clean_invalid_unicode_escapes(
                     row_dict["content"]
                 )
@@ -734,7 +735,6 @@ class FCReportsDataLoader(DataLoader):
                 )
 
             output = {
-                # fix escape characters with raw_unicode_escape
                 "content": content,
                 "source": row_dict["source"],
                 "description": row_dict["description"],
@@ -747,6 +747,37 @@ class FCReportsDataLoader(DataLoader):
             parsed_row = self.parse_row(row)
             if parsed_row:
                 yield parsed_row
+
+    @staticmethod
+    def extract_tags(source_url: str, report_content: str) -> List[str]:
+        """Extracts the tags from a source url and the FC Report content.
+
+        Args:
+            source_url: The URL of the file.
+            report_content: The content of the FC Report.
+            
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        parts_mapper = {
+            "ml-news": ["ml-news"],
+            "gradient-dissent": ["gradient-dissent"],
+        }
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+ 
+        if ("wandb.log" or "wandb.init") in report_content:
+            tags.append("contains-wandb-code")
+
+        return tags
 
     def lazy_load(self) -> Iterator[Document]:
         """A lazy loader for code documents.
@@ -768,9 +799,8 @@ class FCReportsDataLoader(DataLoader):
                     ),
                     "file_type": ".md",
                     "description": parsed_row["description"],
-                    "tags": ["FC-Reports"] + ["ml-news"]
-                    if "ml-news" in parsed_row["source"]
-                    else [],
+                    "tags": ["fc-report"] + self.extract_tags(
+                        parsed_row["source"], parsed_row["content"]),
                 },
             )
             yield document
