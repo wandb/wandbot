@@ -41,6 +41,8 @@ from git import Repo
 
 from wandbot.utils import get_logger
 
+from wandbot.ingestion.config import FasttextModelConfig
+
 logger = get_logger(__name__)
 
 
@@ -296,7 +298,9 @@ class LocalLangDetect:
     https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
     '''
 
-    def __init__(self, model_path="data/cache/models/lid.176.bin"):
+    def __init__(self, model_path=None):
+        if model_path is None:
+            model_path = str(FasttextModelConfig().fasttext_file_path)
         self.model_path = model_path
         self.model = fasttext.load_model(model_path)
 

@@ -836,9 +836,10 @@ def load(
 
     # Download fasttext model for language detection
     fasttext_model = FasttextModelConfig()
-    _ = run.use_artifact(fasttext_model.fasttext_artifact_name, 
-                         type=fasttext_model.fasttext_artifact_type
-                         ).download(fasttext_model.fasttext_path)
+    if not os.path.isfile(fasttext_model.fasttext_file_path):
+        _ = run.use_artifact(fasttext_model.fasttext_artifact_name, 
+                            type=fasttext_model.fasttext_artifact_type
+                            ).download(fasttext_model.fasttext_file_path)
 
     en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())

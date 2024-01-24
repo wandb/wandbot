@@ -233,7 +233,7 @@ class VectorStoreConfig(BaseSettings):
 
 
 class FasttextModelConfig(BaseSettings):
-    fasttext_path: pathlib.Path = pathlib.Path("data/cache/models/lid.176.bin")
+    fasttext_file_path: pathlib.Path = pathlib.Path("data/cache/models/lid.176.bin/lid.176.bin")
     fasttext_artifact_name: str = 'wandbot/wandbot_public/fasttext-lid.176.bin:v0'
     fasttext_artifact_type: str = 'fasttext-model'
 
