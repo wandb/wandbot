@@ -232,5 +232,11 @@ class VectorStoreConfig(BaseSettings):
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
 
 
+class FasttextModelConfig(BaseSettings):
+    model_path: str = "data/cache/models/lid.176.bin"
+    model_artifact_name: str = 'wandbot/wandbot_public/fasttext-lid.176.bin:v0'
+    model_artifact_type: str = 'fasttext-model'
+
+
 if __name__ == "__main__":
     print(FCReportsStoreConfig().model_dump_json(indent=2))

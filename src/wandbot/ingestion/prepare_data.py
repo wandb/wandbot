@@ -42,6 +42,7 @@ from wandbot.ingestion.config import (
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
     WeaveExamplesStoreConfig,
+    FasttextModelConfig
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
@@ -832,6 +833,12 @@ def load(
         type="dataset",
         description="Raw documents for wandbot",
     )
+
+    # Download fasttext model for language detection
+    fasttext_model = FasttextModelConfig()
+    _ = run.use_artifact(fasttext_model.model_artifact_name, 
+                         type=fasttext_model.model_artifact_type
+                         ).download(fasttext_model.model_path)
 
     en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())

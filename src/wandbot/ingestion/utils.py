@@ -291,9 +291,11 @@ def extract_frontmatter(file_path: pathlib.Path) -> Dict[str, Any]:
 
 
 class LocalLangDetect:
-    # Download this model from https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
-    # and place it in data/cache/models/lid.176.bin
-    # TODO: Make this a wandb artifact
+    '''
+    Uses fasttext to detect the language of a text, from this file:
+    https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
+    '''
+
     def __init__(self, model_path="data/cache/models/lid.176.bin"):
         self.model_path = model_path
         self.model = fasttext.load_model(model_path)
