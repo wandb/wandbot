@@ -3,7 +3,7 @@ name = "wandbot"
 version = "1.1.0"
 description = "A Q&A bot for Weights & Biases documentation"
 authors = ["parambharat <bharat.ramanathan@wandb.com>"]
-license = "LICENSE"
+license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/wandb/wandbot"
 repository = "https://github.com/wandb/wandbot"
@@ -48,7 +48,9 @@ langchain = "^0.1.0"
 langchain-openai = "^0.0.2"
 setuptools = "69.0.2"  # needed to install on replit (added 2024-23-01)
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev]
+
+[tool.poetry.group.dev.dependencies]
 fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
 
 [build-system]
