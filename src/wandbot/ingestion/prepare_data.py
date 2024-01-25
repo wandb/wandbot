@@ -764,6 +764,10 @@ class FCReportsDataLoader(DataLoader):
         parts_mapper = {
             "ml-news": ["ml-news"],
             "gradient-dissent": ["gradient-dissent"],
+            "event-announcement": ["event-announcements"],
+            "events": ["events"],
+            "announcements": ["announcements"],
+            "launch-releases": ["launch-releases"],
         }
         tags = []
         for part in parts:
