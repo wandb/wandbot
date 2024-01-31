@@ -15,10 +15,9 @@ from pydantic import BaseModel, Field
 from pydantic.v1 import BaseModel as BaseModelV1
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from tenacity import retry, stop_after_attempt, wait_random_exponential
-
 from wandbot.chat.schemas import ChatRequest
 from wandbot.database.schemas import QuestionAnswer
-from wandbot.utils import get_logger
+from wandbot.utils import FastTextLangDetect, get_logger
 
 logger = get_logger(__name__)
 
@@ -291,7 +290,7 @@ class QueryHandlerConfig(BaseSettings):
         validation_alias="default_query_clf_model",
     )
     fallback_query_clf_model: str = Field(
-        "gpt-4-1106-preview",
+        "gpt-3.5-turbo-1106",
         description="The name of the fallback model to use for query classification",
     )
     tokenizer: str = Field(
@@ -371,6 +370,7 @@ class QueryHandler:
         self.tokenizer = tiktoken.get_encoding(self.config.tokenizer)
         self.bot_name_pattern = re.compile(self.config.bot_name_pattern)
         self.cohere_client = cohere.Client(os.environ["COHERE_API_KEY"])
+        self.lang_client = FastTextLangDetect()
         self.openai_client = OpenAI()
         self.query_classifier = CohereQueryClassifier(
             client=self.cohere_client, model=self.config.default_query_clf_model
@@ -387,10 +387,8 @@ class QueryHandler:
         return response
 
     def detect_language(self, query: str) -> str:
-        response = self.cohere_client.detect_language(
-            texts=[query],
-        )
-        return response.results[0].language_code
+        lang_code = self.lang_client.detect_language(query)
+        return lang_code
 
     def clean_query(self, query: str) -> str:
         cleaned_query = self.bot_name_pattern.sub("", query).strip()

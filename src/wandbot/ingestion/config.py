@@ -229,5 +229,3 @@ class VectorStoreConfig(BaseSettings):
     temperature: float = 0.1
     max_retries: int = 3
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
-
-
