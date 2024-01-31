@@ -13,6 +13,7 @@ class MrkdwnFormatter:
         self.italic_pattern = re.compile(r"_([^_]+)_", re.MULTILINE)
         self.bold_pattern = re.compile(r"\*\*([^*]+)\*\*", re.MULTILINE)
         self.strike_pattern = re.compile(r"~~([^~]+)~~", re.MULTILINE)
+        self.header_pattern = re.compile(r"^#+\s*(.*?)\n", re.MULTILINE)
 
     @staticmethod
     def replace_markdown_link(match):
@@ -32,19 +33,20 @@ class MrkdwnFormatter:
     def replace_strike(match):
         return f"~{match.group(1)}~"
 
+    @staticmethod
+    def replace_headers(match):
+        header_text = match.group(1)
+        return f"\n*{header_text}*\n"
+
     def __call__(self, text):
         try:
-            # Split the text into segments based on code blocks
             segments = self.code_block_pattern.split(text)
 
             for i, segment in enumerate(segments):
-                # If the segment is a code block, check for a language specification
                 if segment.startswith("```") and segment.endswith("```"):
-                    # Remove the language specification from the code block
                     segment = self.language_spec_pattern.sub("```\n", segment)
                     segments[i] = segment
                 else:
-                    # If the segment is not a code block, apply the conversion functions
                     segment = self.markdown_link_pattern.sub(
                         self.replace_markdown_link, segment
                     )
@@ -55,9 +57,11 @@ class MrkdwnFormatter:
                     segment = self.strike_pattern.sub(
                         self.replace_strike, segment
                     )
+                    segment = self.header_pattern.sub(
+                        self.replace_headers, segment
+                    )
                     segments[i] = segment
 
-            # Join the segments back together
             return "".join(segments)
         except Exception:
             return text
