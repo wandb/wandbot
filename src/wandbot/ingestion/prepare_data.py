@@ -22,14 +22,13 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
+import wandb
 from google.cloud import bigquery
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from tqdm import tqdm
-
-import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -42,16 +41,14 @@ from wandbot.ingestion.config import (
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
     WeaveExamplesStoreConfig,
-    FasttextModelConfig
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
-    LocalLangDetect,
     clean_contents,
     extract_frontmatter,
     fetch_git_repo,
 )
-from wandbot.utils import get_logger
+from wandbot.utils import FastTextLangDetect, get_logger
 
 logger = get_logger(__name__)
 
@@ -756,7 +753,7 @@ class FCReportsDataLoader(DataLoader):
         Args:
             source_url: The URL of the file.
             report_content: The content of the FC Report.
-            
+
         Returns:
             The extracted tags.
         """
@@ -778,7 +775,7 @@ class FCReportsDataLoader(DataLoader):
                 tags.append(part)
         tags = [tag.split(".")[0] for tag in tags]
         tags = list(set([tag.title() for tag in tags]))
- 
+
         if ("wandb.log" or "wandb.init") in report_content:
             tags.append("contains-wandb-code")
 
@@ -792,7 +789,7 @@ class FCReportsDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-        lang_detect = LocalLangDetect()
+        lang_detect = FastTextLangDetect()
         data_dump_fame = self.fetch_data()
         for parsed_row in self.parse_data_dump(data_dump_fame):
             document = Document(
@@ -804,8 +801,10 @@ class FCReportsDataLoader(DataLoader):
                     ),
                     "file_type": ".md",
                     "description": parsed_row["description"],
-                    "tags": ["fc-report"] + self.extract_tags(
-                        parsed_row["source"], parsed_row["content"]),
+                    "tags": ["fc-report"]
+                    + self.extract_tags(
+                        parsed_row["source"], parsed_row["content"]
+                    ),
                 },
             )
             yield document
@@ -838,13 +837,6 @@ def load(
         description="Raw documents for wandbot",
     )
 
-    # Download fasttext model for language detection
-    fasttext_model = FasttextModelConfig()
-    if not os.path.isfile(fasttext_model.fasttext_file_path):
-        _ = run.use_artifact(fasttext_model.fasttext_artifact_name, 
-                            type=fasttext_model.fasttext_artifact_type
-                            ).download(fasttext_model.fasttext_file_path)
-
     en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
@@ -861,9 +853,9 @@ def load(
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
-        # sdk_code_loader,
+        sdk_code_loader,
         sdk_tests_loader,
-        # weave_code_loader,
+        weave_code_loader,
         weave_examples_loader,
         wandb_edu_code_loader,
         fc_reports_loader,

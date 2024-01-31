@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -232,11 +231,3 @@ class VectorStoreConfig(BaseSettings):
     embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")
 
 
-class FasttextModelConfig(BaseSettings):
-    fasttext_file_path: pathlib.Path = pathlib.Path("data/cache/models/lid.176.bin/lid.176.bin")
-    fasttext_artifact_name: str = 'wandbot/wandbot_public/fasttext-lid.176.bin:v0'
-    fasttext_artifact_type: str = 'fasttext-model'
-
-
-if __name__ == "__main__":
-    print(FCReportsStoreConfig().model_dump_json(indent=2))

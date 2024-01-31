@@ -25,10 +25,13 @@ import hashlib
 import json
 import logging
 import os
+import pathlib
 import sqlite3
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import faiss
+import fasttext
+import wandb
 from llama_index import (
     ServiceContext,
     StorageContext,
@@ -38,8 +41,10 @@ from llama_index import (
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
-from llama_index.vector_stores import FaissVectorStore
 from llama_index.schema import NodeWithScore, TextNode
+from llama_index.vector_stores import FaissVectorStore
+from pydantic_settings import BaseSettings
+
 
 def get_logger(name: str) -> logging.Logger:
     """Creates and returns a logger with the specified name.
@@ -275,3 +280,46 @@ def create_no_result_dummy_node() -> NodeWithScore:
     }
     dummy_text_node = TextNode(text=dummy_text, metadata=dummy_metadata)
     return NodeWithScore(node=dummy_text_node, score=0.0)
+
+
+class FasttextModelConfig(BaseSettings):
+    fasttext_file_path: pathlib.Path = pathlib.Path(
+        "data/cache/models/lid.176.bin"
+    )
+    fasttext_artifact_name: str = (
+        "wandbot/wandbot_public/fasttext-lid.176.bin:v0"
+    )
+    fasttext_artifact_type: str = "fasttext-model"
+
+
+class FastTextLangDetect:
+    """Uses fasttext to detect the language of a text, from this file:
+    https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
+    """
+
+    def __init__(self, config: FasttextModelConfig = FasttextModelConfig()):
+        self.config = config
+        self._model = self._load_model()
+
+    def detect_language(self, text: str):
+        predictions = self.model.predict(text.replace("\n", " "))
+        return predictions[0][0].replace("__label__", "")
+
+    def detect_language_batch(self, texts: List[str]):
+        predictions = self.model.predict(texts)
+        return [p[0].replace("__label__", "") for p in predictions[0]]
+
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = self._load_model()
+        return self._model
+
+    def _load_model(self):
+        if not os.path.isfile(self.config.fasttext_file_path):
+            _ = wandb.run.use_artifact(
+                self.config.fasttext_artifact_name,
+                type=self.config.fasttext_artifact_type,
+            ).download(root=str(self.config.fasttext_file_path.parent))
+        self._model = fasttext.load_model(str(self.config.fasttext_file_path))
+        return self._model
