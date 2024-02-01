@@ -5,19 +5,19 @@ Zenpy client for interacting with the Zendesk API and the APIClient for interact
 
 The system performs the following steps:
 1. Creates a new ticket with a predefined question.
-2. Enters a loop where it fetches new tickets every 120 seconds.
+2. Enters a loop where it fetches new tickets every 600 seconds.
 3. For each new ticket, it extracts the question, generates a response, formats the response, and updates the ticket
  with the response.
 
 This module contains the following classes:
-- ZendeskAIResponseSystem: Handles the interaction with the Zendesk system.
+- ZendeskWandBotResponseSystem: Handles the interaction with the Zendesk system.
 
 This module contains the following functions:
 - extract_question(ticket): Extracts the question from a given ticket.
 - format_response(response): Formats the response to be sent as a ticket comment.
 
 This module is meant to be run as a script and not imported as a module. When run as a script, it initializes a
-ZendeskAIResponseSystem object and runs it in an event loop.
+ZendeskWandBotResponseSystem object and runs it in an event loop.
 
 """
 import asyncio
@@ -27,11 +27,13 @@ from zenpy import Zenpy
 from zenpy.lib.api_objects import Comment, Ticket
 
 from wandbot.api.client import AsyncAPIClient
-from wandbot.apps.zendesk.config import ZendeskAppConfig
+from wandbot.apps.zendesk.config import zendesk_app_config
 from wandbot.utils import get_logger
+from wandbot.apps.zendesk.extract_by_type import *
+
 
 logger = get_logger(__name__)
-config = ZendeskAppConfig()
+config = zendesk_app_config()
 
 
 def extract_question(ticket: Ticket) -> str:
@@ -39,9 +41,7 @@ def extract_question(ticket: Ticket) -> str:
 
     This function performs the following steps:
     1. Extracts the description from the ticket.
-    2. Converts the description to lower case and replaces newline and carriage return characters with a space.
-    3. Removes the string "[discourse post]" from the description.
-    4. Truncates the description to a maximum length of 4095 characters.
+    2. Chooses what type of ticket we are looking at, and then extracts the ticket depending on the ticket type.
 
     Args:
         ticket (Ticket): The ticket object from which the question is to be extracted.
@@ -49,27 +49,24 @@ def extract_question(ticket: Ticket) -> str:
     Returns:
         str: The extracted question from the ticket's description.
     """
-
     description = ticket.description
-    # Convert the description to lower case and replace newline and carriage return characters with a space
-    question = description.lower().replace("\n", " ").replace("\r", "")
-    # Remove the string "[discourse post]" from the description
-    question = question.replace("[discourse post]", "")
-    # Truncate the description to a maximum length of 4095 characters
-    question = question[:4095]
+    if "forum" in ticket.tags:
+        return discourse_ext(description)
+    elif "zopim_offline_message" in ticket.tags:
+        return offline_msg_ext(description)
+    elif "add_cc_note" in ticket.tags:
+        return email_msg_ext(description)
 
     return question
 
 
-# TODO: add the necessary format we want to depending on ticket type
 def format_response(response: str) -> str:
     """Formats the response to be sent as a ticket comment.
 
     This function performs the following steps:
     1. Converts the response to a string.
-    2. Truncates the response to a maximum length of 2000 characters.
-    3. Appends an ellipsis (...) if the response was truncated.
-    4. Appends a signature at the end of the response.
+    2. Appends a signature at the end of the response.
+    3. Appends a warning saying that this is wandbot talking in the front of the reply.
 
     Args:
         response (str): The response to be formatted.
@@ -77,17 +74,12 @@ def format_response(response: str) -> str:
     Returns:
         str: The formatted response.
     """
-
-    response = str(response)
-    max_length = 2000
-    # Truncate the response to a maximum length of 2000 characters
-    if len(response) > max_length:
-        response = response[:max_length] + "..."
-    # Append a signature at the end of the response
-    return response + "\n\n-WandBot 🤖"
+    response_str = str(response)
+    final_response = config.DISCBOTINTRO + response_str
+    return f"{final_response}\n\n-WandBot 🤖"
 
 
-class ZendeskAIResponseSystem:
+class ZendeskWandBotResponseSystem:
     """Handles the interaction with the Zendesk system.
 
     This class is responsible for creating and updating tickets in the Zendesk system. It uses the Zenpy client for
@@ -96,74 +88,44 @@ class ZendeskAIResponseSystem:
     Attributes:
         zenpy_client (Zenpy): The client for interacting with the Zendesk API.
         api_client (AsyncAPIClient): The client for interacting with the WandBot API.
+        semaphore (Semaphore): Use semaphore to control how many api calls to wandbot we make
     """
-
     def __init__(self) -> None:
-        """Initializes the ZendeskAIResponseSystem with the necessary clients.
+        """Initializes the ZendeskWandBotResponseSystem with the necessary clients.
 
         The Zenpy client is initialized with the user credentials from the configuration. The AsyncAPIClient is
         initialized with the WandBot API URL from the configuration.
         """
-
-        user_creds = {
+        self.user_creds = {
             "email": config.ZENDESK_EMAIL,
             "password": config.ZENDESK_PASSWORD,
             "subdomain": config.ZENDESK_SUBDOMAIN,
         }
-        self.zenpy_client = Zenpy(**user_creds)
+        self.zenpy_client = Zenpy(**self.user_creds)
         self.api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
-    def create_new_ticket(self, question_text: str) -> None:
-        """Creates a new ticket in the Zendesk system.
-
-        This method uses the Zenpy client to create a new ticket in the Zendesk system. The ticket is created with a
-        predefined subject, status, priority, and tags. The description of the ticket is set to the provided question
-        text.
-
-        Args:
-            question_text (str): The text to be used as the description of the ticket.
-
-        Returns:
-            None
-        """
-
-        self.zenpy_client.tickets.create(
-            Ticket(
-                subject="WandbotTest4",
-                description=question_text,
-                status="new",
-                priority="low",
-                tags=["botTest", "forum"],
-            )
-        )
+        self.semaphore = asyncio.Semaphore(config.MAX_WANDBOT_REQUESTS)
+        self.request_interval = config.REQUEST_INTERVAL
 
     def fetch_new_tickets(self) -> List[Ticket]:
         """Fetches new tickets from the Zendesk system.
 
         This method uses the Zenpy client to fetch new tickets from the Zendesk system. It filters the fetched
-        tickets based on specific requirements. The tickets are filtered if they have the tag "forum" and do not have
-        the tag "answered_by_bot".
+        tickets based on specific requirements. The tickets are filtered if they have the tags "forum",
+        "zopim_offline_message" and do not have the tag "answered_by_bot", "zopim_chat", "picked_up_by_bot".
 
         Returns:
             list: A list of filtered tickets that are new and have not been answered by the bot.
         """
-
+        exclude_tags = ["answered_by_bot", "zopim_chat", "picked_up_by_bot"]
         new_tickets = self.zenpy_client.search(
-            type="ticket", status="new", group_id=config.ZDGROUPID
+            type="ticket",
+            status="new",
+            tags=["forum", "zopim_offline_message"],
+            minus=[f"tags:{tag}" for tag in exclude_tags],
         )
-        # Filtering based on specific requirements
-        filtered_tickets = [
-            ticket for ticket in new_tickets if "forum" in ticket.tags
-        ]
-        # filtered_tickets = [ticket for ticket in new_tickets if 'bottest' in ticket.tags]
-        # for testing purposes only
-        filtered_tickets_not_answered = [
-            ticket
-            for ticket in filtered_tickets
-            if "answered_by_bot" not in ticket.tags
-        ]  # for testing purposes only
+        return new_tickets
 
-        return filtered_tickets_not_answered
 
     async def generate_response(self, question: str) -> str:
         """Generates a response to a given question.
@@ -225,7 +187,6 @@ class ZendeskAIResponseSystem:
 
         Args:
             ticket (Ticket): The ticket for which feedback is to be gathered.
-
         Returns:
             None
         """
@@ -240,9 +201,8 @@ class ZendeskAIResponseSystem:
         """Runs the Zendesk AI Response System.
 
         This method performs the following steps:
-        1. Creates a new ticket with a predefined question.
-        2. Enters a loop where it fetches new tickets every 120 seconds.
-        3. For each new ticket, it extracts the question, generates a response, formats the response,
+        1. Enters a loop where it fetches new tickets every 600 seconds.
+        2. For each new ticket, it extracts the question, generates a response, formats the response,
          and updates the ticket with the response.
 
         This method is asynchronous and should be run in an event loop.
@@ -251,29 +211,41 @@ class ZendeskAIResponseSystem:
             None
         """
 
-        # Create a new ticket with a predefined question
-        self.create_new_ticket(
-            "Is there a way to programmatically list all projects for a given entity?"
-        )
+        # after set_limit number of tickets, have a timeout
+        set_limit = config.MAX_WANDBOT_REQUESTS
+        logger.info(f"WandBot + zendesk is running")
+        sem = asyncio.Semaphore(set_limit)
 
-        # Enter a loop where it fetches new tickets every 120 seconds
         while True:
-            await asyncio.sleep(120)
+            await asyncio.sleep(config.INTERVAL_TO_FETCH_TICKETS)
+
+            # restart the zenpy client because it times out after 3 minutes
+            self.zenpy_client = Zenpy(**self.user_creds)
 
             # Fetch new tickets
-            new_tickets = self.fetch_new_tickets()
-            logger.info(f"New unanswered Tickets: {len(new_tickets)}")
+            new_tickets = list(self.fetch_new_tickets())
+            logger.info(f"New unanswered Zendesk tickets: {new_tickets}")
 
-            # For each new ticket, extract the question, generate a response, format the response,
+            # For every set_limit new tickets, extract the question, generate a response, format the response,
             # and update the ticket with the response
-            for ticket in new_tickets:
-                question = extract_question(ticket)
-                response = await self.generate_response(question)
+            for i in range(0, len(new_tickets), set_limit):
+                batch = new_tickets[i : i + set_limit]
+                for ticket in batch:
+                    async with sem:
+                        question = extract_question(ticket)
+                        response = await self.generate_response(question)
 
-                formatted_response = format_response(response)
-                self.update_ticket(ticket, formatted_response)
+                        formatted_response = format_response(response)
+                        self.update_ticket(ticket, formatted_response)
+
+                # Timeout after a certain amount of tickets, 5 in this case
+                if i + set_limit < len(new_tickets):
+                    await asyncio.sleep(config.REQUEST_INTERVAL)
+
+            if len(new_tickets) > 0:
+                logger.info(f"Done processing tickets: {len(new_tickets)}")
 
 
 if __name__ == "__main__":
-    zd = ZendeskAIResponseSystem()
+    zd = ZendeskWandBotResponseSystem()
     asyncio.run(zd.run())
