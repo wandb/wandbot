@@ -30,7 +30,6 @@ from llama_index.node_parser import (
     TokenTextSplitter,
 )
 from llama_index.schema import BaseNode, TextNode
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -120,7 +119,7 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 384) -> List[Any]:
     """Loads documents and returns a list of nodes.
 
     Args:
@@ -159,6 +158,26 @@ def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
 
     nodes = node_parser.get_nodes_from_documents(nodes)
 
-    nodes = list(filter(lambda x: len(x.get_content()) > 10, nodes))
+    def filter_smaller_nodes(
+        text_nodes: List[TextNode], min_size: int = 5
+    ) -> List[TextNode]:
+        """Filters out nodes that are smaller than the chunk size.
 
+        Args:
+            text_nodes: A list of nodes.
+            min_size: The minimum size of a node.
+
+        Returns:
+            A list of nodes.
+        """
+
+        for node in text_nodes:
+            content = node.get_content()
+            word_len = len(
+                [c for c in content.strip().split() if c and len(c) > 2]
+            )
+            if word_len >= min_size:
+                yield node
+
+    nodes = list(filter_smaller_nodes(nodes))
     return nodes
