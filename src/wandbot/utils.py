@@ -31,7 +31,6 @@ from typing import Any, List, Optional
 
 import faiss
 import fasttext
-import wandb
 from llama_index import (
     ServiceContext,
     StorageContext,
@@ -44,6 +43,8 @@ from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import FaissVectorStore
 from pydantic_settings import BaseSettings
+
+import wandb
 
 
 def get_logger(name: str) -> logging.Logger:

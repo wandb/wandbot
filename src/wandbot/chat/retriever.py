@@ -25,9 +25,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import wandb
 from wandbot.utils import (
-    get_logger, 
-    load_service_context, 
-    create_no_result_dummy_node
+    create_no_result_dummy_node,
+    get_logger,
+    load_service_context,
 )
 
 logger = get_logger(__name__)
@@ -102,7 +102,9 @@ class MetadataPostprocessor(BaseNodePostprocessor):
             new_nodes.append(node)
         if len(new_nodes) < self.min_result_size:
             dummy_node = create_no_result_dummy_node()
-            new_nodes.extend([dummy_node] * (self.min_result_size - len(new_nodes)))
+            new_nodes.extend(
+                [dummy_node] * (self.min_result_size - len(new_nodes))
+            )
         return new_nodes
 
 
