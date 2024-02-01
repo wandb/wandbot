@@ -2,7 +2,6 @@ import os
 from typing import Any, Dict, List, Optional
 
 import requests
-import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -22,6 +21,8 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+import wandb
 from wandbot.utils import (
     create_no_result_dummy_node,
     get_logger,

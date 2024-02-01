@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from pydantic.v1 import BaseModel as BaseModelV1
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from tenacity import retry, stop_after_attempt, wait_random_exponential
+
 from wandbot.chat.schemas import ChatRequest
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.utils import FastTextLangDetect, get_logger

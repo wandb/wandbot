@@ -16,9 +16,10 @@ import json
 import pathlib
 from typing import Any, Dict, List
 
-import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
+
+import wandb
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import (
