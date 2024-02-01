@@ -30,7 +30,6 @@ from llama_index.node_parser import (
     TokenTextSplitter,
 )
 from llama_index.schema import BaseNode, TextNode
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -120,7 +119,7 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 384) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 384) -> List[TextNode]:
     """Loads documents and returns a list of nodes.
 
     Args:

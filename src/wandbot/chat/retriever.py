@@ -1,32 +1,34 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
+import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
     StorageContext,
-    load_index_from_storage,
+    load_indices_from_storage,
 )
 from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
+from llama_index.constants import DEFAULT_SIMILARITY_TOP_K
 from llama_index.core.base_retriever import BaseRetriever
+from llama_index.llms.utils import LLMType
 from llama_index.postprocessor import CohereRerank
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.query_engine import RetrieverQueryEngine
 from llama_index.response_synthesizers import BaseSynthesizer, ResponseMode
-from llama_index.retrievers import BM25Retriever
-from llama_index.schema import NodeWithScore, QueryType, TextNode
-from llama_index.vector_stores import FaissVectorStore
+from llama_index.retrievers import BM25Retriever, QueryFusionRetriever
+from llama_index.retrievers.fusion_retriever import FUSION_MODES
+from llama_index.schema import IndexNode, NodeWithScore, QueryType, TextNode
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-import wandb
 from wandbot.utils import (
     create_no_result_dummy_node,
     get_logger,
     load_service_context,
+    load_storage_context,
 )
 
 logger = get_logger(__name__)
@@ -230,6 +232,89 @@ class HybridRetriever(BaseRetriever):
         return nodes
 
 
+class FusionRetriever(QueryFusionRetriever):
+    def __init__(
+        self,
+        retrievers: List[HybridRetriever],
+        llm: Optional[LLMType] = "default",
+        query_gen_prompt: Optional[str] = None,
+        mode: FUSION_MODES = FUSION_MODES.SIMPLE,
+        similarity_top_k: int = DEFAULT_SIMILARITY_TOP_K,
+        num_queries: int = 4,
+        use_async: bool = True,
+        verbose: bool = False,
+        callback_manager: Optional[CallbackManager] = None,
+        objects: Optional[List[IndexNode]] = None,
+        object_map: Optional[dict] = None,
+    ) -> None:
+        super().__init__(
+            retrievers=retrievers,
+            llm=llm,
+            query_gen_prompt=query_gen_prompt,
+            mode=mode,
+            similarity_top_k=similarity_top_k,
+            num_queries=num_queries,
+            use_async=use_async,
+            verbose=verbose,
+            callback_manager=callback_manager,
+            objects=objects,
+            object_map=object_map,
+        )
+        self._retrievers = retrievers
+
+    def _run_sync_queries(
+        self, queries: List[str], **kwargs
+    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
+        results = {}
+        for query in queries:
+            for i, retriever in enumerate(self._retrievers):
+                results[(query, i)] = retriever.retrieve(query, **kwargs)
+
+        return results
+
+    def _retrieve(
+        self, query_bundle: QueryBundle, **kwargs
+    ) -> List[NodeWithScore]:
+        if self.num_queries > 1:
+            queries = self._get_queries(query_bundle.query_str)
+        else:
+            queries = [query_bundle.query_str]
+
+        if self.use_async:
+            results = self._run_nested_async_queries(queries)
+        else:
+            results = self._run_sync_queries(queries, **kwargs)
+
+        if self.mode == FUSION_MODES.RECIPROCAL_RANK:
+            return self._reciprocal_rerank_fusion(results)[
+                : self.similarity_top_k
+            ]
+        elif self.mode == FUSION_MODES.SIMPLE:
+            return self._simple_fusion(results)[: self.similarity_top_k]
+        else:
+            raise ValueError(f"Invalid fusion mode: {self.mode}")
+
+    def retrieve(
+        self, str_or_query_bundle: QueryType, **kwargs
+    ) -> List[NodeWithScore]:
+        self._check_callback_manager()
+
+        if isinstance(str_or_query_bundle, str):
+            query_bundle = QueryBundle(str_or_query_bundle)
+        else:
+            query_bundle = str_or_query_bundle
+        with self.callback_manager.as_trace("query"):
+            with self.callback_manager.event(
+                CBEventType.RETRIEVE,
+                payload={EventPayload.QUERY_STR: query_bundle.query_str},
+            ) as retrieve_event:
+                nodes = self._retrieve(query_bundle, **kwargs)
+                retrieve_event.on_end(
+                    payload={EventPayload.NODES: nodes},
+                )
+        return nodes
+
+
 class RetrieverConfig(BaseSettings):
     index_artifact: str = Field(
         "wandbot/wandbot-dev/wandbot_index:latest",
@@ -258,7 +343,7 @@ class RetrieverConfig(BaseSettings):
 class WandbRetrieverQueryEngine(RetrieverQueryEngine):
     def __init__(
         self,
-        retriever: HybridRetriever,
+        retriever: FusionRetriever,
         response_synthesizer: Optional[BaseSynthesizer] = None,
         node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
         callback_manager: Optional[CallbackManager] = None,
@@ -269,6 +354,7 @@ class WandbRetrieverQueryEngine(RetrieverQueryEngine):
             node_postprocessors=node_postprocessors,
             callback_manager=callback_manager,
         )
+        self._retriever = retriever
 
     def retrieve(
         self, query_bundle: QueryBundle, **kwargs
@@ -299,23 +385,37 @@ class Retriever:
             )
         )
 
-        self.storage_context = self.load_storage_context_from_artifact(
+        (
+            self.storage_context,
+            index_ids,
+        ) = self.load_storage_context_from_artifact(
             artifact_url=self.config.index_artifact
         )
 
-        self.index = load_index_from_storage(
-            self.storage_context, service_context=self.service_context
+        self.indices = load_indices_from_storage(
+            self.storage_context,
+            service_context=self.service_context,
+            index_ids=index_ids,
         )
-        self._retriever = HybridRetriever(
-            index=self.index,
+        retriever_list = []
+        for index in self.indices:
+            retriever = HybridRetriever(
+                index=index,
+                similarity_top_k=self.config.similarity_top_k,
+                storage_context=self.storage_context,
+            )
+            retriever_list.append(retriever)
+        self._retriever = FusionRetriever(
+            retriever_list,
             similarity_top_k=self.config.similarity_top_k,
-            storage_context=self.storage_context,
+            num_queries=1,
+            use_async=False,
         )
         self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
-    ) -> StorageContext:
+    ) -> Tuple[StorageContext, Dict[str, str]]:
         """Loads the storage context from the given artifact URL.
 
         Args:
@@ -328,11 +428,11 @@ class Retriever:
         artifact_dir = artifact.download()
         index_path = f"{artifact_dir}/{DEFAULT_VECTOR_STORE}{NAMESPACE_SEP}{DEFAULT_PERSIST_FNAME}"
         logger.debug(f"Loading index from {index_path}")
-        storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore.from_persist_path(index_path),
+        storage_context = load_storage_context(
+            embed_dimensions=self.config.embeddings_size,
             persist_dir=artifact_dir,
         )
-        return storage_context
+        return storage_context, artifact.metadata["index_ids"]
 
     def load_query_engine(
         self,

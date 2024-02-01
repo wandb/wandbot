@@ -22,14 +22,13 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
+import wandb
 from google.cloud import bigquery
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from tqdm import tqdm
-
-import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -852,14 +851,14 @@ def load(
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
-        examples_code_loader,
-        examples_notebook_loader,
-        sdk_code_loader,
-        sdk_tests_loader,
-        weave_code_loader,
-        weave_examples_loader,
-        wandb_edu_code_loader,
-        fc_reports_loader,
+        # examples_code_loader,
+        # examples_notebook_loader,
+        # sdk_code_loader,
+        # sdk_tests_loader,
+        # weave_code_loader,
+        # weave_examples_loader,
+        # wandb_edu_code_loader,
+        # fc_reports_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 

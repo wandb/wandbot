@@ -16,10 +16,9 @@ import json
 import pathlib
 from typing import Any, Dict, List
 
-from langchain.schema import Document as LcDocument
-from llama_index.callbacks import WandbCallbackHandler
-
 import wandb
+from langchain.schema import Document as LcDocument
+from llama_index.schema import TextNode
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import (
@@ -75,7 +74,7 @@ def load(
         pathlib.Path(artifact_dir).rglob("documents.jsonl")
     )
 
-    transformed_documents: List[LcDocument] = []
+    transformed_documents: Dict[str, List[TextNode]] = {}
     for document_file in document_files:
         documents: List[LcDocument] = []
         with document_file.open() as f:
@@ -83,18 +82,31 @@ def load(
                 doc_dict: Dict[str, Any] = json.loads(line)
                 doc: LcDocument = LcDocument(**doc_dict)
                 documents.append(doc)
-        transformed_documents.extend(preprocess_data.load(documents))
-    unique_objects = {obj.hash: obj for obj in transformed_documents}
-    transformed_documents = list(unique_objects.values())
-    index = load_index(
-        transformed_documents,
-        service_context,
-        storage_context,
-        persist_dir=str(config.persist_dir),
-    )
-    wandb_callback: WandbCallbackHandler = WandbCallbackHandler()
+        preprocessed_documents = preprocess_data.load(documents)
+        unique_objects = {obj.hash: obj for obj in preprocessed_documents}
+        preprocessed_documents = list(unique_objects.values())
+        transformed_documents[
+            document_file.parent.name
+        ] = preprocessed_documents
 
-    wandb_callback.persist_index(index, index_name=result_artifact_name)
-    wandb_callback.finish()
+    for store_name, doc_list in transformed_documents.items():
+        logger.info(f"Number of documents: {len(doc_list)}")
+        _ = load_index(
+            doc_list,
+            service_context,
+            storage_context,
+            index_id=store_name,
+            persist_dir=str(config.persist_dir),
+        )
+    artifact = wandb.Artifact(
+        name="wandbot_index",
+        type="storage_context",
+        metadata={"index_ids": list(transformed_documents.keys())},
+    )
+    artifact.add_dir(
+        local_path=str(config.persist_dir),
+    )
+    run.log_artifact(artifact)
+
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"
