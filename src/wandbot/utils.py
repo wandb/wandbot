@@ -31,11 +31,12 @@ from typing import Any, List, Optional
 
 import faiss
 import fasttext
+import wandb
 from llama_index import (
     ServiceContext,
     StorageContext,
     VectorStoreIndex,
-    load_index_from_storage,
+    load_indices_from_storage,
 )
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
@@ -43,8 +44,6 @@ from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import FaissVectorStore
 from pydantic_settings import BaseSettings
-
-import wandb
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -171,11 +170,14 @@ def load_service_context(
     )
 
 
-def load_storage_context(embed_dimensions: int) -> StorageContext:
+def load_storage_context(
+    embed_dimensions: int, persist_dir: str | None = None
+) -> StorageContext:
     """Loads a storage context with the specified parameters.
 
     Args:
         embed_dimensions: The dimensions of the embeddings.
+        persist_dir: The directory where the storage context is persisted.
 
     Returns:
         A storage context instance with the specified parameters.
@@ -184,14 +186,16 @@ def load_storage_context(embed_dimensions: int) -> StorageContext:
     faiss_index = faiss.IndexFlatL2(embed_dimensions)
     storage_context = StorageContext.from_defaults(
         vector_store=FaissVectorStore(faiss_index),
+        persist_dir=persist_dir,
     )
     return storage_context
 
 
 def load_index(
-    nodes: Any,
+    nodes: List[TextNode],
     service_context: ServiceContext,
     storage_context: StorageContext,
+    index_id: str,
     persist_dir: str,
 ) -> VectorStoreIndex:
     """Loads an index from storage or creates a new one if not found.
@@ -200,21 +204,20 @@ def load_index(
         nodes: The nodes to include in the index.
         service_context: The service context for the index.
         storage_context: The storage context for the index.
+        index_id: The ID of the index.
         persist_dir: The directory where the index is persisted.
 
     Returns:
         An index instance with the specified parameters.
     """
-    try:
-        index = load_index_from_storage(storage_context)
-    except Exception:
-        index = VectorStoreIndex(
-            nodes=nodes,
-            service_context=service_context,
-            storage_context=storage_context,
-            show_progress=True,
-        )
-        index.storage_context.persist(persist_dir=persist_dir)
+    index = VectorStoreIndex(
+        nodes=nodes,
+        service_context=service_context,
+        storage_context=storage_context,
+        show_progress=True,
+    )
+    index.set_index_id(index_id)
+    index.storage_context.persist(persist_dir=persist_dir)
     return index
 
 
@@ -324,3 +327,6 @@ class FastTextLangDetect:
             ).download(root=str(self.config.fasttext_file_path.parent))
         self._model = fasttext.load_model(str(self.config.fasttext_file_path))
         return self._model
+
+
+load_indices_from_storage
