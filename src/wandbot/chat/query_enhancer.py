@@ -290,7 +290,7 @@ class QueryHandlerConfig(BaseSettings):
         validation_alias="default_query_clf_model",
     )
     fallback_query_clf_model: str = Field(
-        "gpt-4-1106-preview",
+        "gpt-3.5-turbo-1106",
         description="The name of the fallback model to use for query classification",
     )
     tokenizer: str = Field(
