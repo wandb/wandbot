@@ -28,6 +28,7 @@ Typical usage example:
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
@@ -44,9 +45,6 @@ from llama_index.memory import BaseMemory
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
-from weave.monitoring import StreamTable
-
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
@@ -58,6 +56,7 @@ from wandbot.chat.retriever import (
 )
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger, load_service_context
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -255,14 +254,16 @@ class Chat:
             llm=self.config.chat_model_name,
             temperature=self.config.chat_temperature,
             max_retries=self.config.max_retries,
-            embeddings_cache=str(self.config.embeddings_cache),
+            embeddings_model=self.config.embeddings_model,
+            embeddings_size=self.config.embeddings_dim,
             callback_manager=self.callback_manager,
         )
         self.fallback_service_context = load_service_context(
             llm=self.config.fallback_model_name,
             temperature=self.config.chat_temperature,
             max_retries=self.config.max_fallback_retries,
-            embeddings_cache=str(self.config.embeddings_cache),
+            embeddings_model=self.config.embeddings_model,
+            embeddings_size=self.config.embeddings_dim,
             callback_manager=self.callback_manager,
         )
 
@@ -279,8 +280,8 @@ class Chat:
         service_context: ServiceContext,
         query_intent: str = "\n",
         language: str = "en",
-        initial_k: int = 15,
-        top_k: int = 5,
+        initial_k: int = 10,
+        top_k: int = 10,
     ) -> WandbContextChatEngine:
         """Loads the chat engine with the given model name and maximum retries.
 

@@ -86,26 +86,19 @@ class Timer:
         return (self.stop - self.start).total_seconds()
 
 
-def load_embeddings(cache_dir: str) -> OpenAIEmbedding:
+def load_embeddings(
+    model_name: str = "text-embedding-3-small", dimensions: int = 512
+) -> OpenAIEmbedding:
     """Loads embeddings from cache or creates new ones if not found.
 
     Args:
-        cache_dir: The directory where the embeddings cache is stored.
+        model_name: The name of the model to load.
+        dimensions: The dimensions of the embeddings.
 
     Returns:
         A cached embedder instance.
     """
-    # underlying_embeddings = OpenAIEmbeddings()
-    #
-    # embeddings_cache_fs = LocalFileStore(cache_dir)
-    # cached_embedder = CacheBackedEmbeddings.from_bytes_store(
-    #     underlying_embeddings,
-    #     embeddings_cache_fs,
-    #     namespace=underlying_embeddings.model + "/",
-    # )
-    #
-    # return cast(LCEmbeddings, cached_embedder)
-    embeddings = OpenAIEmbedding()
+    embeddings = OpenAIEmbedding(model=model_name, dimensions=dimensions)
     return embeddings
 
 
@@ -140,7 +133,8 @@ def load_llm(
 
 
 def load_service_context(
-    embeddings_cache: str,
+    embeddings_model: str = "text-embedding-3-small",
+    embeddings_size: int = 512,
     llm: str = "gpt-3.5-turbo-16k-0613",
     temperature: float = 0.1,
     max_retries: int = 2,
@@ -149,9 +143,10 @@ def load_service_context(
     """Loads a service context with the specified parameters.
 
     Args:
+        embeddings_model: The name of the embeddings model to load.
+        embeddings_size: The size of the embeddings.
         llm: The language model to load.
         temperature: The temperature parameter for the model.
-        embeddings_cache: The directory where the embeddings cache is stored.
         max_retries: The maximum number of retries for loading the model.
         callback_manager: The callback manager for the service context (optional).
 
@@ -159,7 +154,9 @@ def load_service_context(
         A service context instance with the specified parameters.
     """
 
-    embed_model = load_embeddings(embeddings_cache)
+    embed_model = load_embeddings(
+        model_name=embeddings_model, dimensions=embeddings_size
+    )
     llm = load_llm(
         model_name=llm,
         temperature=temperature,

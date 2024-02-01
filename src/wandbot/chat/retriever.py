@@ -1,8 +1,8 @@
 import os
-import pathlib
 from typing import Any, Dict, List, Optional
 
 import requests
+import wandb
 from llama_index import (
     QueryBundle,
     ServiceContext,
@@ -22,8 +22,6 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-import wandb
 from wandbot.utils import (
     create_no_result_dummy_node,
     get_logger,
@@ -141,19 +139,22 @@ class YouRetriever(BaseRetriever):
             else:
                 results = response.json()
 
-            search_hits = [
-                (
-                    "\n".join(hit["snippets"]),
-                    {
-                        "source": hit["url"],
-                        "language": "en",
-                        "description": hit["description"],
-                        "title": hit["title"],
-                        "tags": ["you.com"],
-                    },
-                )
+            snippets = [hit["snippets"] for hit in results["hits"]]
+            snippet_metadata = [
+                {
+                    "source": hit["url"],
+                    "language": "en",
+                    "description": hit["description"],
+                    "title": hit["title"],
+                    "tags": ["you.com"],
+                }
                 for hit in results["hits"]
             ]
+            search_hits = []
+            for snippet_list, metadata in zip(snippets, snippet_metadata):
+                for snippet in snippet_list:
+                    search_hits.append((snippet, metadata))
+
             return [
                 NodeWithScore(
                     node=TextNode(text=s[0], metadata=s[1]),
@@ -234,15 +235,14 @@ class RetrieverConfig(BaseSettings):
         env="WANDB_INDEX_ARTIFACT",
         validation_alias="wandb_index_artifact",
     )
-    embeddings_cache: pathlib.Path = Field(
-        pathlib.Path("data/cache/embeddings"), env="EMBEDDINGS_CACHE_PATH"
-    )
+    embeddings_model: str = "text-embedding-3-small"
+    embeddings_size: int = 512
     top_k: int = Field(
-        default=5,
+        default=10,
         env="RETRIEVER_TOP_K",
     )
     similarity_top_k: int = Field(
-        default=20,
+        default=10,
         env="RETRIEVER_SIMILARITY_TOP_K",
     )
     language: str = Field(
@@ -292,7 +292,8 @@ class Retriever:
             service_context
             if service_context
             else load_service_context(
-                embeddings_cache=str(self.config.embeddings_cache),
+                embeddings_model=self.config.embeddings_model,
+                embeddings_size=self.config.embeddings_dim,
                 callback_manager=callback_manager,
             )
         )
@@ -301,7 +302,9 @@ class Retriever:
             artifact_url=self.config.index_artifact
         )
 
-        self.index = load_index_from_storage(self.storage_context)
+        self.index = load_index_from_storage(
+            self.storage_context, service_context=self.service_context
+        )
         self._retriever = HybridRetriever(
             index=self.index,
             similarity_top_k=self.config.similarity_top_k,

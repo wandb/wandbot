@@ -224,9 +224,9 @@ class FCReportsStoreConfig(DataStoreConfig):
 
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
-    embedding_dim: int = 1536
+    embeddings_model: str = "text-embedding-3-small"
+    embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    chat_model_name: str = "gpt-3.5-turbo-0613"
+    chat_model_name: str = "gpt-3.5-turbo-1106"
     temperature: float = 0.1
     max_retries: int = 3
-    embeddings_cache: pathlib.Path = pathlib.Path("data/cache/embeddings")

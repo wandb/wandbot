@@ -16,10 +16,9 @@ import json
 import pathlib
 from typing import Any, Dict, List
 
+import wandb
 from langchain.schema import Document as LcDocument
 from llama_index.callbacks import WandbCallbackHandler
-
-import wandb
 from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import (
@@ -55,7 +54,7 @@ def load(
         wandb.Error: An error occurred during the loading process.
     """
     config: VectorStoreConfig = VectorStoreConfig()
-    run: wandb.Run = wandb.init(
+    run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="create_vectorstore"
     )
     artifact: wandb.Artifact = run.use_artifact(
@@ -64,7 +63,8 @@ def load(
     artifact_dir: str = artifact.download()
     storage_context = load_storage_context(config.embedding_dim)
     service_context = load_service_context(
-        embeddings_cache=str(config.embeddings_cache),
+        embeddings_model=config.embeddings_model,
+        embeddings_size=config.embedding_dim,
         llm="gpt-3.5-turbo-16k-0613",
         temperature=config.temperature,
         max_retries=config.max_retries,

@@ -30,9 +30,8 @@ class ChatConfig(BaseSettings):
         env="WANDB_INDEX_ARTIFACT",
         validation_alias="wandb_index_artifact",
     )
-    embeddings_cache: pathlib.Path = Field(
-        pathlib.Path("data/cache/embeddings"), env="EMBEDDINGS_CACHE_PATH"
-    )
+    embeddings_model: str = "text-embedding-3-small"
+    embeddings_dim: int = 512
     verbose: bool = False
     wandb_project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
     wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
