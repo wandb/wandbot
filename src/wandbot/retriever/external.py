@@ -31,7 +31,7 @@ class YouRetriever(BaseRetriever):
         self, query_bundle: QueryBundle, **kwargs
     ) -> List[NodeWithScore]:
         """Retrieve."""
-        if kwargs.get("is_avoid_query", False):
+        if not kwargs.get("is_avoid_query", False):
             try:
                 headers = {"X-API-Key": self._api_key}
                 url = "https://api.ydc-index.io/search"

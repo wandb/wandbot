@@ -61,7 +61,6 @@ def load(
         source_artifact_path, type="dataset"
     )
     artifact_dir: str = artifact.download()
-    storage_context = load_storage_context(config.embedding_dim)
     service_context = load_service_context(
         embeddings_model=config.embeddings_model,
         embeddings_size=config.embedding_dim,
@@ -70,11 +69,14 @@ def load(
         max_retries=config.max_retries,
     )
 
+    storage_context = load_storage_context(persist_dir=str(config.persist_dir))
+
     document_files: List[pathlib.Path] = list(
         pathlib.Path(artifact_dir).rglob("documents.jsonl")
     )
 
-    transformed_documents: List[LcDocument] = []
+    transformed_documents: List[TextNode] = []
+    indices = []
     for document_file in document_files:
         documents: List[LcDocument] = []
         with document_file.open() as f:
@@ -85,9 +87,23 @@ def load(
         preprocessed_documents = preprocess_data.load(documents)
         unique_objects = {obj.hash: obj for obj in preprocessed_documents}
         preprocessed_documents = list(unique_objects.values())
-        transformed_documents.extend(preprocessed_documents)
 
-    index = load_index(
+        for document in preprocessed_documents:
+            document.metadata["index"] = document_file.parent.name
+            tags_list = (
+                document.metadata["tags"] if document.metadata["tags"] else []
+            )
+
+            if tags_list:
+                document.metadata["tags"] = ",".join(tags_list)
+            else:
+                document.metadata["tags"] = ""
+
+        transformed_documents.extend(preprocessed_documents)
+        indices.append(document_file.parent.name)
+
+    logger.info(f"Number of documents: {len(transformed_documents)}")
+    _ = load_index(
         transformed_documents,
         service_context,
         storage_context,
@@ -96,7 +112,7 @@ def load(
     artifact = wandb.Artifact(
         name="wandbot_index",
         type="storage_context",
-        metadata={"index_ids": list(transformed_documents.keys())},
+        metadata={"indices": indices},
     )
     artifact.add_dir(
         local_path=str(config.persist_dir),

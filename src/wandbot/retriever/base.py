@@ -13,14 +13,20 @@ from llama_index.core.base_retriever import BaseRetriever
 from llama_index.postprocessor import BaseNodePostprocessor, CohereRerank
 from llama_index.query_engine import RetrieverQueryEngine
 from llama_index.response_synthesizers import BaseSynthesizer, ResponseMode
+from llama_index.retrievers import BM25Retriever
 from llama_index.retrievers.fusion_retriever import FUSION_MODES
-from llama_index.schema import NodeWithScore
+from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
-from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
+from llama_index.vector_stores.types import (
+    DEFAULT_PERSIST_FNAME,
+    ExactMatchFilter,
+    FilterCondition,
+    MetadataFilters,
+)
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from wandbot.retriever.external import YouRetriever
-from wandbot.retriever.fusion import FusionRetriever, HybridRetriever
+from wandbot.retriever.fusion import FusionRetriever
 from wandbot.retriever.postprocessors import (
     LanguageFilterPostprocessor,
     MetadataPostprocessor,
@@ -78,6 +84,29 @@ class RetrieverConfig(BaseSettings):
     )
 
 
+def load_bm25retriever(index, similarity_top_k: int, index_name: str = None):
+    if index_name is None:
+        all_docs = index.storage_context.vector_store.client.get()
+    else:
+        all_docs = index.storage_context.vector_store.client.get(
+            where={"index": index_name}
+        )
+
+    nodes = []
+    for node_id, document, metadata in zip(
+        all_docs["ids"], all_docs["documents"], all_docs["metadatas"]
+    ):
+        nodes.append(
+            TextNode(node_id=node_id, text=document, metadata=metadata)
+        )
+
+    bm25_retriever = BM25Retriever.from_defaults(
+        nodes=nodes,
+        similarity_top_k=similarity_top_k,
+    )
+    return bm25_retriever
+
+
 class Retriever:
     def __init__(
         self,
@@ -108,7 +137,7 @@ class Retriever:
             )
         )
 
-        self.storage_context = self.load_storage_context_from_artifact(
+        self.storage_context, indices = self.load_storage_context_from_artifact(
             artifact_url=self.config.index_artifact
         )
 
@@ -116,31 +145,32 @@ class Retriever:
             self.storage_context,
             service_context=self.service_context,
         )
-        retriever_list = []
-        for index in self.indices:
-            retriever = HybridRetriever(
-                index=index,
-                similarity_top_k=self.config.similarity_top_k,
-                storage_context=self.storage_context,
+        self.vector_retriever = self.index.as_retriever(
+            similarity_top_k=self.config.similarity_top_k,
+            storage_context=self.storage_context,
+        )
+        self.bm25_retriever = load_bm25retriever(
+            self.index, self.config.similarity_top_k
+        )
+
+        self.bm25_retrievers_by_index = {
+            index: load_bm25retriever(
+                self.index, self.config.similarity_top_k, index
             )
-            retriever_list.append(retriever)
+            for index in indices
+        }
+
         self.you_retriever = YouRetriever(
             api_key=os.environ.get("YOU_API_KEY"),
             similarity_top_k=self.config.similarity_top_k,
         )
         self._retriever = FusionRetriever(
-            retriever_list,
-            similarity_top_k=self.config.similarity_top_k
-            * len(retriever_list)
-            // 2,
+            [self.vector_retriever, self.bm25_retriever, self.you_retriever],
+            similarity_top_k=self.config.similarity_top_k,
             num_queries=1,
-            use_async=True,
+            use_async=False,
             mode=FUSION_MODES.RECIPROCAL_RANK,
         )
-        retriever_list.append(self.you_retriever)
-        index_ids = index_ids + ["you.com"]
-        self._retriever_map = dict(zip(index_ids, retriever_list))
-
         self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
@@ -158,11 +188,8 @@ class Retriever:
         artifact_dir = artifact.download()
         index_path = f"{artifact_dir}/{DEFAULT_VECTOR_STORE}{NAMESPACE_SEP}{DEFAULT_PERSIST_FNAME}"
         logger.debug(f"Loading index from {index_path}")
-        storage_context = load_storage_context(
-            embed_dimensions=self.config.embeddings_size,
-            persist_dir=artifact_dir,
-        )
-        return storage_context
+        storage_context = load_storage_context(persist_dir=artifact_dir)
+        return storage_context, artifact.metadata["indices"]
 
     def load_query_engine(
         self,
@@ -226,28 +253,45 @@ class Retriever:
         """
         top_k = top_k or self.config.top_k
         language = language or self.config.language
-        retrievers = []
-        for index in indices or []:
-            retriever = self._retriever_map.get(index)
-            if not retriever and index:
-                logger.warning(
-                    f"Index {index} not found in retriever map. Skipping the index"
-                )
-            retrievers.append(retriever)
 
-        retrievers = [retriever for retriever in retrievers if retriever]
-
-        if not retrievers:
-            logger.warning("No retrievers found. Defaulting to all retrievers")
+        if not indices:
+            logger.warning(
+                "No indices were provided. Using the fusion retriever."
+            )
             retriever = self._retriever
         else:
+            exact_match_filters = [
+                ExactMatchFilter(key="index", value=idx) for idx in indices
+            ]
+            metadata_filters = MetadataFilters(
+                filters=exact_match_filters,
+                condition=FilterCondition.OR,
+            )
+
+            retrievers = [
+                self.index.as_retriever(
+                    similarity_top_k=self.config.similarity_top_k,
+                    storage_context=self.storage_context,
+                    filters=metadata_filters,
+                ),
+            ]
+            bm25_retrievers = [
+                self.bm25_retrievers_by_index.get(index) for index in indices
+            ]
+            bm25_retrievers = [
+                retriever
+                for retriever in bm25_retrievers
+                if retriever is not None
+            ]
+            retrievers.extend(bm25_retrievers)
+            if kwargs.pop("include_web_results", None):
+                retrievers.append(self.you_retriever)
+
             retriever = FusionRetriever(
                 retrievers,
-                similarity_top_k=self.config.similarity_top_k
-                * len(retrievers)
-                // 2,
+                similarity_top_k=self.config.similarity_top_k,
                 num_queries=1,
-                use_async=True,
+                use_async=False,
                 mode=FUSION_MODES.RECIPROCAL_RANK,
             )
 
@@ -324,6 +368,7 @@ class Retriever:
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
         is_avoid_query: bool | None = False,
+        **kwargs,
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -346,6 +391,7 @@ class Retriever:
             include_tags=include_tags,
             exclude_tags=exclude_tags,
             is_avoid_query=is_avoid_query,
+            **kwargs,
         )
 
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
