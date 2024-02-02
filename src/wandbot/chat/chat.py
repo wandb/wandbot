@@ -28,6 +28,7 @@ Typical usage example:
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
@@ -44,20 +45,18 @@ from llama_index.memory import BaseMemory
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
-from weave.monitoring import StreamTable
-
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
-from wandbot.chat.retriever import (
-    HybridRetriever,
+from wandbot.chat.schemas import ChatRequest, ChatResponse
+from wandbot.retriever.base import Retriever
+from wandbot.retriever.fusion import HybridRetriever
+from wandbot.retriever.postprocessors import (
     LanguageFilterPostprocessor,
     MetadataPostprocessor,
-    Retriever,
 )
-from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger, load_service_context
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
