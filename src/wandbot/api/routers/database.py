@@ -23,7 +23,7 @@ db_client: DatabaseClient | None = None
 
 router = APIRouter(
     prefix="/data",
-    tags=["database"],
+    tags=["database", "crud"],
 )
 
 
