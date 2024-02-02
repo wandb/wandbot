@@ -1,12 +1,12 @@
 import asyncio
-import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import nest_asyncio
-from llama_index import QueryBundle
+from llama_index import QueryBundle, VectorStoreIndex
 from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
 from llama_index.constants import DEFAULT_SIMILARITY_TOP_K
 from llama_index.core.base_retriever import BaseRetriever
+from llama_index.indices.base import BaseIndex
 from llama_index.llms.utils import LLMType
 from llama_index.retrievers import BM25Retriever, QueryFusionRetriever
 from llama_index.retrievers.fusion_retriever import FUSION_MODES
@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 class HybridRetriever(BaseRetriever):
     def __init__(
         self,
-        index,
+        index: Union[VectorStoreIndex, BaseIndex],
         storage_context,
         similarity_top_k: int = 20,
     ):
@@ -31,14 +31,14 @@ class HybridRetriever(BaseRetriever):
             similarity_top_k=similarity_top_k,
             storage_context=self.storage_context,
         )
+
         self.bm25_retriever = BM25Retriever.from_defaults(
-            docstore=self.index.docstore,
+            nodes=self.index.docstore.get_nodes(
+                list(self.index.index_struct.nodes_dict.values())
+            ),
             similarity_top_k=similarity_top_k,
         )
-        self.you_retriever = YouRetriever(
-            api_key=os.environ.get("YOU_API_KEY"),
-            similarity_top_k=similarity_top_k,
-        )
+
         super().__init__()
 
     def _retrieve(self, query: QueryBundle, **kwargs):
@@ -48,16 +48,11 @@ class HybridRetriever(BaseRetriever):
     async def _aretrieve(self, query: QueryBundle, **kwargs):
         bm25_nodes = await self.bm25_retriever.aretrieve(query)
         vector_nodes = await self.vector_retriever.aretrieve(query)
-        you_nodes = (
-            await self.you_retriever.aretrieve(query)
-            if not kwargs.get("is_avoid_query", False)
-            else []
-        )
 
         # combine the two lists of nodes
         all_nodes = []
         node_ids = set()
-        for n in bm25_nodes + vector_nodes + you_nodes:
+        for n in bm25_nodes + vector_nodes:
             if n.node.node_id not in node_ids:
                 all_nodes.append(n)
                 node_ids.add(n.node.node_id)
@@ -93,7 +88,7 @@ class HybridRetriever(BaseRetriever):
 class FusionRetriever(QueryFusionRetriever):
     def __init__(
         self,
-        retrievers: List[HybridRetriever],
+        retrievers: List[Union[HybridRetriever, YouRetriever]],
         llm: Optional[LLMType] = "default",
         query_gen_prompt: Optional[str] = None,
         mode: FUSION_MODES = FUSION_MODES.SIMPLE,
@@ -125,9 +120,13 @@ class FusionRetriever(QueryFusionRetriever):
     ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
         tasks, task_queries = [], []
         for query in queries:
-            for i, retriever in enumerate(self._retrievers):
+            for i, retriever in enumerate(self._retrievers[:-1]):
                 tasks.append(retriever.aretrieve(query, **kwargs))
                 task_queries.append(query)
+
+            # get you retriever results
+            tasks.append(self._retrievers[-1].aretrieve(query, **kwargs))
+            task_queries.append(query)
 
         task_results = run_async_tasks(tasks)
 
