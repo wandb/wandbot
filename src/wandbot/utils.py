@@ -20,6 +20,7 @@ Typical usage example:
     storage_context = load_storage_context(768, "/path/to/persist")
     index = load_index(nodes, service_context, storage_context, "/path/to/persist")
 """
+import asyncio
 import datetime
 import hashlib
 import json
@@ -27,17 +28,13 @@ import logging
 import os
 import pathlib
 import sqlite3
-from typing import Any, List, Optional
+from typing import Any, Coroutine, List, Optional, Tuple
 
 import faiss
 import fasttext
+import nest_asyncio
 import wandb
-from llama_index import (
-    ServiceContext,
-    StorageContext,
-    VectorStoreIndex,
-    load_indices_from_storage,
-)
+from llama_index import ServiceContext, StorageContext, VectorStoreIndex
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
@@ -327,4 +324,39 @@ class FastTextLangDetect:
         return self._model
 
 
-load_indices_from_storage
+def run_async_tasks(
+    tasks: List[Coroutine],
+    show_progress: bool = False,
+    progress_bar_desc: str = "Running async tasks",
+) -> Tuple[Any]:
+    """Run a list of async tasks."""
+    tasks_to_execute: List[Any] = tasks
+
+    nest_asyncio.apply()
+    if show_progress:
+        try:
+            from tqdm.asyncio import tqdm
+
+            # jupyter notebooks already have an event loop running
+            # we need to reuse it instead of creating a new one
+
+            loop = asyncio.get_event_loop()
+
+            async def _tqdm_gather() -> List[Any]:
+                return await tqdm.gather(
+                    *tasks_to_execute, desc=progress_bar_desc
+                )
+
+            tqdm_outputs: Tuple[Any] = loop.run_until_complete(_tqdm_gather())
+            return tqdm_outputs
+        # run the operation w/o tqdm on hitting a fatal
+        # may occur in some environments where tqdm.asyncio
+        # is not supported
+        except Exception:
+            pass
+
+    async def _gather() -> Tuple[Any]:
+        return await asyncio.gather(*tasks_to_execute)
+
+    outputs: Tuple[Any] = asyncio.run(_gather())
+    return outputs

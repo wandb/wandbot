@@ -1,6 +1,8 @@
+import asyncio
 import os
 from typing import Dict, List, Optional, Tuple
 
+import nest_asyncio
 from llama_index import QueryBundle
 from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
 from llama_index.constants import DEFAULT_SIMILARITY_TOP_K
@@ -10,7 +12,7 @@ from llama_index.retrievers import BM25Retriever, QueryFusionRetriever
 from llama_index.retrievers.fusion_retriever import FUSION_MODES
 from llama_index.schema import IndexNode, NodeWithScore, QueryType
 from wandbot.retriever.external import YouRetriever
-from wandbot.utils import get_logger
+from wandbot.utils import get_logger, run_async_tasks
 
 logger = get_logger(__name__)
 
@@ -40,10 +42,14 @@ class HybridRetriever(BaseRetriever):
         super().__init__()
 
     def _retrieve(self, query: QueryBundle, **kwargs):
-        bm25_nodes = self.bm25_retriever.retrieve(query)
-        vector_nodes = self.vector_retriever.retrieve(query)
+        nest_asyncio.apply()
+        return asyncio.run(self._aretrieve(query, **kwargs))
+
+    async def _aretrieve(self, query: QueryBundle, **kwargs):
+        bm25_nodes = await self.bm25_retriever.aretrieve(query)
+        vector_nodes = await self.vector_retriever.aretrieve(query)
         you_nodes = (
-            self.you_retriever.retrieve(query)
+            await self.you_retriever.aretrieve(query)
             if not kwargs.get("is_avoid_query", False)
             else []
         )
@@ -60,6 +66,12 @@ class HybridRetriever(BaseRetriever):
     def retrieve(
         self, str_or_query_bundle: QueryType, **kwargs
     ) -> List[NodeWithScore]:
+        nest_asyncio.apply()
+        return asyncio.run(self.aretrieve(str_or_query_bundle, **kwargs))
+
+    async def aretrieve(
+        self, str_or_query_bundle: QueryType, **kwargs
+    ) -> List[NodeWithScore]:
         self._check_callback_manager()
 
         if isinstance(str_or_query_bundle, str):
@@ -71,7 +83,7 @@ class HybridRetriever(BaseRetriever):
                 CBEventType.RETRIEVE,
                 payload={EventPayload.QUERY_STR: query_bundle.query_str},
             ) as retrieve_event:
-                nodes = self._retrieve(query_bundle, **kwargs)
+                nodes = await self._aretrieve(query_bundle, **kwargs)
                 retrieve_event.on_end(
                     payload={EventPayload.NODES: nodes},
                 )
@@ -108,6 +120,25 @@ class FusionRetriever(QueryFusionRetriever):
         )
         self._retrievers = retrievers
 
+    def _run_nested_async_queries(
+        self, queries: List[QueryBundle], **kwargs
+    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
+        tasks, task_queries = [], []
+        for query in queries:
+            for i, retriever in enumerate(self._retrievers):
+                tasks.append(retriever.aretrieve(query, **kwargs))
+                task_queries.append(query)
+
+        task_results = run_async_tasks(tasks)
+
+        results = {}
+        for i, (query, query_result) in enumerate(
+            zip(task_queries, task_results)
+        ):
+            results[(query.query_str, i)] = query_result
+
+        return results
+
     def _run_sync_queries(
         self, queries: List[QueryBundle], **kwargs
     ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
@@ -117,6 +148,25 @@ class FusionRetriever(QueryFusionRetriever):
                 results[(query.query_str, i)] = retriever.retrieve(
                     query, **kwargs
                 )
+
+        return results
+
+    async def _run_async_queries(
+        self, queries: List[QueryBundle], **kwargs
+    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
+        tasks, task_queries = [], []
+        for query in queries:
+            for i, retriever in enumerate(self._retrievers):
+                tasks.append(retriever.aretrieve(query, **kwargs))
+                task_queries.append(query)
+
+        task_results = await asyncio.gather(*tasks)
+
+        results = {}
+        for i, (query, query_result) in enumerate(
+            zip(task_queries, task_results)
+        ):
+            results[(query.query_str, i)] = query_result
 
         return results
 
@@ -132,6 +182,25 @@ class FusionRetriever(QueryFusionRetriever):
             results = self._run_nested_async_queries(queries)
         else:
             results = self._run_sync_queries(queries, **kwargs)
+
+        if self.mode == FUSION_MODES.RECIPROCAL_RANK:
+            return self._reciprocal_rerank_fusion(results)[
+                : self.similarity_top_k
+            ]
+        elif self.mode == FUSION_MODES.SIMPLE:
+            return self._simple_fusion(results)[: self.similarity_top_k]
+        else:
+            raise ValueError(f"Invalid fusion mode: {self.mode}")
+
+    async def _aretrieve(
+        self, query_bundle: QueryBundle, **kwargs
+    ) -> List[NodeWithScore]:
+        if self.num_queries > 1:
+            queries = self._get_queries(query_bundle.query_str)
+        else:
+            queries = [query_bundle]
+
+        results = await self._run_async_queries(queries, **kwargs)
 
         if self.mode == FUSION_MODES.RECIPROCAL_RANK:
             return self._reciprocal_rerank_fusion(results)[
@@ -160,4 +229,28 @@ class FusionRetriever(QueryFusionRetriever):
                 retrieve_event.on_end(
                     payload={EventPayload.NODES: nodes},
                 )
+        return nodes
+
+    async def aretrieve(
+        self, str_or_query_bundle: QueryType, **kwargs
+    ) -> List[NodeWithScore]:
+        self._check_callback_manager()
+
+        if isinstance(str_or_query_bundle, str):
+            query_bundle = QueryBundle(str_or_query_bundle)
+        else:
+            query_bundle = str_or_query_bundle
+        with self.callback_manager.as_trace("query"):
+            with self.callback_manager.event(
+                CBEventType.RETRIEVE,
+                payload={EventPayload.QUERY_STR: query_bundle.query_str},
+            ) as retrieve_event:
+                nodes = await self._aretrieve(query_bundle, **kwargs)
+                nodes = await self._ahandle_recursive_retrieval(
+                    query_bundle, nodes
+                )
+                retrieve_event.on_end(
+                    payload={EventPayload.NODES: nodes},
+                )
+
         return nodes

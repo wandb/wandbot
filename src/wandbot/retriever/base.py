@@ -8,9 +8,11 @@ from llama_index import (
     load_index_from_storage,
 )
 from llama_index.callbacks import CallbackManager
+from llama_index.core.base_retriever import BaseRetriever
 from llama_index.postprocessor import BaseNodePostprocessor, CohereRerank
 from llama_index.query_engine import RetrieverQueryEngine
 from llama_index.response_synthesizers import BaseSynthesizer, ResponseMode
+from llama_index.retrievers.fusion_retriever import FUSION_MODES
 from llama_index.schema import NodeWithScore
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
@@ -85,7 +87,15 @@ class Retriever:
         self.config = (
             config if isinstance(config, RetrieverConfig) else RetrieverConfig()
         )
-        self.run = run
+        self.run = (
+            run
+            if run
+            else wandb.init(
+                project=self.config.wandb_project,
+                entity=self.config.wandb_entity,
+                job_type="retrieve",
+            )
+        )
         self.service_context = (
             service_context
             if service_context
@@ -113,8 +123,12 @@ class Retriever:
             [retriever],
             similarity_top_k=self.config.similarity_top_k,
             num_queries=1,
-            use_async=False,
+            use_async=True,
+            mode=FUSION_MODES.RECIPROCAL_RANK,
         )
+
+        self._retriever_map = dict(zip(index_ids, retriever_list))
+
         self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
@@ -140,6 +154,7 @@ class Retriever:
 
     def load_query_engine(
         self,
+        retriever: BaseRetriever | None = None,
         top_k: int | None = None,
         language: str | None = None,
         include_tags: List[str] | None = None,
@@ -166,16 +181,17 @@ class Retriever:
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
         ]
         query_engine = WandbRetrieverQueryEngine.from_args(
-            retriever=self._retriever,
+            retriever=retriever,
             node_postprocessors=node_postprocessors,
             response_mode=ResponseMode.NO_TEXT,
             service_context=self.service_context,
         )
         return query_engine
 
-    def retrieve(
+    def _retrieve(
         self,
         query: str,
+        index: str | None = None,
         language: str | None = None,
         top_k: int | None = None,
         include_tags: List[str] | None = None,
@@ -186,6 +202,7 @@ class Retriever:
 
         Args:
             query: A string representing the query.
+            index: A string representing the index to retrieve the results from.
             language: A string representing the language of the query.
             top_k: An integer representing the number of top results to retrieve.
             include_tags: A list of strings representing the tags to include in the results.
@@ -196,8 +213,16 @@ class Retriever:
         """
         top_k = top_k or self.config.top_k
         language = language or self.config.language
+        retriever = self._retriever_map.get(index)
+        if not retriever:
+            if index:
+                logger.warning(
+                    f"Index {index} not found in retriever map. Defaulting to main retriever."
+                )
+            retriever = self._retriever
 
         retrieval_engine = self.load_query_engine(
+            retriever=retriever,
             top_k=top_k,
             language=language,
             include_tags=include_tags,
@@ -227,8 +252,77 @@ class Retriever:
         self.is_avoid_query = None
         return outputs
 
+    def retrieve(
+        self,
+        query: str,
+        language: str | None = None,
+        top_k: int | None = None,
+        include_tags: List[str] | None = None,
+        exclude_tags: List[str] | None = None,
+        is_avoid_query: bool | None = False,
+    ):
+        """Retrieves the top k results from the index for the given query.
+
+        Args:
+            query: A string representing the query.
+            language: A string representing the language of the query.
+            top_k: An integer representing the number of top results to retrieve.
+            include_tags: A list of strings representing the tags to include in the results.
+            exclude_tags: A list of strings representing the tags to exclude from the results.
+
+        Returns:
+            A list of dictionaries representing the retrieved results.
+        """
+
+        return self._retrieve(
+            query,
+            index=None,
+            language=language,
+            top_k=top_k,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
+            is_avoid_query=is_avoid_query,
+        )
+
+    def retrieve_from_index(
+        self,
+        query: str,
+        index: str,
+        language: str | None = None,
+        top_k: int | None = None,
+        include_tags: List[str] | None = None,
+        exclude_tags: List[str] | None = None,
+        is_avoid_query: bool | None = False,
+    ):
+        """Retrieves the top k results from the index for the given query.
+
+        Args:
+            query: A string representing the query.
+            index: A string representing the index to retrieve the results from.
+            language: A string representing the language of the query.
+            top_k: An integer representing the number of top results to retrieve.
+            include_tags: A list of strings representing the tags to include in the results.
+            exclude_tags: A list of strings representing the tags to exclude from the results.
+
+        Returns:
+            A list of dictionaries representing the retrieved results.
+        """
+        return self._retrieve(
+            query,
+            index=index,
+            language=language,
+            top_k=top_k,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
+            is_avoid_query=is_avoid_query,
+        )
+
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        retrievals = self.retrieve(query, **kwargs)
+        if "index" in kwargs:
+            retrievals = self.retrieve_from_index(query, **kwargs)
+        else:
+            retrievals = self.retrieve(query, **kwargs)
+
         logger.debug(f"Retrieved {len(retrievals)} results.")
         logger.debug(f"Retrieval: {retrievals[0]}")
         return retrievals
