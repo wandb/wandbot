@@ -16,8 +16,7 @@ from collections import OrderedDict
 from typing import Any, List
 
 from pydantic_settings import BaseSettings
-
-from wandbot.api.schemas import APIQueryResponse
+from wandbot.api.routers.chat import APIQueryResponse
 
 
 def deduplicate(input_list: List[Any]) -> List[Any]:

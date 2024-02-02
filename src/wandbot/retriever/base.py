@@ -191,7 +191,7 @@ class Retriever:
     def _retrieve(
         self,
         query: str,
-        index: str | None = None,
+        indices: List[str] | None = None,
         language: str | None = None,
         top_k: int | None = None,
         include_tags: List[str] | None = None,
@@ -202,7 +202,7 @@ class Retriever:
 
         Args:
             query: A string representing the query.
-            index: A string representing the index to retrieve the results from.
+            indices: A list of strings representing the indices to retrieve the results from.
             language: A string representing the language of the query.
             top_k: An integer representing the number of top results to retrieve.
             include_tags: A list of strings representing the tags to include in the results.
@@ -213,13 +213,28 @@ class Retriever:
         """
         top_k = top_k or self.config.top_k
         language = language or self.config.language
-        retriever = self._retriever_map.get(index)
-        if not retriever:
-            if index:
+        retrievers = []
+        for index in indices or []:
+            retriever = self._retriever_map.get(index)
+            if not retriever and index:
                 logger.warning(
-                    f"Index {index} not found in retriever map. Defaulting to main retriever."
+                    f"Index {index} not found in retriever map. Skipping the index"
                 )
+            retrievers.append(retriever)
+
+        retrievers = [retriever for retriever in retrievers if retriever]
+
+        if not retrievers:
+            logger.warning("No retrievers found. Defaulting to all retrievers")
             retriever = self._retriever
+        else:
+            retriever = FusionRetriever(
+                retrievers,
+                similarity_top_k=self.config.similarity_top_k,
+                num_queries=1,
+                use_async=True,
+                mode=FUSION_MODES.RECIPROCAL_RANK,
+            )
 
         retrieval_engine = self.load_query_engine(
             retriever=retriever,
@@ -276,7 +291,7 @@ class Retriever:
 
         return self._retrieve(
             query,
-            index=None,
+            indices=None,
             language=language,
             top_k=top_k,
             include_tags=include_tags,
@@ -284,10 +299,10 @@ class Retriever:
             is_avoid_query=is_avoid_query,
         )
 
-    def retrieve_from_index(
+    def retrieve_from_indices(
         self,
         query: str,
-        index: str,
+        indices: List[str],
         language: str | None = None,
         top_k: int | None = None,
         include_tags: List[str] | None = None,
@@ -298,7 +313,7 @@ class Retriever:
 
         Args:
             query: A string representing the query.
-            index: A string representing the index to retrieve the results from.
+            indices: A string representing the index to retrieve the results from.
             language: A string representing the language of the query.
             top_k: An integer representing the number of top results to retrieve.
             include_tags: A list of strings representing the tags to include in the results.
@@ -309,7 +324,7 @@ class Retriever:
         """
         return self._retrieve(
             query,
-            index=index,
+            indices=indices,
             language=language,
             top_k=top_k,
             include_tags=include_tags,
@@ -318,8 +333,11 @@ class Retriever:
         )
 
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        if "index" in kwargs:
-            retrievals = self.retrieve_from_index(query, **kwargs)
+        indices = kwargs.pop("indices")
+        if indices and isinstance(indices, list):
+            retrievals = self.retrieve_from_indices(
+                query, indices=indices, **kwargs
+            )
         else:
             retrievals = self.retrieve(query, **kwargs)
 
