@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import wandb
@@ -18,6 +19,7 @@ from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
 from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from wandbot.retriever.external import YouRetriever
 from wandbot.retriever.fusion import FusionRetriever, HybridRetriever
 from wandbot.retriever.postprocessors import (
     LanguageFilterPostprocessor,
@@ -114,26 +116,36 @@ class Retriever:
             self.storage_context,
             service_context=self.service_context,
         )
-        retriever = HybridRetriever(
-            index=self.index,
+        retriever_list = []
+        for index in self.indices:
+            retriever = HybridRetriever(
+                index=index,
+                similarity_top_k=self.config.similarity_top_k,
+                storage_context=self.storage_context,
+            )
+            retriever_list.append(retriever)
+        self.you_retriever = YouRetriever(
+            api_key=os.environ.get("YOU_API_KEY"),
             similarity_top_k=self.config.similarity_top_k,
-            storage_context=self.storage_context,
         )
         self._retriever = FusionRetriever(
-            [retriever],
-            similarity_top_k=self.config.similarity_top_k,
+            retriever_list,
+            similarity_top_k=self.config.similarity_top_k
+            * len(retriever_list)
+            // 2,
             num_queries=1,
             use_async=True,
             mode=FUSION_MODES.RECIPROCAL_RANK,
         )
-
+        retriever_list.append(self.you_retriever)
+        index_ids = index_ids + ["you.com"]
         self._retriever_map = dict(zip(index_ids, retriever_list))
 
         self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
-    ) -> Tuple[StorageContext, Dict[str, str]]:
+    ) -> Tuple[StorageContext, List[str]]:
         """Loads the storage context from the given artifact URL.
 
         Args:
@@ -197,6 +209,7 @@ class Retriever:
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
         is_avoid_query: bool | None = False,
+        **kwargs,
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -230,7 +243,9 @@ class Retriever:
         else:
             retriever = FusionRetriever(
                 retrievers,
-                similarity_top_k=self.config.similarity_top_k,
+                similarity_top_k=self.config.similarity_top_k
+                * len(retrievers)
+                // 2,
                 num_queries=1,
                 use_async=True,
                 mode=FUSION_MODES.RECIPROCAL_RANK,
@@ -275,6 +290,7 @@ class Retriever:
         include_tags: List[str] | None = None,
         exclude_tags: List[str] | None = None,
         is_avoid_query: bool | None = False,
+        **kwargs,
     ):
         """Retrieves the top k results from the index for the given query.
 
@@ -333,8 +349,10 @@ class Retriever:
         )
 
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        indices = kwargs.pop("indices")
-        if indices and isinstance(indices, list):
+        indices = kwargs.pop("indices", [])
+        if kwargs.get("include_web_results"):
+            indices.append("you.com")
+        if len(indices) > 1:
             retrievals = self.retrieve_from_indices(
                 query, indices=indices, **kwargs
             )

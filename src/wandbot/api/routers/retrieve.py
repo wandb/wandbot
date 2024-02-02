@@ -43,12 +43,13 @@ class Indices(str, Enum):
 
 class APIRetrievalRequest(BaseModel):
     query: str
-    indices: List[Indices] | None = None
+    indices: List[Indices] = []
     language: str = "en"
     initial_k: int = 10
     top_k: int = 5
     include_tags: List[str] = []
     exclude_tags: List[str] = []
+    include_web_results: bool = True
 
 
 @router.post(
@@ -56,7 +57,7 @@ class APIRetrievalRequest(BaseModel):
     response_model=APIRetrievalResponse,
     status_code=status.HTTP_200_OK,
 )
-async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
+def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     """Retrieves the top k results for a given query.
 
     Args:
@@ -69,11 +70,12 @@ async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
         query=request.query,
         indices=[idx.value for idx in request.indices]
         if request.indices
-        else None,
+        else [],
         language=request.language,
         top_k=request.top_k,
         include_tags=request.include_tags,
         exclude_tags=request.exclude_tags,
+        include_web_results=request.include_web_results,
     )
 
     return APIRetrievalResponse(
