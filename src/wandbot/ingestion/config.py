@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -82,7 +81,7 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     language: str = "en"
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_en")
+    docstore_dir: pathlib.Path = pathlib.Path("docodile_en")
 
 
 class DocodileJapaneseStoreConfig(DataStoreConfig):
@@ -95,7 +94,7 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     language: str = "ja"
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_ja")
+    docstore_dir: pathlib.Path = pathlib.Path("docodile_ja")
 
 
 class ExampleCodeStoreConfig(DataStoreConfig):
@@ -107,7 +106,7 @@ class ExampleCodeStoreConfig(DataStoreConfig):
         file_pattern="*.py",
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_example_code")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_code")
 
 
 class ExampleNotebookStoreConfig(DataStoreConfig):
@@ -119,7 +118,7 @@ class ExampleNotebookStoreConfig(DataStoreConfig):
         file_pattern="*.ipynb",
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_example_colab")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_colab")
 
 
 class SDKCodeStoreConfig(DataStoreConfig):
@@ -131,7 +130,7 @@ class SDKCodeStoreConfig(DataStoreConfig):
         file_pattern="*.py",
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_sdk_code")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_sdk_code")
 
 
 class SDKTestsStoreConfig(DataStoreConfig):
@@ -143,7 +142,7 @@ class SDKTestsStoreConfig(DataStoreConfig):
         file_pattern="*.py",
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_sdk_tests")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_sdk_tests")
 
 
 class WeaveCodeStoreConfig(DataStoreConfig):
@@ -155,7 +154,7 @@ class WeaveCodeStoreConfig(DataStoreConfig):
         file_pattern=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_code")
+    docstore_dir: pathlib.Path = pathlib.Path("weave_sdk_code")
 
 
 class WeaveExamplesStoreConfig(DataStoreConfig):
@@ -167,7 +166,7 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
         file_pattern=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_examples")
+    docstore_dir: pathlib.Path = pathlib.Path("weave_examples")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):
@@ -179,7 +178,7 @@ class WandbEduCodeStoreConfig(DataStoreConfig):
         file_pattern=["*.py", "*.ipynb", ".*md"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_wandb_edu")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_edu_code")
 
 
 class WeaveJsStoreConfig(DataStoreConfig):
@@ -191,7 +190,7 @@ class WeaveJsStoreConfig(DataStoreConfig):
         file_pattern=["*.js", "*.ts"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_js")
+    docstore_dir: pathlib.Path = pathlib.Path("weave_js")
 
 
 class FCReportsStoreConfig(DataStoreConfig):
@@ -203,7 +202,7 @@ class FCReportsStoreConfig(DataStoreConfig):
         file_pattern=["*.json"],
         is_git_repo=False,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("docstore_fc_reports")
+    docstore_dir: pathlib.Path = pathlib.Path("fc_reports")
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":

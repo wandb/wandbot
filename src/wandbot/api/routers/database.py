@@ -2,17 +2,17 @@ import wandb
 from fastapi import APIRouter
 from starlette import status
 from starlette.responses import Response
-from wandbot.api.schemas import (
-    APICreateChatThreadRequest,
-    APIFeedbackRequest,
-    APIFeedbackResponse,
-    APIGetChatThreadResponse,
-    APIQuestionAnswerRequest,
-    APIQuestionAnswerResponse,
-)
 from wandbot.database.client import DatabaseClient
 from wandbot.database.database import engine
 from wandbot.database.models import Base
+from wandbot.database.schemas import (
+    ChatThread,
+    ChatThreadCreate,
+    Feedback,
+    FeedbackCreate,
+    QuestionAnswer,
+    QuestionAnswerCreate,
+)
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -25,6 +25,14 @@ router = APIRouter(
     prefix="/data",
     tags=["database"],
 )
+
+
+class APIQuestionAnswerRequest(QuestionAnswerCreate):
+    pass
+
+
+class APIQuestionAnswerResponse(QuestionAnswer):
+    pass
 
 
 @router.post(
@@ -48,6 +56,10 @@ async def create_question_answer(
     if question_answer is None:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return question_answer
+
+
+class APIGetChatThreadResponse(ChatThread):
+    pass
 
 
 @router.get(
@@ -87,6 +99,14 @@ async def get_chat_thread(
     return chat_thread
 
 
+class APIFeedbackRequest(FeedbackCreate):
+    pass
+
+
+class APIFeedbackResponse(Feedback):
+    pass
+
+
 @router.post(
     "/feedback",
     response_model=APIFeedbackResponse | None,
@@ -117,3 +137,11 @@ async def feedback(
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
+
+
+class APIGetChatThreadRequest(ChatThreadCreate):
+    pass
+
+
+class APICreateChatThreadRequest(ChatThreadCreate):
+    pass

@@ -15,16 +15,16 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
-
-from wandbot.api.schemas import (
+from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
+from wandbot.api.routers.database import (
     APIFeedbackRequest,
     APIFeedbackResponse,
     APIGetChatThreadRequest,
     APIGetChatThreadResponse,
-    APIQueryRequest,
-    APIQueryResponse,
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
+)
+from wandbot.api.routers.retrieve import (
     APIRetrievalRequest,
     APIRetrievalResponse,
 )

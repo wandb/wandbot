@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 from starlette import status
-from wandbot.api.schemas import APIQueryRequest, APIQueryResponse
 from wandbot.chat.chat import Chat, ChatConfig
-from wandbot.chat.schemas import ChatRequest
+from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -14,6 +13,14 @@ router = APIRouter(
     prefix="/chat",
     tags=["chat"],
 )
+
+
+class APIQueryRequest(ChatRequest):
+    pass
+
+
+class APIQueryResponse(ChatResponse):
+    pass
 
 
 @router.post(
