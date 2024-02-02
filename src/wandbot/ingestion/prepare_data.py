@@ -851,14 +851,14 @@ def load(
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
-        examples_code_loader,
-        examples_notebook_loader,
-        sdk_code_loader,
-        sdk_tests_loader,
-        weave_code_loader,
-        weave_examples_loader,
-        wandb_edu_code_loader,
-        fc_reports_loader,
+        # examples_code_loader,
+        # examples_notebook_loader,
+        # sdk_code_loader,
+        # sdk_tests_loader,
+        # weave_code_loader,
+        # weave_examples_loader,
+        # wandb_edu_code_loader,
+        # fc_reports_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 

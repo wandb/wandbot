@@ -7,6 +7,7 @@ from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
 from llama_index.constants import DEFAULT_SIMILARITY_TOP_K
 from llama_index.core.base_retriever import BaseRetriever
 from llama_index.indices.base import BaseIndex
+from llama_index.indices.vector_store import VectorIndexRetriever
 from llama_index.llms.utils import LLMType
 from llama_index.retrievers import BM25Retriever, QueryFusionRetriever
 from llama_index.retrievers.fusion_retriever import FUSION_MODES
@@ -88,7 +89,9 @@ class HybridRetriever(BaseRetriever):
 class FusionRetriever(QueryFusionRetriever):
     def __init__(
         self,
-        retrievers: List[Union[HybridRetriever, YouRetriever]],
+        retrievers: List[
+            Union[VectorIndexRetriever, BM25Retriever, YouRetriever]
+        ],
         llm: Optional[LLMType] = "default",
         query_gen_prompt: Optional[str] = None,
         mode: FUSION_MODES = FUSION_MODES.SIMPLE,
@@ -144,9 +147,12 @@ class FusionRetriever(QueryFusionRetriever):
         results = {}
         for query in queries:
             for i, retriever in enumerate(self._retrievers):
-                results[(query.query_str, i)] = retriever.retrieve(
-                    query, **kwargs
-                )
+                if isinstance(retriever, YouRetriever):
+                    results[(query.query_str, i)] = retriever.retrieve(
+                        query, **kwargs
+                    )
+                else:
+                    results[(query.query_str, i)] = retriever.retrieve(query)
 
         return results
 

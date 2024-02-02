@@ -50,7 +50,7 @@ from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.retriever.base import Retriever
-from wandbot.retriever.fusion import HybridRetriever
+from wandbot.retriever.fusion import FusionRetriever
 from wandbot.retriever.postprocessors import (
     LanguageFilterPostprocessor,
     MetadataPostprocessor,
@@ -95,7 +95,7 @@ def rebuild_full_prompt(
 class WandbContextChatEngine(ContextChatEngine):
     def __init__(
         self,
-        retriever: HybridRetriever,
+        retriever: FusionRetriever,
         llm: LLM,
         memory: BaseMemory,
         prefix_messages: List[ChatMessage],
@@ -112,7 +112,7 @@ class WandbContextChatEngine(ContextChatEngine):
             context_template=context_template,
             callback_manager=callback_manager,
         )
-        self._retriever: HybridRetriever = retriever
+        self._retriever: FusionRetriever = retriever
 
     def _generate_context(
         self, message: str, **kwargs
