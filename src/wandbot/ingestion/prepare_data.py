@@ -17,6 +17,7 @@ Typical usage example:
 import json
 import os
 import pathlib
+from multiprocessing import Pool, cpu_count
 from typing import Any, Dict, Iterator, List
 from urllib.parse import urljoin, urlparse
 
@@ -28,7 +29,7 @@ from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
-from tqdm import tqdm
+
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
@@ -43,12 +44,11 @@ from wandbot.ingestion.config import (
     WeaveExamplesStoreConfig,
 )
 from wandbot.ingestion.utils import (
-    EXTENSION_MAP,
     clean_contents,
     extract_frontmatter,
     fetch_git_repo,
 )
-from wandbot.utils import FastTextLangDetect, get_logger
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -102,12 +102,12 @@ class DataLoader(BaseLoader):
             )
 
         local_paths = []
-        file_patterns = (
-            [self.config.data_source.file_pattern]
-            if isinstance(self.config.data_source.file_pattern, str)
-            else self.config.data_source.file_pattern
-        )
-        for file_pattern in file_patterns:
+        # file_patterns = (
+        #     [self.config.data_source.file_pattern]
+        #     if isinstance(self.config.data_source.file_pattern, str)
+        #     else self.config.data_source.file_pattern
+        # )
+        for file_pattern in self.config.data_source.file_patterns:
             local_paths.extend(
                 list(
                     (
@@ -267,6 +267,7 @@ class DocodileDataLoader(DataLoader):
                 document.metadata["tags"] = self.extract_tags(
                     document.metadata["source"]
                 )
+                document.metadata["source_type"] = self.config.source_type
                 yield document
             except Exception as e:
                 logger.warning(
@@ -275,31 +276,6 @@ class DocodileDataLoader(DataLoader):
 
 
 class CodeDataLoader(DataLoader):
-    @staticmethod
-    def extract_tags(source_url: str) -> List[str]:
-        """Extracts the tags from a source url.
-
-        Args:
-            source_url: The URL of the file.
-
-        Returns:
-            The extracted tags.
-        """
-        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
-        tree_slug = parts.index("tree")
-        parts = parts[tree_slug + 2 :]
-        parts_mapper = {"__init__.py": [], "__main__.py": []}
-        tags = []
-        for part in parts:
-            if part in parts_mapper:
-                tags.extend(parts_mapper.get(part, []))
-            else:
-                part = part.replace("-", " ").replace("_", " ")
-                tags.append(part)
-        tags = [tag.split(".")[0] for tag in tags]
-        tags = list(set([tag.title() for tag in tags]))
-        return tags + ["Code"]
-
     def lazy_load(self) -> Iterator[Document]:
         """A lazy loader for code documents.
 
@@ -343,13 +319,28 @@ class CodeDataLoader(DataLoader):
                     (body, resources) = md_exporter.from_notebook_node(notebook)
                     cleaned_body = clean_contents(body)
                     document.page_content = cleaned_body
+                    document.metadata["source_type"] = (
+                        "notebook"
+                        if self.config.source_type == "code"
+                        else self.config.source_type
+                    )
                 elif os.path.splitext(f_name)[-1] == ".md":
                     document = TextLoader(f_name).load()[0]
                     contents = document.page_content
                     cleaned_body = clean_contents(contents)
                     document.page_content = cleaned_body
+                    document.metadata["source_type"] = (
+                        "markdown"
+                        if self.config.source_type == "code"
+                        else self.config.source_type
+                    )
                 else:
                     document = TextLoader(f_name).load()[0]
+                    document.metadata["source_type"] = (
+                        "code"
+                        if self.config.source_type == "code"
+                        else self.config.source_type
+                    )
 
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
@@ -357,13 +348,6 @@ class CodeDataLoader(DataLoader):
                 document.metadata["source"] = document_files[
                     document.metadata["source"]
                 ]
-                document.metadata["language"] = EXTENSION_MAP[
-                    document.metadata["file_type"]
-                ]
-                document.metadata["description"] = ""
-                document.metadata["tags"] = self.extract_tags(
-                    document.metadata["source"]
-                )
                 yield document
             except Exception as e:
                 logger.warning(
@@ -591,7 +575,7 @@ class FCReportsDataLoader(DataLoader):
         spec_type_ls = []
         is_buggy_ls = []
         is_short_report_ls = []
-        for idx, row in tqdm(reports_df.iterrows()):
+        for idx, row in reports_df.iterrows():
             if row["spec"] is None or isinstance(row["spec"], float):
                 logger.debug(idx)
                 markdown_ls.append("spec-error")
@@ -692,7 +676,8 @@ class FCReportsDataLoader(DataLoader):
 
         return self.config.data_source.local_path
 
-    def clean_invalid_unicode_escapes(self, text):
+    @staticmethod
+    def clean_invalid_unicode_escapes(text):
         """
         clean up invalid unicode escape sequences
         """
@@ -777,7 +762,7 @@ class FCReportsDataLoader(DataLoader):
         tags = list(set([tag.title() for tag in tags]))
 
         if ("wandb.log" or "wandb.init") in report_content:
-            tags.append("contains-wandb-code")
+            tags.append("Contains Wandb Code")
 
         return tags
 
@@ -789,25 +774,49 @@ class FCReportsDataLoader(DataLoader):
         Yields:
             A Document object.
         """
-        lang_detect = FastTextLangDetect()
         data_dump_fame = self.fetch_data()
         for parsed_row in self.parse_data_dump(data_dump_fame):
             document = Document(
                 page_content=parsed_row["content"],
                 metadata={
                     "source": parsed_row["source"],
-                    "language": lang_detect.detect_language(
-                        parsed_row["content"]
-                    ),
+                    "source_type": self.config.source_type,
                     "file_type": ".md",
                     "description": parsed_row["description"],
-                    "tags": ["fc-report"]
+                    "tags": ["Fully Connected", "Report"]
                     + self.extract_tags(
                         parsed_row["source"], parsed_row["content"]
                     ),
                 },
             )
             yield document
+
+
+SOURCE_TYPE_TO_LOADER_MAP = {
+    "documentation": DocodileDataLoader,
+    "code": CodeDataLoader,
+    "notebook": CodeDataLoader,
+    "report": FCReportsDataLoader,
+}
+
+
+def load_from_config(config: DataStoreConfig) -> pathlib.Path:
+    loader = SOURCE_TYPE_TO_LOADER_MAP[config.source_type](config)
+    loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
+
+    with (loader.config.docstore_dir / "config.json").open("w") as f:
+        f.write(loader.config.model_dump_json())
+
+    with (loader.config.docstore_dir / "documents.jsonl").open("w") as f:
+        for document in loader.load():
+            document_json = {
+                "page_content": document.page_content,
+                "metadata": document.metadata,
+            }
+            f.write(json.dumps(document_json) + "\n")
+    with (loader.config.docstore_dir / "metadata.json").open("w") as f:
+        json.dump(loader.metadata, f)
+    return loader.config.docstore_dir
 
 
 def load(
@@ -837,47 +846,26 @@ def load(
         description="Raw documents for wandbot",
     )
 
-    en_docodile_loader = DocodileDataLoader(DocodileEnglishStoreConfig())
-    ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
-    examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
-    examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
-    sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
-    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
-    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
-    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
-    wandb_edu_code_loader = CodeDataLoader(WandbEduCodeStoreConfig())
-    fc_reports_loader = FCReportsDataLoader(FCReportsStoreConfig())
+    configs = [
+        DocodileEnglishStoreConfig(),
+        DocodileJapaneseStoreConfig(),
+        ExampleCodeStoreConfig(),
+        ExampleNotebookStoreConfig(),
+        SDKCodeStoreConfig(),
+        SDKTestsStoreConfig(),
+        WeaveCodeStoreConfig(),
+        WeaveExamplesStoreConfig(),
+        WandbEduCodeStoreConfig(),
+        FCReportsStoreConfig(),
+    ]
 
-    for loader in [
-        en_docodile_loader,
-        ja_docodile_loader,
-        # examples_code_loader,
-        # examples_notebook_loader,
-        # sdk_code_loader,
-        # sdk_tests_loader,
-        # weave_code_loader,
-        # weave_examples_loader,
-        # wandb_edu_code_loader,
-        # fc_reports_loader,
-    ]:
-        loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
+    pool = Pool(cpu_count() - 1)
+    results = pool.imap_unordered(load_from_config, configs)
 
-        with (loader.config.docstore_dir / "config.json").open("w") as f:
-            f.write(loader.config.model_dump_json())
-
-        with (loader.config.docstore_dir / "documents.jsonl").open("w") as f:
-            for document in loader.load():
-                document_json = {
-                    "page_content": document.page_content,
-                    "metadata": document.metadata,
-                }
-                f.write(json.dumps(document_json) + "\n")
-        with (loader.config.docstore_dir / "metadata.json").open("w") as f:
-            json.dump(loader.metadata, f)
-
+    for docstore_path in results:
         artifact.add_dir(
-            str(loader.config.docstore_dir),
-            name=loader.config.docstore_dir.name,
+            str(docstore_path),
+            name=docstore_path.name,
         )
     run.log_artifact(artifact)
     run.finish()

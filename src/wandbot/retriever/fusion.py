@@ -1,261 +1,198 @@
-import asyncio
-from typing import Dict, List, Optional, Tuple, Union
+import json
+from operator import itemgetter
 
-import nest_asyncio
-from llama_index import QueryBundle, VectorStoreIndex
-from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
-from llama_index.constants import DEFAULT_SIMILARITY_TOP_K
-from llama_index.core.base_retriever import BaseRetriever
-from llama_index.indices.base import BaseIndex
-from llama_index.indices.vector_store import VectorIndexRetriever
-from llama_index.llms.utils import LLMType
-from llama_index.retrievers import BM25Retriever, QueryFusionRetriever
-from llama_index.retrievers.fusion_retriever import FUSION_MODES
-from llama_index.schema import IndexNode, NodeWithScore, QueryType
-from wandbot.retriever.external import YouRetriever
-from wandbot.utils import get_logger, run_async_tasks
+from langchain.load import dumps, loads
+from langchain.prompts.prompt import PromptTemplate
+from langchain.retrievers.document_compressors import CohereRerank
+from langchain.schema import format_document, Document
+from langchain_core.runnables import (
+    RunnablePassthrough,
+    RunnableParallel,
+    RunnableLambda,
+    RunnableBranch,
+)
 
-logger = get_logger(__name__)
+from wandbot.utils import clean_document_content
+
+DEFAULT_DOCUMENT_PROMPT = PromptTemplate.from_template(
+    template="source: {source}\nsource_type: {source_type}\nhas_code: {has_code}\n\n{page_content}"
+)
 
 
-class HybridRetriever(BaseRetriever):
-    def __init__(
-        self,
-        index: Union[VectorStoreIndex, BaseIndex],
-        storage_context,
-        similarity_top_k: int = 20,
-    ):
-        self.index = index
-        self.storage_context = storage_context
+def combine_documents(
+    docs,
+    document_prompt=DEFAULT_DOCUMENT_PROMPT,
+    document_separator="\n\n---\n\n",
+):
+    cleaned_docs = [clean_document_content(doc) for doc in docs]
+    doc_strings = [
+        format_document(doc, document_prompt) for doc in cleaned_docs
+    ]
+    return document_separator.join(doc_strings)
 
-        self.vector_retriever = self.index.as_retriever(
-            similarity_top_k=similarity_top_k,
-            storage_context=self.storage_context,
+
+def process_input_for_retrieval(retrieval_input):
+    if isinstance(retrieval_input, list):
+        retrieval_input = "\n".join(retrieval_input)
+    elif isinstance(retrieval_input, dict):
+        retrieval_input = json.dumps(retrieval_input)
+    elif not isinstance(retrieval_input, str):
+        retrieval_input = str(retrieval_input)
+    return retrieval_input
+
+
+def load_simple_retrieval_chain(retriever, input_key):
+    default_input_chain = (
+        itemgetter("standalone_question")
+        | RunnablePassthrough()
+        | process_input_for_retrieval
+        | RunnableParallel(context=retriever)
+        | itemgetter("context")
+    )
+
+    input_chain = (
+        itemgetter(input_key)
+        | RunnablePassthrough()
+        | process_input_for_retrieval
+        | RunnableParallel(context=retriever)
+        | itemgetter("context")
+    )
+
+    retrieval_chain = RunnableBranch(
+        (
+            lambda x: not x["avoid_query"],
+            input_chain,
+        ),
+        (
+            lambda x: x["avoid_query"],
+            default_input_chain,
+        ),
+        default_input_chain,
+    )
+
+    return retrieval_chain
+
+
+def reciprocal_rank_fusion(results: list[list], k=60):
+    fused_scores = {}
+    for docs in results:
+        # Assumes the docs are returned in sorted order of relevance
+        for rank, doc in enumerate(docs):
+            doc_str = dumps(doc)
+            if doc_str not in fused_scores:
+                fused_scores[doc_str] = 0
+            previous_score = fused_scores[doc_str]
+            fused_scores[doc_str] += 1 / (rank + k)
+
+    ranked_results = [
+        (loads(doc), score)
+        for doc, score in sorted(
+            fused_scores.items(), key=lambda x: x[1], reverse=True
+        )
+    ]
+    return [item[0] for item in ranked_results]
+
+
+def load_cohere_rerank_chain(top_k=5):
+    def load_rerank_chain(language):
+        if language == "en":
+            cohere_rerank = CohereRerank(
+                top_n=top_k, model="rerank-english-v2.0"
+            )
+        else:
+            cohere_rerank = CohereRerank(
+                top_n=top_k, model="rerank-multilingual-v2.0"
+            )
+
+        return lambda x: cohere_rerank.compress_documents(
+            documents=x["context"], query=x["question"]
         )
 
-        self.bm25_retriever = BM25Retriever.from_defaults(
-            nodes=self.index.docstore.get_nodes(
-                list(self.index.index_struct.nodes_dict.values())
+    cohere_rerank = RunnableBranch(
+        (
+            lambda x: x["language"] == "en",
+            load_rerank_chain("en"),
+        ),
+        (
+            lambda x: x["language"],
+            load_rerank_chain("ja"),
+        ),
+        load_rerank_chain("ja"),
+    )
+
+    return cohere_rerank
+
+
+def get_web_contexts(web_results):
+    output_documents = []
+    if not web_results:
+        return []
+    web_answer = web_results["web_answer"]
+    # if web_answer:
+    #     output_documents += [
+    #         Document(
+    #             page_content=web_answer,
+    #             metadata={
+    #                 "source": "you.com",
+    #                 "source_type": "web_answer",
+    #                 "has_code": None,
+    #             },
+    #         )
+    #     ]
+    return (
+        output_documents
+        + [
+            Document(
+                page_content=document["context"], metadata=document["metadata"]
+            )
+            for document in web_results["web_context"]
+        ]
+        if web_results.get("web_context")
+        else []
+    )
+
+
+def load_fusion_retriever_chain(base_retriever, top_k=5):
+    query_retrieval_chain = load_simple_retrieval_chain(
+        base_retriever, "question"
+    )
+    standalone_query_retrieval_chain = load_simple_retrieval_chain(
+        base_retriever, "standalone_question"
+    )
+    keywords_retrieval_chain = load_simple_retrieval_chain(
+        base_retriever, "keywords"
+    )
+    vector_search_retrieval_chain = load_simple_retrieval_chain(
+        base_retriever, "vector_search"
+    )
+
+    combined_retrieval_chain = (
+        RunnableParallel(
+            question=query_retrieval_chain,
+            standalone_question=standalone_query_retrieval_chain,
+            keywords=keywords_retrieval_chain,
+            vector_search=vector_search_retrieval_chain,
+            web_context=RunnableLambda(
+                lambda x: get_web_contexts(x["web_results"])
             ),
-            similarity_top_k=similarity_top_k,
         )
-
-        super().__init__()
-
-    def _retrieve(self, query: QueryBundle, **kwargs):
-        nest_asyncio.apply()
-        return asyncio.run(self._aretrieve(query, **kwargs))
-
-    async def _aretrieve(self, query: QueryBundle, **kwargs):
-        bm25_nodes = await self.bm25_retriever.aretrieve(query)
-        vector_nodes = await self.vector_retriever.aretrieve(query)
-
-        # combine the two lists of nodes
-        all_nodes = []
-        node_ids = set()
-        for n in bm25_nodes + vector_nodes:
-            if n.node.node_id not in node_ids:
-                all_nodes.append(n)
-                node_ids.add(n.node.node_id)
-        return all_nodes
-
-    def retrieve(
-        self, str_or_query_bundle: QueryType, **kwargs
-    ) -> List[NodeWithScore]:
-        nest_asyncio.apply()
-        return asyncio.run(self.aretrieve(str_or_query_bundle, **kwargs))
-
-    async def aretrieve(
-        self, str_or_query_bundle: QueryType, **kwargs
-    ) -> List[NodeWithScore]:
-        self._check_callback_manager()
-
-        if isinstance(str_or_query_bundle, str):
-            query_bundle = QueryBundle(str_or_query_bundle)
-        else:
-            query_bundle = str_or_query_bundle
-        with self.callback_manager.as_trace("query"):
-            with self.callback_manager.event(
-                CBEventType.RETRIEVE,
-                payload={EventPayload.QUERY_STR: query_bundle.query_str},
-            ) as retrieve_event:
-                nodes = await self._aretrieve(query_bundle, **kwargs)
-                retrieve_event.on_end(
-                    payload={EventPayload.NODES: nodes},
-                )
-        return nodes
-
-
-class FusionRetriever(QueryFusionRetriever):
-    def __init__(
-        self,
-        retrievers: List[
-            Union[VectorIndexRetriever, BM25Retriever, YouRetriever]
-        ],
-        llm: Optional[LLMType] = "default",
-        query_gen_prompt: Optional[str] = None,
-        mode: FUSION_MODES = FUSION_MODES.SIMPLE,
-        similarity_top_k: int = DEFAULT_SIMILARITY_TOP_K,
-        num_queries: int = 4,
-        use_async: bool = True,
-        verbose: bool = False,
-        callback_manager: Optional[CallbackManager] = None,
-        objects: Optional[List[IndexNode]] = None,
-        object_map: Optional[dict] = None,
-    ) -> None:
-        super().__init__(
-            retrievers=retrievers,
-            llm=llm,
-            query_gen_prompt=query_gen_prompt,
-            mode=mode,
-            similarity_top_k=similarity_top_k,
-            num_queries=num_queries,
-            use_async=use_async,
-            verbose=verbose,
-            callback_manager=callback_manager,
-            objects=objects,
-            object_map=object_map,
+        | itemgetter(
+            "question",
+            "standalone_question",
+            "keywords",
+            "vector_search",
+            "web_context",
         )
-        self._retrievers = retrievers
+        | reciprocal_rank_fusion
+    )
 
-    def _run_nested_async_queries(
-        self, queries: List[QueryBundle], **kwargs
-    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
-        tasks, task_queries = [], []
-        for query in queries:
-            for i, retriever in enumerate(self._retrievers[:-1]):
-                tasks.append(retriever.aretrieve(query, **kwargs))
-                task_queries.append(query)
-
-            # get you retriever results
-            tasks.append(self._retrievers[-1].aretrieve(query, **kwargs))
-            task_queries.append(query)
-
-        task_results = run_async_tasks(tasks)
-
-        results = {}
-        for i, (query, query_result) in enumerate(
-            zip(task_queries, task_results)
-        ):
-            results[(query.query_str, i)] = query_result
-
-        return results
-
-    def _run_sync_queries(
-        self, queries: List[QueryBundle], **kwargs
-    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
-        results = {}
-        for query in queries:
-            for i, retriever in enumerate(self._retrievers):
-                if isinstance(retriever, YouRetriever):
-                    results[(query.query_str, i)] = retriever.retrieve(
-                        query, **kwargs
-                    )
-                else:
-                    results[(query.query_str, i)] = retriever.retrieve(query)
-
-        return results
-
-    async def _run_async_queries(
-        self, queries: List[QueryBundle], **kwargs
-    ) -> Dict[Tuple[str, int], List[NodeWithScore]]:
-        tasks, task_queries = [], []
-        for query in queries:
-            for i, retriever in enumerate(self._retrievers):
-                tasks.append(retriever.aretrieve(query, **kwargs))
-                task_queries.append(query)
-
-        task_results = await asyncio.gather(*tasks)
-
-        results = {}
-        for i, (query, query_result) in enumerate(
-            zip(task_queries, task_results)
-        ):
-            results[(query.query_str, i)] = query_result
-
-        return results
-
-    def _retrieve(
-        self, query_bundle: QueryBundle, **kwargs
-    ) -> List[NodeWithScore]:
-        if self.num_queries > 1:
-            queries = self._get_queries(query_bundle.query_str)
-        else:
-            queries = [query_bundle]
-
-        if self.use_async:
-            results = self._run_nested_async_queries(queries)
-        else:
-            results = self._run_sync_queries(queries, **kwargs)
-
-        if self.mode == FUSION_MODES.RECIPROCAL_RANK:
-            return self._reciprocal_rerank_fusion(results)[
-                : self.similarity_top_k
-            ]
-        elif self.mode == FUSION_MODES.SIMPLE:
-            return self._simple_fusion(results)[: self.similarity_top_k]
-        else:
-            raise ValueError(f"Invalid fusion mode: {self.mode}")
-
-    async def _aretrieve(
-        self, query_bundle: QueryBundle, **kwargs
-    ) -> List[NodeWithScore]:
-        if self.num_queries > 1:
-            queries = self._get_queries(query_bundle.query_str)
-        else:
-            queries = [query_bundle]
-
-        results = await self._run_async_queries(queries, **kwargs)
-
-        if self.mode == FUSION_MODES.RECIPROCAL_RANK:
-            return self._reciprocal_rerank_fusion(results)[
-                : self.similarity_top_k
-            ]
-        elif self.mode == FUSION_MODES.SIMPLE:
-            return self._simple_fusion(results)[: self.similarity_top_k]
-        else:
-            raise ValueError(f"Invalid fusion mode: {self.mode}")
-
-    def retrieve(
-        self, str_or_query_bundle: QueryType, **kwargs
-    ) -> List[NodeWithScore]:
-        self._check_callback_manager()
-
-        if isinstance(str_or_query_bundle, str):
-            query_bundle = QueryBundle(str_or_query_bundle)
-        else:
-            query_bundle = str_or_query_bundle
-        with self.callback_manager.as_trace("query"):
-            with self.callback_manager.event(
-                CBEventType.RETRIEVE,
-                payload={EventPayload.QUERY_STR: query_bundle.query_str},
-            ) as retrieve_event:
-                nodes = self._retrieve(query_bundle, **kwargs)
-                retrieve_event.on_end(
-                    payload={EventPayload.NODES: nodes},
-                )
-        return nodes
-
-    async def aretrieve(
-        self, str_or_query_bundle: QueryType, **kwargs
-    ) -> List[NodeWithScore]:
-        self._check_callback_manager()
-
-        if isinstance(str_or_query_bundle, str):
-            query_bundle = QueryBundle(str_or_query_bundle)
-        else:
-            query_bundle = str_or_query_bundle
-        with self.callback_manager.as_trace("query"):
-            with self.callback_manager.event(
-                CBEventType.RETRIEVE,
-                payload={EventPayload.QUERY_STR: query_bundle.query_str},
-            ) as retrieve_event:
-                nodes = await self._aretrieve(query_bundle, **kwargs)
-                nodes = await self._ahandle_recursive_retrieval(
-                    query_bundle, nodes
-                )
-                retrieve_event.on_end(
-                    payload={EventPayload.NODES: nodes},
-                )
-
-        return nodes
+    cohere_rerank_chain = load_cohere_rerank_chain(top_k=top_k)
+    ranked_retrieval_chain = (
+        RunnableParallel(
+            context=combined_retrieval_chain,
+            question=itemgetter("question"),
+            language=itemgetter("language"),
+        )
+        | cohere_rerank_chain
+    )
+    return ranked_retrieval_chain
