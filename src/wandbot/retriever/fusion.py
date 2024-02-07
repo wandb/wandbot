@@ -4,12 +4,12 @@ from operator import itemgetter
 from langchain.load import dumps, loads
 from langchain.prompts.prompt import PromptTemplate
 from langchain.retrievers.document_compressors import CohereRerank
-from langchain.schema import format_document, Document
+from langchain.schema import Document, format_document
 from langchain_core.runnables import (
-    RunnablePassthrough,
-    RunnableParallel,
-    RunnableLambda,
     RunnableBranch,
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
 )
 
 from wandbot.utils import clean_document_content

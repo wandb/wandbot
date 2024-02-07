@@ -7,8 +7,8 @@ import cohere
 from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
-    RunnableLambda,
     Runnable,
+    RunnableLambda,
     RunnableParallel,
     RunnablePassthrough,
 )

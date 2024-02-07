@@ -4,10 +4,10 @@ from typing import List
 from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
-    RunnableLambda,
-    RunnableParallel,
     Runnable,
     RunnableBranch,
+    RunnableLambda,
+    RunnableParallel,
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field

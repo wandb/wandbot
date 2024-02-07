@@ -4,6 +4,7 @@ from typing import Any, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
+
 from wandbot.retriever.base import Retriever
 
 router = APIRouter(
@@ -68,9 +69,9 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     """
     results = retriever(
         query=request.query,
-        indices=[idx.value for idx in request.indices]
-        if request.indices
-        else [],
+        indices=(
+            [idx.value for idx in request.indices] if request.indices else None
+        ),
         language=request.language,
         top_k=request.top_k,
         include_tags=request.include_tags,

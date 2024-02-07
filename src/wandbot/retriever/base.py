@@ -1,7 +1,7 @@
-import wandb
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
+import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 
 

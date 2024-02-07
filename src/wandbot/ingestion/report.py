@@ -14,6 +14,7 @@ Typical usage example:
     vectorstore_artifact = "wandbot/wandbot-dev/vectorstores:latest"
     create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
 """
+
 import json
 import pathlib
 from datetime import datetime

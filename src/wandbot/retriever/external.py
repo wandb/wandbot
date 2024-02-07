@@ -5,7 +5,8 @@ import requests
 from llama_index import QueryBundle
 from llama_index.callbacks import CallbackManager, CBEventType, EventPayload
 from llama_index.core.base_retriever import BaseRetriever
-from llama_index.schema import NodeWithScore, QueryType, TextNode
+from llama_index.schema import NodeWithScore, TextNode
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

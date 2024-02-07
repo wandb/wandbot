@@ -16,16 +16,14 @@ import json
 import pathlib
 from typing import List
 
-import wandb
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
+import wandb
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.utils import (
-    get_logger,
-)
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 

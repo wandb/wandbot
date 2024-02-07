@@ -25,6 +25,7 @@ Typical usage example:
     git_repo_metadata = fetch_git_repo(paths, id_file)
     cell_info = concatenate_cells(cell, include_outputs, max_output_length, traceback)
 """
+
 import pathlib
 import re
 import subprocess

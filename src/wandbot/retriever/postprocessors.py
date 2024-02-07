@@ -3,6 +3,7 @@ from typing import List, Optional
 from llama_index import QueryBundle
 from llama_index.postprocessor import BaseNodePostprocessor
 from llama_index.schema import NodeWithScore
+
 from wandbot.utils import create_no_result_dummy_node, get_logger
 
 logger = get_logger(__name__)

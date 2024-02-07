@@ -33,9 +33,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
+
+import wandb
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router

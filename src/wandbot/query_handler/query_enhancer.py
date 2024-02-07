@@ -3,8 +3,8 @@ from operator import itemgetter
 import regex as re
 from langchain_core.runnables import (
     Runnable,
-    RunnablePassthrough,
     RunnableParallel,
+    RunnablePassthrough,
 )
 from langchain_openai import ChatOpenAI
 

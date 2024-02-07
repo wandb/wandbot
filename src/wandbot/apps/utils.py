@@ -16,6 +16,7 @@ from collections import OrderedDict
 from typing import Any, List
 
 from pydantic_settings import BaseSettings
+
 from wandbot.api.routers.chat import APIQueryResponse
 
 

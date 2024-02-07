@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from starlette import status
+
 from wandbot.chat.chat import Chat, ChatConfig
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import get_logger
