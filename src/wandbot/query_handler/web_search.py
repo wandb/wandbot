@@ -1,13 +1,13 @@
 import os
 from operator import itemgetter
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import requests
 from langchain_core.runnables import (
-    RunnableLambda,
-    RunnableBranch,
-    RunnableParallel,
     Runnable,
+    RunnableBranch,
+    RunnableLambda,
+    RunnableParallel,
     RunnablePassthrough,
 )
 from pydantic import BaseModel, Field

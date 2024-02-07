@@ -1,13 +1,13 @@
 from operator import itemgetter
 
-from langchain_core.runnables import RunnableParallel, RunnableLambda
+from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 from wandbot.chat.response_synthesis import load_response_synthesizer_chain
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.query_handler.query_enhancer import load_query_enhancement_chain
 from wandbot.retriever.base import (
-    load_vector_store_from_config,
     load_retriever_with_options,
+    load_vector_store_from_config,
 )
 from wandbot.retriever.fusion import load_fusion_retriever_chain
 

@@ -21,23 +21,23 @@ Typical usage example:
 
 import json
 import pathlib
-from typing import Any, List, Sequence, Callable
+from typing import Any, Callable, List, Sequence
 
 import tiktoken
-import wandb
 from langchain.text_splitter import (
-    RecursiveCharacterTextSplitter,
-    MarkdownHeaderTextSplitter,
     Language,
+    MarkdownHeaderTextSplitter,
+    RecursiveCharacterTextSplitter,
+    TokenTextSplitter,
 )
-from langchain.text_splitter import TokenTextSplitter
-from langchain_core.documents import Document, BaseDocumentTransformer
+from langchain_core.documents import BaseDocumentTransformer, Document
 
+import wandb
 from wandbot.utils import (
-    get_logger,
     FastTextLangDetect,
-    make_document_tokenization_safe,
     filter_smaller_documents,
+    get_logger,
+    make_document_tokenization_safe,
 )
 
 logger = get_logger(__name__)

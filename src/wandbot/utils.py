@@ -36,7 +36,6 @@ import faiss
 import fasttext
 import nest_asyncio
 import tiktoken
-import wandb
 from langchain_core.documents import Document
 from llama_index import ServiceContext, StorageContext, VectorStoreIndex
 from llama_index.embeddings import OpenAIEmbedding
@@ -45,6 +44,8 @@ from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import FaissVectorStore
 from pydantic_settings import BaseSettings
+
+import wandb
 
 
 def get_logger(name: str) -> logging.Logger:

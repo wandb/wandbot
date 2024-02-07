@@ -12,18 +12,22 @@ Typical usage example:
   chat_thread = db_client.get_chat_thread(application='app1', thread_id='123')
   question_answer = db_client.create_question_answer(question_answer=QuestionAnswerCreateSchema())
 """
+
 import json
 from typing import Any, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
 from wandbot.database.models import QuestionAnswer as QuestionAnswerModel
 from wandbot.database.schemas import ChatThreadCreate as ChatThreadCreateSchema
 from wandbot.database.schemas import Feedback as FeedbackSchema
-from wandbot.database.schemas import QuestionAnswerCreate as QuestionAnswerCreateSchema
+from wandbot.database.schemas import (
+    QuestionAnswerCreate as QuestionAnswerCreateSchema,
+)
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

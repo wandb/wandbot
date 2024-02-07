@@ -1,6 +1,6 @@
 import os
 
-from wandbot.ingestion import vectorstores, preprocess_data
+from wandbot.ingestion import preprocess_data, vectorstores
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

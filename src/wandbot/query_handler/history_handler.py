@@ -1,13 +1,12 @@
 from _operator import itemgetter
-
 from langchain_core.messages import get_buffer_string
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
-    RunnablePassthrough,
-    RunnableLambda,
-    RunnableBranch,
     Runnable,
+    RunnableBranch,
+    RunnableLambda,
+    RunnablePassthrough,
 )
 from langchain_openai import ChatOpenAI
 

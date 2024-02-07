@@ -1,6 +1,6 @@
 from operator import itemgetter
 
-from langchain_core.runnables import RunnablePassthrough, Runnable
+from langchain_core.runnables import Runnable, RunnablePassthrough
 
 from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 

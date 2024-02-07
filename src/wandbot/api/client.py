@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
+
 from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
 from wandbot.api.routers.database import (
     APIFeedbackRequest,
