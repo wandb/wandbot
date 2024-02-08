@@ -47,6 +47,8 @@ class MultiLabel(BaseModel):
     intents: List[Label] = Field(
         ...,
         description="The list of intents associated with the query",
+        min_items=1,
+        max_items=3,
     )
 
 

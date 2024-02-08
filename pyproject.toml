@@ -42,6 +42,7 @@ pymdown-extensions = "^10.5"
 langchain = "^0.1.5"
 langchain-openai = "^0.0.5"
 chromadb = "^0.4.22"
+langchain-experimental = "^0.0.50"
 
 [tool.poetry.dev-dependencies]
 #fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
