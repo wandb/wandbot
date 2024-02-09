@@ -33,7 +33,6 @@ class EnhancedQuery(BaseModel):
 
 
 def load_query_rewrite_chain(model: ChatOpenAI) -> RunnableSerializable:
-
     query_rewrite_prompt = ChatPromptTemplate.from_messages(
         QUERY_REWRITE_PROMPT_MESSAGES
     )

@@ -120,7 +120,6 @@ class YouSearch:
 
 
 def load_web_answer_chain(search_field: str, top_k: int = 5) -> Runnable:
-
     you_search = YouSearch(os.environ["YOU_API_KEY"], top_k)
 
     web_answer_chain = RunnablePassthrough().assign(
@@ -152,7 +151,6 @@ def load_web_answer_chain(search_field: str, top_k: int = 5) -> Runnable:
 
 
 def load_web_search_chain(search_field: str, top_k: int = 5) -> Runnable:
-
     you_search = YouSearch(os.environ["YOU_API_KEY"], top_k)
 
     web_answer_chain = RunnablePassthrough().assign(

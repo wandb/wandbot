@@ -32,7 +32,6 @@ def clean_question(question: str) -> str:
 def load_query_enhancement_chain(
     model: ChatOpenAI, lang_detect_model_path: str
 ) -> Runnable:
-
     condense_question_chain = load_query_condense_chain(model)
     intent_enhancement_chain = load_intent_enhancement_chain(model)
 
