@@ -28,7 +28,6 @@ Typical usage example:
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-import wandb
 from llama_index import ServiceContext
 from llama_index.callbacks import (
     CallbackManager,
@@ -45,14 +44,20 @@ from llama_index.memory import BaseMemory
 from llama_index.postprocessor.types import BaseNodePostprocessor
 from llama_index.schema import MetadataMode, NodeWithScore, QueryBundle
 from llama_index.tools import ToolOutput
+from weave.monitoring import StreamTable
+
+import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.retriever.base import Retriever
 from wandbot.retriever.fusion import HybridRetriever
+from wandbot.retriever.postprocessors import (
+    LanguageFilterPostprocessor,
+    MetadataPostprocessor,
+)
 from wandbot.utils import Timer, get_logger, load_service_context
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -295,6 +300,7 @@ class Chat:
         query_engine = self.retriever.load_query_engine(
             language=language,
             top_k=top_k,
+            is_avoid_query=True if "avoid" in query_intent.lower() else False,
         )
 
         self.qa_prompt = load_chat_prompt(
@@ -309,10 +315,14 @@ class Chat:
             similarity_top_k=initial_k,
             response_mode="compact",
             node_postprocessors=[
-                CohereRerank(top_n=top_k, model="rerank-english-v2.0")
-                if language == "en"
-                else CohereRerank(
-                    top_n=top_k, model="rerank-multilingual-v2.0"
+                MetadataPostprocessor(),
+                LanguageFilterPostprocessor(languages=[language, "python"]),
+                (
+                    CohereRerank(top_n=top_k, model="rerank-english-v2.0")
+                    if language == "en"
+                    else CohereRerank(
+                        top_n=top_k, model="rerank-multilingual-v2.0"
+                    )
                 ),
             ],
             prefix_messages=self.qa_prompt.message_templates,

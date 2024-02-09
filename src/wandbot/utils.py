@@ -20,6 +20,7 @@ Typical usage example:
     storage_context = load_storage_context(768, "/path/to/persist")
     index = load_index(nodes, service_context, storage_context, "/path/to/persist")
 """
+
 import asyncio
 import datetime
 import hashlib
@@ -27,13 +28,15 @@ import json
 import logging
 import os
 import pathlib
+import re
 import sqlite3
 from typing import Any, Coroutine, List, Optional, Tuple
 
 import chromadb
 import fasttext
 import nest_asyncio
-import wandb
+import tiktoken
+from langchain_core.documents import Document
 from llama_index import ServiceContext, StorageContext, VectorStoreIndex
 from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
@@ -41,6 +44,8 @@ from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import ChromaVectorStore
 from pydantic_settings import BaseSettings
+
+import wandb
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -369,3 +374,63 @@ def run_async_tasks(
 
     outputs: Tuple[Any] = asyncio.run(_gather())
     return outputs
+
+
+def clean_document_content(doc: Document) -> Document:
+    cleaned_content = re.sub(r"\n{3,}", "\n\n", doc.page_content)
+    cleaned_content = cleaned_content.strip()
+    cleaned_document = Document(
+        page_content=cleaned_content, metadata=doc.metadata
+    )
+    cleaned_document = make_document_tokenization_safe(cleaned_document)
+    return cleaned_document
+
+
+def make_document_tokenization_safe(document: Document) -> Document:
+    """Removes special tokens from the given documents.
+
+    Args:
+        documents: A list of strings representing the documents.
+
+    Returns:
+        A list of cleaned documents with special tokens removed.
+    """
+    encoding = tiktoken.get_encoding("cl100k_base")
+    special_tokens_set = encoding.special_tokens_set
+
+    def remove_special_tokens(text: str) -> str:
+        """Removes special tokens from the given text.
+
+        Args:
+            text: A string representing the text.
+
+        Returns:
+            The text with special tokens removed.
+        """
+        for token in special_tokens_set:
+            text = text.replace(token, "")
+        return text
+
+    content = document.page_content
+    cleaned_document = remove_special_tokens(content)
+    return Document(page_content=cleaned_document, metadata=document.metadata)
+
+
+def filter_smaller_documents(
+    documents: List[Document], min_size: int = 3, min_line_size: int = 5
+) -> List[Document]:
+    def filter_small_document(document: Document) -> bool:
+        return (
+            len(
+                [
+                    doc
+                    for doc in document.page_content.split("\n")
+                    if len(doc.strip().split()) >= min_line_size
+                ]
+            )
+            >= min_size
+        )
+
+    return [
+        document for document in documents if filter_small_document(document)
+    ]

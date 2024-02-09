@@ -33,9 +33,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
+
+import wandb
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
@@ -93,47 +93,13 @@ async def lifespan(app: FastAPI):
         wandb.run.finish()
 
 
-app = FastAPI(
-    title="Wandbot",
-    description="An API to access Wandbot - The Weights & Biases AI Assistant.",
-    version="1.3.0",
-    lifespan=lifespan,
-)
+app = FastAPI(name="wandbot", version="1.0.0", lifespan=lifespan)
 
 
 app.include_router(chat_router.router)
 app.include_router(database_router.router)
 app.include_router(retrieve_router.router)
 
-
-def route_to_camel_case(route_name: str) -> str:
-    """Converts a route name to camel case.
-
-    Args:
-        route_name: The name of the route.
-
-    Returns:
-        The route name in camel case.
-    """
-    words = route_name.split("_")
-    if len(words) == 1:
-        return words[0].title()
-    return words[0] + "".join(word.title() for word in words[1:])
-
-
-def use_route_names_as_operation_ids(app: FastAPI) -> None:
-    """
-    Simplify operation IDs so that generated API clients have simpler function
-    names.
-
-    Should be called only after all routes have been added.
-    """
-    for route in app.routes:
-        if isinstance(route, APIRoute):
-            route.operation_id = route_to_camel_case(route.name)
-
-
-use_route_names_as_operation_ids(app)
 
 if __name__ == "__main__":
     import uvicorn

@@ -4,6 +4,7 @@ from typing import Any, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
+
 from wandbot.retriever.base import Retriever
 
 router = APIRouter(
@@ -43,11 +44,12 @@ class Indices(str, Enum):
 
 class APIRetrievalRequest(BaseModel):
     query: str
-    indices: List[Indices] = [index for index in Indices]
+    indices: List[Indices] | None = None
     language: str = "en"
+    initial_k: int = 10
     top_k: int = 5
     include_tags: List[str] = []
-    include_web_results: bool = True
+    exclude_tags: List[str] = []
 
 
 @router.post(
@@ -55,7 +57,7 @@ class APIRetrievalRequest(BaseModel):
     response_model=APIRetrievalResponse,
     status_code=status.HTTP_200_OK,
 )
-def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
+async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     """Retrieves the top k results for a given query.
 
     Args:
@@ -66,11 +68,13 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     """
     results = retriever(
         query=request.query,
-        indices=[idx.value for idx in request.indices],
+        indices=(
+            [idx.value for idx in request.indices] if request.indices else None
+        ),
         language=request.language,
         top_k=request.top_k,
         include_tags=request.include_tags,
-        include_web_results=request.include_web_results,
+        exclude_tags=request.exclude_tags,
     )
 
     return APIRetrievalResponse(
