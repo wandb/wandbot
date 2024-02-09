@@ -47,7 +47,6 @@ class KeywordsSchema(BaseModel):
 
 
 def load_keywords_extraction_chain(model: ChatOpenAI) -> Runnable:
-
     keywords_prompt = ChatPromptTemplate.from_messages(KEYWORDS_PROMPT_MESSAGES)
 
     keywords_extraction_chain = create_structured_output_runnable(

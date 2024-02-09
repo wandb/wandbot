@@ -48,11 +48,11 @@ JA_OUTRO_MESSAGE = (
     "#support チャンネルにいるwandbチームに質問してください。この答えは役に立ったでしょうか？下のボタンでお知らせ下さい。"
 )
 
-JA_ERROR_MESSAGE = (
-    "「おっと、問題が発生しました。しばらくしてからもう一度お試しください。」"
-)
+JA_ERROR_MESSAGE = "「おっと、問題が発生しました。しばらくしてからもう一度お試しください。」"
 
-JA_FALLBACK_WARNING_MESSAGE = "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
+JA_FALLBACK_WARNING_MESSAGE = (
+    "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
+)
 
 
 class SlackAppEnConfig(BaseSettings):

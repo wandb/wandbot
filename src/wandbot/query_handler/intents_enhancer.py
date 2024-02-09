@@ -172,7 +172,6 @@ INTENT_PROMPT_MESSAGES = [
 
 
 def load_intent_extraction_chain(model: ChatOpenAI) -> Runnable:
-
     intents_prompt = ChatPromptTemplate.from_messages(INTENT_PROMPT_MESSAGES)
 
     intents_classification_chain = create_structured_output_runnable(
