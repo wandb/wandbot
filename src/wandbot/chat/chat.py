@@ -50,11 +50,7 @@ from wandbot.chat.prompts import load_chat_prompt, partial_format
 from wandbot.chat.query_enhancer import CompleteQuery, QueryHandler
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.retriever.base import Retriever
-from wandbot.retriever.fusion import FusionRetriever
-from wandbot.retriever.postprocessors import (
-    LanguageFilterPostprocessor,
-    MetadataPostprocessor,
-)
+from wandbot.retriever.fusion import HybridRetriever
 from wandbot.utils import Timer, get_logger, load_service_context
 from weave.monitoring import StreamTable
 
@@ -95,7 +91,7 @@ def rebuild_full_prompt(
 class WandbContextChatEngine(ContextChatEngine):
     def __init__(
         self,
-        retriever: FusionRetriever,
+        retriever: HybridRetriever,
         llm: LLM,
         memory: BaseMemory,
         prefix_messages: List[ChatMessage],
@@ -112,7 +108,7 @@ class WandbContextChatEngine(ContextChatEngine):
             context_template=context_template,
             callback_manager=callback_manager,
         )
-        self._retriever: FusionRetriever = retriever
+        self._retriever: HybridRetriever = retriever
 
     def _generate_context(
         self, message: str, **kwargs
@@ -299,7 +295,6 @@ class Chat:
         query_engine = self.retriever.load_query_engine(
             language=language,
             top_k=top_k,
-            is_avoid_query=True if "avoid" in query_intent.lower() else False,
         )
 
         self.qa_prompt = load_chat_prompt(
@@ -314,8 +309,6 @@ class Chat:
             similarity_top_k=initial_k,
             response_mode="compact",
             node_postprocessors=[
-                MetadataPostprocessor(),
-                LanguageFilterPostprocessor(languages=[language, "python"]),
                 CohereRerank(top_n=top_k, model="rerank-english-v2.0")
                 if language == "en"
                 else CohereRerank(

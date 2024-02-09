@@ -1,5 +1,4 @@
-import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import wandb
 from llama_index import (
@@ -10,53 +9,17 @@ from llama_index import (
 )
 from llama_index.callbacks import CallbackManager
 from llama_index.core.base_retriever import BaseRetriever
-from llama_index.postprocessor import BaseNodePostprocessor, CohereRerank
+from llama_index.postprocessor import CohereRerank
 from llama_index.query_engine import RetrieverQueryEngine
-from llama_index.response_synthesizers import BaseSynthesizer, ResponseMode
-from llama_index.retrievers import BM25Retriever
-from llama_index.retrievers.fusion_retriever import FUSION_MODES
-from llama_index.schema import NodeWithScore, TextNode
+from llama_index.response_synthesizers import ResponseMode
 from llama_index.vector_stores.simple import DEFAULT_VECTOR_STORE, NAMESPACE_SEP
-from llama_index.vector_stores.types import (
-    DEFAULT_PERSIST_FNAME,
-    ExactMatchFilter,
-    FilterCondition,
-    MetadataFilters,
-)
+from llama_index.vector_stores.types import DEFAULT_PERSIST_FNAME
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from wandbot.retriever.external import YouRetriever
-from wandbot.retriever.fusion import FusionRetriever
-from wandbot.retriever.postprocessors import (
-    LanguageFilterPostprocessor,
-    MetadataPostprocessor,
-)
+from wandbot.retriever.fusion import HybridRetriever
 from wandbot.utils import get_logger, load_service_context, load_storage_context
 
 logger = get_logger(__name__)
-
-
-class WandbRetrieverQueryEngine(RetrieverQueryEngine):
-    def __init__(
-        self,
-        retriever: FusionRetriever,
-        response_synthesizer: Optional[BaseSynthesizer] = None,
-        node_postprocessors: Optional[List[BaseNodePostprocessor]] = None,
-        callback_manager: Optional[CallbackManager] = None,
-    ) -> None:
-        super().__init__(
-            retriever=retriever,
-            response_synthesizer=response_synthesizer,
-            node_postprocessors=node_postprocessors,
-            callback_manager=callback_manager,
-        )
-        self._retriever = retriever
-
-    def retrieve(
-        self, query_bundle: QueryBundle, **kwargs
-    ) -> List[NodeWithScore]:
-        nodes = self._retriever.retrieve(query_bundle, **kwargs)
-        return self._apply_node_postprocessors(nodes, query_bundle=query_bundle)
 
 
 class RetrieverConfig(BaseSettings):
@@ -82,29 +45,6 @@ class RetrieverConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
-
-
-def load_bm25retriever(index, similarity_top_k: int, index_name: str = None):
-    if index_name is None:
-        all_docs = index.storage_context.vector_store.client.get()
-    else:
-        all_docs = index.storage_context.vector_store.client.get(
-            where={"index": index_name}
-        )
-
-    nodes = []
-    for node_id, document, metadata in zip(
-        all_docs["ids"], all_docs["documents"], all_docs["metadatas"]
-    ):
-        nodes.append(
-            TextNode(node_id=node_id, text=document, metadata=metadata)
-        )
-
-    bm25_retriever = BM25Retriever.from_defaults(
-        nodes=nodes,
-        similarity_top_k=similarity_top_k,
-    )
-    return bm25_retriever
 
 
 class Retriever:
@@ -145,33 +85,6 @@ class Retriever:
             self.storage_context,
             service_context=self.service_context,
         )
-        self.vector_retriever = self.index.as_retriever(
-            similarity_top_k=self.config.similarity_top_k,
-            storage_context=self.storage_context,
-        )
-        self.bm25_retriever = load_bm25retriever(
-            self.index, self.config.similarity_top_k
-        )
-
-        self.bm25_retrievers_by_index = {
-            index: load_bm25retriever(
-                self.index, self.config.similarity_top_k, index
-            )
-            for index in indices
-        }
-
-        self.you_retriever = YouRetriever(
-            api_key=os.environ.get("YOU_API_KEY"),
-            similarity_top_k=self.config.similarity_top_k,
-        )
-        self._retriever = FusionRetriever(
-            [self.vector_retriever, self.bm25_retriever, self.you_retriever],
-            similarity_top_k=self.config.similarity_top_k,
-            num_queries=1,
-            use_async=False,
-            mode=FUSION_MODES.RECIPROCAL_RANK,
-        )
-        self.is_avoid_query: bool | None = None
 
     def load_storage_context_from_artifact(
         self, artifact_url: str
@@ -196,30 +109,16 @@ class Retriever:
         retriever: BaseRetriever | None = None,
         top_k: int | None = None,
         language: str | None = None,
-        include_tags: List[str] | None = None,
-        exclude_tags: List[str] | None = None,
-        is_avoid_query: bool | None = None,
-    ) -> WandbRetrieverQueryEngine:
+    ) -> RetrieverQueryEngine:
         top_k = top_k or self.config.top_k
         language = language or self.config.language
 
-        if is_avoid_query is not None:
-            self.is_avoid_query = is_avoid_query
-
         node_postprocessors = [
-            MetadataPostprocessor(
-                include_tags=include_tags,
-                exclude_tags=exclude_tags,
-                min_result_size=top_k,
-            ),
-            LanguageFilterPostprocessor(
-                languages=[language, "python"], min_result_size=top_k
-            ),
             CohereRerank(top_n=top_k, model="rerank-english-v2.0")
             if language == "en"
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
         ]
-        query_engine = WandbRetrieverQueryEngine.from_args(
+        query_engine = RetrieverQueryEngine.from_args(
             retriever=retriever,
             node_postprocessors=node_postprocessors,
             response_mode=ResponseMode.NO_TEXT,
@@ -234,8 +133,7 @@ class Retriever:
         language: str | None = None,
         top_k: int | None = None,
         include_tags: List[str] | None = None,
-        exclude_tags: List[str] | None = None,
-        is_avoid_query: bool | None = False,
+        include_web_results: bool | None = False,
         **kwargs,
     ):
         """Retrieves the top k results from the index for the given query.
@@ -254,56 +152,21 @@ class Retriever:
         top_k = top_k or self.config.top_k
         language = language or self.config.language
 
-        if not indices:
-            logger.warning(
-                "No indices were provided. Using the fusion retriever."
-            )
-            retriever = self._retriever
-        else:
-            exact_match_filters = [
-                ExactMatchFilter(key="index", value=idx) for idx in indices
-            ]
-            metadata_filters = MetadataFilters(
-                filters=exact_match_filters,
-                condition=FilterCondition.OR,
-            )
-
-            retrievers = [
-                self.index.as_retriever(
-                    similarity_top_k=self.config.similarity_top_k,
-                    storage_context=self.storage_context,
-                    filters=metadata_filters,
-                ),
-            ]
-            bm25_retrievers = [
-                self.bm25_retrievers_by_index.get(index) for index in indices
-            ]
-            bm25_retrievers = [
-                retriever
-                for retriever in bm25_retrievers
-                if retriever is not None
-            ]
-            retrievers.extend(bm25_retrievers)
-            if kwargs.pop("include_web_results", None):
-                retrievers.append(self.you_retriever)
-
-            retriever = FusionRetriever(
-                retrievers,
-                similarity_top_k=self.config.similarity_top_k,
-                num_queries=1,
-                use_async=False,
-                mode=FUSION_MODES.RECIPROCAL_RANK,
-            )
+        retriever = HybridRetriever(
+            index=self.index,
+            storage_context=self.storage_context,
+            similarity_top_k=self.config.similarity_top_k,
+            language=language,
+            indices=indices,
+            include_tags=include_tags,
+            include_web_results=include_web_results,
+        )
 
         retrieval_engine = self.load_query_engine(
             retriever=retriever,
             top_k=top_k,
             language=language,
-            include_tags=include_tags,
-            exclude_tags=exclude_tags,
         )
-
-        avoid_query = self.is_avoid_query or is_avoid_query
 
         query_bundle = QueryBundle(
             query_str=query,
@@ -311,9 +174,7 @@ class Retriever:
                 query=query
             ),
         )
-        results = retrieval_engine.retrieve(
-            query_bundle, is_avoid_query=bool(avoid_query)
-        )
+        results = retrieval_engine.retrieve(query_bundle)
 
         outputs = [
             {
@@ -329,11 +190,11 @@ class Retriever:
     def retrieve(
         self,
         query: str,
-        language: str | None = None,
-        top_k: int | None = None,
+        language: str = "en",
+        indices: List[str] | None = None,
+        top_k: int = 5,
         include_tags: List[str] | None = None,
-        exclude_tags: List[str] | None = None,
-        is_avoid_query: bool | None = False,
+        include_web_results: bool | None = False,
         **kwargs,
     ):
         """Retrieves the top k results from the index for the given query.
@@ -341,9 +202,10 @@ class Retriever:
         Args:
             query: A string representing the query.
             language: A string representing the language of the query.
+            indices: A list of strings representing the indices to retrieve the results from.
             top_k: An integer representing the number of top results to retrieve.
             include_tags: A list of strings representing the tags to include in the results.
-            exclude_tags: A list of strings representing the tags to exclude from the results.
+            include_web_results: A boolean representing whether to include web results.
 
         Returns:
             A list of dictionaries representing the retrieved results.
@@ -351,60 +213,15 @@ class Retriever:
 
         return self._retrieve(
             query,
-            indices=None,
+            indices=indices if indices else [],
             language=language,
             top_k=top_k,
-            include_tags=include_tags,
-            exclude_tags=exclude_tags,
-            is_avoid_query=is_avoid_query,
-        )
-
-    def retrieve_from_indices(
-        self,
-        query: str,
-        indices: List[str],
-        language: str | None = None,
-        top_k: int | None = None,
-        include_tags: List[str] | None = None,
-        exclude_tags: List[str] | None = None,
-        is_avoid_query: bool | None = False,
-        **kwargs,
-    ):
-        """Retrieves the top k results from the index for the given query.
-
-        Args:
-            query: A string representing the query.
-            indices: A string representing the index to retrieve the results from.
-            language: A string representing the language of the query.
-            top_k: An integer representing the number of top results to retrieve.
-            include_tags: A list of strings representing the tags to include in the results.
-            exclude_tags: A list of strings representing the tags to exclude from the results.
-
-        Returns:
-            A list of dictionaries representing the retrieved results.
-        """
-        return self._retrieve(
-            query,
-            indices=indices,
-            language=language,
-            top_k=top_k,
-            include_tags=include_tags,
-            exclude_tags=exclude_tags,
-            is_avoid_query=is_avoid_query,
-            **kwargs,
+            include_tags=include_tags if include_tags else [],
+            include_web_results=include_web_results,
         )
 
     def __call__(self, query: str, **kwargs) -> List[Dict[str, Any]]:
-        indices = kwargs.pop("indices", [])
-        if kwargs.get("include_web_results"):
-            indices.append("you.com")
-        if len(indices) > 1:
-            retrievals = self.retrieve_from_indices(
-                query, indices=indices, **kwargs
-            )
-        else:
-            retrievals = self.retrieve(query, **kwargs)
-
+        retrievals = self.retrieve(query, **kwargs)
         logger.debug(f"Retrieved {len(retrievals)} results.")
         logger.debug(f"Retrieval: {retrievals[0]}")
         return retrievals

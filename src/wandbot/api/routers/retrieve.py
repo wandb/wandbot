@@ -43,12 +43,10 @@ class Indices(str, Enum):
 
 class APIRetrievalRequest(BaseModel):
     query: str
-    indices: List[Indices] = []
+    indices: List[Indices] = [index for index in Indices]
     language: str = "en"
-    initial_k: int = 10
     top_k: int = 5
     include_tags: List[str] = []
-    exclude_tags: List[str] = []
     include_web_results: bool = True
 
 
@@ -68,13 +66,10 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
     """
     results = retriever(
         query=request.query,
-        indices=[idx.value for idx in request.indices]
-        if request.indices
-        else [],
+        indices=[idx.value for idx in request.indices],
         language=request.language,
         top_k=request.top_k,
         include_tags=request.include_tags,
-        exclude_tags=request.exclude_tags,
         include_web_results=request.include_web_results,
     )
 
