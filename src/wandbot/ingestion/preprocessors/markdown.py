@@ -8,6 +8,7 @@ from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
 from langchain_core.documents import BaseDocumentTransformer, Document
+
 from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 
 

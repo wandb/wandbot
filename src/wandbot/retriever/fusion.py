@@ -3,9 +3,7 @@ from operator import itemgetter
 
 from langchain.load import dumps, loads
 from langchain.prompts.prompt import PromptTemplate
-from langchain.retrievers.document_compressors import (
-    CohereRerank,
-)
+from langchain.retrievers.document_compressors import CohereRerank
 from langchain.schema import Document, format_document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
