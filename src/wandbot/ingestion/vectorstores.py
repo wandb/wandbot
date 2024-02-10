@@ -59,6 +59,7 @@ def load(
     )
     artifact_dir: str = artifact.download()
 
+    # Todo: Change to LiteLLM Embeddings
     embedding_fn = OpenAIEmbeddings(
         model=config.embeddings_model, dimensions=config.embedding_dim
     )
