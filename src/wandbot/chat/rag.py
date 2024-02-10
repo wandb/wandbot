@@ -1,7 +1,7 @@
 from operator import itemgetter
 
+from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
-
 from wandbot.chat.response_synthesis import load_response_synthesizer_chain
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.query_handler.query_enhancer import load_query_enhancement_chain
@@ -33,6 +33,17 @@ def load_rag_chain(
     base_retriever = load_retriever_with_options(
         vectorstore, search_type=search_type, search_kwargs={"top_k": top_k * 2}
     )
+    parent_retriever = base_retriever | RunnableLambda(
+        lambda docs: [
+            Document(
+                page_content=doc.metadata.get(
+                    "source_content", doc.page_content
+                ),
+                metadata=doc.metadata,
+            )
+            for doc in docs
+        ]
+    )
 
     fallback_response_synthesis_chain = load_response_synthesizer_chain(
         fallback_model
@@ -42,7 +53,7 @@ def load_rag_chain(
     ).with_fallbacks([fallback_response_synthesis_chain])
 
     ranked_retrieval_chain = load_fusion_retriever_chain(
-        base_retriever, embeddings=embeddings_model, top_k=top_k
+        parent_retriever, embeddings=embeddings_model, top_k=top_k
     )
 
     rag_chain = (

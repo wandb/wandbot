@@ -8,7 +8,6 @@ from langchain_core.prompts import (
     format_document,
 )
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
-
 from wandbot.retriever.fusion import combine_documents
 from wandbot.utils import clean_document_content
 
@@ -58,6 +57,7 @@ Here are guidelines you must follow when responding to user questions:
 
 **Reliability**
 - Your responses must rely only on the provided context, not prior knowledge.
+- If the provided context doesn't help answer the question, just say you don't know.
 - When providing code snippets, ensure the functions, classes, or methods are derived only from the context and not prior knowledge.
 - Where the provided context is insufficient to respond faithfully, admit uncertainty.
 - Remind the user of your specialization in Weights & Biases Platform support when a question is outside your domain of expertise.
@@ -65,10 +65,11 @@ Here are guidelines you must follow when responding to user questions:
 
 **Citation**
 - Always cite the source from the provided context.
+- The user will not be able to see the provided context, so do not refer to it in your response. For instance, don't say "As mentioned in the context...".
 - Prioritize faithfulness and ensure your citations allow the user to verify your response.
 - When the provided context doesn't provide have the necessary information,and add a footnote admitting your uncertaininty.
 - Remember, you must return both an answer and citations.
-- If none of the articles answer the question, just say you don't know.
+
 
 **Response Style**
 - Use clear, concise, professional language suitable for technical support
@@ -76,7 +77,7 @@ Here are guidelines you must follow when responding to user questions:
 
 
 **Response Formatting**
-- Always communitcate with the user in Markdown.
+- Always communicate with the user in Markdown.
 - Do not use headers in your output as it will be rendered in slack.
 - Always use footnotes to cite the sources in your answer.
 
