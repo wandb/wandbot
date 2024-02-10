@@ -32,7 +32,7 @@ import re
 import sqlite3
 from typing import Any, Coroutine, List, Optional, Tuple
 
-import faiss
+import chromadb
 import fasttext
 import nest_asyncio
 import tiktoken
@@ -42,7 +42,7 @@ from llama_index.embeddings import OpenAIEmbedding
 from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
-from llama_index.vector_stores import FaissVectorStore
+from llama_index.vector_stores import ChromaVectorStore
 from pydantic_settings import BaseSettings
 
 import wandb
@@ -63,6 +63,9 @@ def get_logger(name: str) -> logging.Logger:
     )
     logger = logging.getLogger(name)
     return logger
+
+
+logger = get_logger(__name__)
 
 
 class Timer:
@@ -169,24 +172,33 @@ def load_service_context(
     )
 
 
-def load_storage_context(
-    embed_dimensions: int, persist_dir: str | None = None
-) -> StorageContext:
+def load_storage_context(persist_dir: str | None = None) -> StorageContext:
     """Loads a storage context with the specified parameters.
 
     Args:
-        embed_dimensions: The dimensions of the embeddings.
+        embedding_function: The embedding function to use in the vectorstore.
         persist_dir: The directory where the storage context is persisted.
 
     Returns:
         A storage context instance with the specified parameters.
     """
 
-    faiss_index = faiss.IndexFlatL2(embed_dimensions)
-    storage_context = StorageContext.from_defaults(
-        vector_store=FaissVectorStore(faiss_index),
-        persist_dir=persist_dir,
-    )
+    chroma_client = chromadb.PersistentClient(path=persist_dir)
+    chroma_collection = chroma_client.get_or_create_collection("docstore")
+    try:
+        storage_context = StorageContext.from_defaults(
+            vector_store=ChromaVectorStore(
+                chroma_collection=chroma_collection, persist_dir=persist_dir
+            ),
+            persist_dir=persist_dir,
+        )
+    except FileNotFoundError as e:
+        logger.debug(f"Error loading storage context: {e}")
+        storage_context = StorageContext.from_defaults(
+            vector_store=ChromaVectorStore(
+                chroma_collection=chroma_collection, persist_dir=persist_dir
+            ),
+        )
     return storage_context
 
 
@@ -194,7 +206,6 @@ def load_index(
     nodes: List[TextNode],
     service_context: ServiceContext,
     storage_context: StorageContext,
-    index_id: str,
     persist_dir: str,
 ) -> VectorStoreIndex:
     """Loads an index from storage or creates a new one if not found.
@@ -215,7 +226,6 @@ def load_index(
         storage_context=storage_context,
         show_progress=True,
     )
-    index.set_index_id(index_id)
     index.storage_context.persist(persist_dir=persist_dir)
     return index
 

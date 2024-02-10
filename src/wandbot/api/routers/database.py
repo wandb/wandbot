@@ -24,7 +24,7 @@ db_client: DatabaseClient | None = None
 
 router = APIRouter(
     prefix="/data",
-    tags=["database"],
+    tags=["database", "crud"],
 )
 
 
@@ -41,7 +41,7 @@ class APIQuestionAnswerResponse(QuestionAnswer):
     response_model=APIQuestionAnswerResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_question_answer(
+def create_question_answer(
     request: APIQuestionAnswerRequest, response: Response
 ) -> APIQuestionAnswerResponse | None:
     """Creates a question answer.
@@ -63,12 +63,20 @@ class APIGetChatThreadResponse(ChatThread):
     pass
 
 
+class APIGetChatThreadRequest(ChatThreadCreate):
+    pass
+
+
+class APICreateChatThreadRequest(ChatThreadCreate):
+    pass
+
+
 @router.get(
     "/chat_thread/{application}/{thread_id}",
     response_model=APIGetChatThreadResponse | None,
     status_code=status.HTTP_200_OK,
 )
-async def get_chat_thread(
+def get_chat_thread(
     application: str, thread_id: str, response: Response
 ) -> APIGetChatThreadResponse:
     """Retrieves a chat thread from the database.
@@ -113,7 +121,7 @@ class APIFeedbackResponse(Feedback):
     response_model=APIFeedbackResponse | None,
     status_code=status.HTTP_201_CREATED,
 )
-async def feedback(
+def feedback(
     request: APIFeedbackRequest, response: Response
 ) -> APIFeedbackResponse:
     """Handles the feedback request and logs the feedback data.
@@ -138,11 +146,3 @@ async def feedback(
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
-
-
-class APIGetChatThreadRequest(ChatThreadCreate):
-    pass
-
-
-class APICreateChatThreadRequest(ChatThreadCreate):
-    pass

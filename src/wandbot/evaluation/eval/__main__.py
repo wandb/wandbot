@@ -95,9 +95,9 @@ def get_answer_correctness(row_str: str) -> str:
         reference_notes=row["reference_notes"],
     )
     result = parse_answer_eval("answer_correctness", result.dict())
-    result["answer_correctness_score_(ragas)"] = (
-        metrics.answer_correctness.score_single(row)
-    )
+    result[
+        "answer_correctness_score_(ragas)"
+    ] = metrics.answer_correctness.score_single(row)
     result = json.dumps(result)
     return result
 
@@ -113,9 +113,9 @@ def get_answer_relevancy(row_str: str) -> str:
         reference=row["ground_truths"],
     )
     result = parse_answer_eval("answer_relevancy", result.dict())
-    result["answer_relevancy_score_(ragas)"] = (
-        metrics.answer_relevancy.score_single(row)
-    )
+    result[
+        "answer_relevancy_score_(ragas)"
+    ] = metrics.answer_relevancy.score_single(row)
     result = json.dumps(result)
     return result
 
@@ -132,9 +132,9 @@ def get_answer_faithfulness(row_str: str) -> str:
     )
 
     result = parse_answer_eval("answer_faithfulness", result.dict())
-    result["answer_faithfulness_score_(ragas)"] = (
-        metrics.faithfulness.score_single(row)
-    )
+    result[
+        "answer_faithfulness_score_(ragas)"
+    ] = metrics.faithfulness.score_single(row)
     result = json.dumps(result)
     return result
 

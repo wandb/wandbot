@@ -27,7 +27,7 @@ class APIQueryResponse(ChatResponse):
 @router.post(
     "/query", response_model=APIQueryResponse, status_code=status.HTTP_200_OK
 )
-async def query(
+def query(
     request: APIQueryRequest,
 ) -> APIQueryResponse:
     """Executes a query using the chat function and returns the result as an APIQueryResponse.
