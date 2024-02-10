@@ -142,7 +142,6 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
 
 
 def load_response_synthesizer_chain(model) -> Runnable:
-
     response_prompt = ChatPromptTemplate.from_messages(
         RESPONSE_SYNTHESIS_PROMPT_MESSAGES
     )

@@ -1,17 +1,17 @@
 import os
 from typing import List, Union
 
-from llama_index import QueryBundle, VectorStoreIndex
-from llama_index.callbacks import CBEventType, EventPayload
-from llama_index.core.base_retriever import BaseRetriever
-from llama_index.indices.base import BaseIndex
-from llama_index.schema import NodeWithScore, QueryType
-from llama_index.vector_stores import (
-    ExactMatchFilter,
-    FilterCondition,
-    FilterOperator,
-    MetadataFilter,
-    MetadataFilters,
+from langchain.load import dumps, loads
+from langchain.prompts.prompt import PromptTemplate
+from langchain.retrievers.document_compressors import CohereRerank
+from langchain.schema import Document, format_document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from langchain_core.runnables import (
+    RunnableBranch,
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
 )
 from wandbot.retriever.external import YouRetriever
 from wandbot.utils import get_logger
