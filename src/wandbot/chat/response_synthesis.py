@@ -8,6 +8,7 @@ from langchain_core.prompts import (
     format_document,
 )
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
+
 from wandbot.retriever.fusion import combine_documents
 from wandbot.utils import clean_document_content
 
