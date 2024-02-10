@@ -21,18 +21,13 @@ Typical usage example:
 
 import json
 import pathlib
-from typing import Any, Callable, List, Sequence
+from typing import Any, List, Sequence
 
 import tiktoken
-from langchain.text_splitter import (
-    Language,
-    MarkdownHeaderTextSplitter,
-    RecursiveCharacterTextSplitter,
-    TokenTextSplitter,
-)
-from langchain_core.documents import BaseDocumentTransformer, Document
-
 import wandb
+from langchain_core.documents import BaseDocumentTransformer, Document
+from wandbot.ingestion.preprocessors.markdown import MarkdownTextTransformer
+from wandbot.ingestion.preprocessors.source_code import CodeTextTransformer
 from wandbot.utils import (
     FastTextLangDetect,
     filter_smaller_documents,
@@ -65,170 +60,28 @@ def len_function_with_doc(document: Document) -> int:
     return len(tokenizer.encode(document.page_content))
 
 
-class MarkdownTextTransformer(BaseDocumentTransformer):
-    def __init__(self, lang_detect, chunk_size: int = 512):
-        self.fasttext_model = lang_detect
-        self.chunk_size: int = chunk_size
-        self.length_function: Callable[[str], int]
-        self.recursive_splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.MARKDOWN,
-            chunk_size=self.chunk_size,
-            chunk_overlap=0,
-            keep_separator=True,
-            length_function=length_function,
-        )
-        self.header_splitter = MarkdownHeaderTextSplitter(
-            headers_to_split_on=[
-                ("#", "header_1"),
-                ("##", "header_2"),
-                ("###", "header_3"),
-                ("####", "header_4"),
-                ("#####", "header_5"),
-                ("######", "header_6"),
-            ]
-        )
-
-    def split_document_on_headers(
-        self,
-        document: Document,
-    ) -> List[Document]:
-        output_documents = []
-        splits = self.header_splitter.split_text(document.page_content)
-        for split in list(splits):
-            output_documents.append(
-                Document(
-                    page_content=split.page_content, metadata=document.metadata
-                )
-            )
-        return output_documents
-
-    def recursively_merge_chunks(
-        self,
-        chunks: List[Document],
-    ) -> List[Document]:
-        if not chunks:  # check if chunks is empty
-            return []  # return an empty list if chunks is empty
-        merged_chunks = []
-        current_chunk = chunks[0]
-        current_length = length_function(current_chunk.page_content)
-        for chunk in chunks[1:]:
-            chunk_length = length_function(chunk.page_content)
-            if current_length + chunk_length <= self.chunk_size:
-                current_chunk.page_content += (
-                    "\n\n" + chunk.page_content + "\n\n"
-                )
-                current_length += chunk_length
-            else:
-                merged_chunks.append(current_chunk)
-                current_chunk = chunk
-                current_length = chunk_length
-        merged_chunks.append(current_chunk)
-        return merged_chunks
-
-    def identify_document_language(self, document: Document) -> str:
-        return self.fasttext_model.detect_language(document.page_content)
-
-    def split_markdown_documents(
-        self,
-        documents: List[Document],
-    ) -> List[Document]:
-        chunked_documents = []
-        for document in documents:
-            document_splits = self.split_document_on_headers(
-                document=document,
-            )
-            split_chunks = self.recursive_splitter.split_documents(
-                document_splits
-            )
-            merged_chunks = self.recursively_merge_chunks(
-                split_chunks,
-            )
-            chunked_documents.extend(merged_chunks)
-
-        for document in chunked_documents[:]:
-            document.metadata["has_code"] = "```" in document.page_content
-            document.metadata["language"] = self.identify_document_language(
-                document
-            )
-        return chunked_documents
-
-    def transform_documents(
-        self, documents: Sequence[Document], **kwargs: Any
-    ) -> Sequence[Document]:
-        split_documents = self.split_markdown_documents(list(documents))
-        transformed_documents = []
-        for document in split_documents:
-            transformed_documents.append(document)
-        return transformed_documents
-
-
-class CodeTextTransformer(BaseDocumentTransformer):
+class DocumentTransformer(BaseDocumentTransformer):
     def __init__(
         self,
-        chunk_size: int = 512,
+        lang_detect,
+        max_size: int = 512,
+        min_size: int = 5,
+        length_function=None,
     ):
-        self.chunk_size: int = chunk_size
-        self.length_function: Callable[[str], int]
-
-    def split_documents(self, documents: List[Document]) -> List[Document]:
-        """Split incoming code and return chunks using the AST."""
-        chunked_documents = []
-        for document in documents:
-            file_extension = document.metadata.get("file_type", "")
-            if file_extension in [".py", ".js", ".ts"]:
-                language = {
-                    ".py": Language.PYTHON,
-                    ".js": Language.JS,
-                    ".ts": Language.JS,
-                }[file_extension]
-                recursive_splitter = (
-                    RecursiveCharacterTextSplitter.from_language(
-                        language=language,
-                        chunk_size=self.chunk_size,
-                        chunk_overlap=0,
-                        keep_separator=True,
-                        length_function=length_function,
-                    )
-                )
-                chunked_documents.extend(
-                    recursive_splitter.split_documents([document])
-                )
-            elif file_extension in [".md", ".ipynb"]:
-                chunked_documents.extend(
-                    MarkdownTextTransformer().transform_documents([document])
-                )
-            else:
-                chunked_documents.extend(
-                    TokenTextSplitter().split_documents([document])
-                )
-        return chunked_documents
-
-    def transform_documents(
-        self, documents: Sequence[Document], **kwargs: Any
-    ) -> Sequence[Document]:
-        document_splits = []
-        for document in list(documents):
-            document_splits.extend(self.split_documents([document]))
-
-        transformed_documents = []
-
-        for document in list(document_splits):
-            document.metadata["has_code"] = True
-            document.metadata["language"] = "en"
-            transformed_documents.append(document)
-
-        return transformed_documents
-
-
-class DocumentTransformer(BaseDocumentTransformer):
-    def __init__(self, lang_detect, max_size: int = 512, min_size: int = 5):
         self.lang_detect = lang_detect
         self.chunk_size = max_size
         self.min_size = min_size
+        self.length_function = length_function
         self.markdown_transformer = MarkdownTextTransformer(
-            lang_detect=lang_detect, chunk_size=self.chunk_size
+            lang_detect=lang_detect,
+            chunk_size=self.chunk_size,
+            length_function=self.length_function,
         )
-        self.code_transformer = CodeTextTransformer(chunk_size=self.chunk_size)
+        self.code_transformer = CodeTextTransformer(
+            lang_detect=self.lang_detect,
+            chunk_size=self.chunk_size,
+            length_function=length_function,
+        )
 
     def filter_smaller_documents(
         self, documents: List[Document], min_size: int = 5
@@ -236,9 +89,8 @@ class DocumentTransformer(BaseDocumentTransformer):
         """Filters out nodes that are smaller than the chunk size.
 
         Args:
-            text_nodes: A list of nodes.
+            documents: A list of nodes.
             min_size: The minimum size of a node.
-
         Returns:
             A list of nodes.
         """
@@ -327,6 +179,8 @@ def load(
     transformer = DocumentTransformer(
         lang_detect=lang_detect,
         max_size=512,
+        min_size=5,
+        length_function=length_function,
     )
 
     result_artifact = wandb.Artifact(result_artifact_name, type="dataset")
@@ -351,17 +205,17 @@ def load(
             )
 
             transformed_file.parent.mkdir(parents=True, exist_ok=True)
-            with transformed_file.open("w") as f:
+            with transformed_file.open("w") as of:
                 for document in transformed_documents:
-                    f.write(json.dumps(document.dict()) + "\n")
+                    of.write(json.dumps(document.dict()) + "\n")
 
             config["chunk_size"] = 512
-            with open(transformed_file.parent / "config.json", "w") as f:
-                json.dump(config, f)
+            with open(transformed_file.parent / "config.json", "w") as of:
+                json.dump(config, of)
 
             metadata["num_transformed_documents"] = len(transformed_documents)
-            with open(transformed_file.parent / "metadata.json", "w") as f:
-                json.dump(metadata, f)
+            with open(transformed_file.parent / "metadata.json", "w") as of:
+                json.dump(metadata, of)
 
             result_artifact.add_dir(
                 str(transformed_file.parent),
