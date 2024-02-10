@@ -1,4 +1,5 @@
 from _operator import itemgetter
+
 from langchain_core.messages import get_buffer_string
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,28 +11,19 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 
-CONDENSE_PROMPT_SYSTEM_TEMPLATE = (
-    "Given the following conversation between a user and an AI assistant and a follow up "
-    "question from user, rephrase the follow up question to be a standalone question. Ensure "
-    "that the standalone question summarizes the conversation and completes the follow up "
-    "question with all the necessary context. If there is no history return the original question verbatim"
-)
+CONDENSE_PROMPT_SYSTEM_TEMPLATE = """Given the following conversation and a follow up question, rephrase the follow up \
+question to be a standalone question.
+
+Chat History:
+{chat_history}
+Follow Up Input: {question}
+Standalone Question:"""
 
 
 CONDENSE_PROMPT_MESSAGES = [
-    ("system", CONDENSE_PROMPT_SYSTEM_TEMPLATE),
     (
-        "human",
-        """Rephrase the following question to be a standalone question based on the given history:
-
-<history>
-{chat_history}
-</history>
-
-<question>
-{question}
-</question>
-""",
+        "system",
+        CONDENSE_PROMPT_SYSTEM_TEMPLATE,
     ),
 ]
 

@@ -3,8 +3,12 @@ from operator import itemgetter
 
 from langchain.load import dumps, loads
 from langchain.prompts.prompt import PromptTemplate
-from langchain.retrievers.document_compressors import CohereRerank
+from langchain.retrievers.document_compressors import (
+    CohereRerank,
+)
 from langchain.schema import Document, format_document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.runnables import (
     RunnableBranch,
     RunnableLambda,
@@ -152,7 +156,7 @@ def get_web_contexts(web_results):
     )
 
 
-def load_fusion_retriever_chain(base_retriever, top_k=5):
+def load_fusion_retriever_chain(base_retriever, embeddings, top_k=5):
     query_retrieval_chain = load_simple_retrieval_chain(
         base_retriever, "question"
     )
@@ -187,9 +191,28 @@ def load_fusion_retriever_chain(base_retriever, top_k=5):
     )
 
     cohere_rerank_chain = load_cohere_rerank_chain(top_k=top_k)
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=300,
+        chunk_overlap=0,
+        separators=["\n```\n", "\n\n", "\n"],
+        keep_separator=False,
+    )
+
+    redundant_filter = EmbeddingsRedundantFilter(embeddings=embeddings)
+
     ranked_retrieval_chain = (
         RunnableParallel(
-            context=combined_retrieval_chain,
+            context=combined_retrieval_chain
+            | splitter.split_documents
+            | (
+                lambda x: [
+                    doc
+                    for doc in x
+                    if len("".join(doc.page_content.strip().split())) > 10
+                ]
+            )
+            | redundant_filter.transform_documents,
             question=itemgetter("question"),
             language=itemgetter("language"),
         )
