@@ -5503,6 +5503,42 @@ testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8-2020", "ini2toml[l
 testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "packaging (>=23.1)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
 [[package]]
+name = "simsimd"
+version = "3.7.4"
+description = "Fastest SIMD-Accelerated Vector Similarity Functions for x86 and Arm"
+optional = false
+python-versions = "*"
+files = [
+    {file = "simsimd-3.7.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:36c01dba9a42b368b1528af7eabe68f5ec5666aecb3665f6d936713ebc219dac"},
+    {file = "simsimd-3.7.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:bda3cd1013afd732b171ebd837dbc6d1bcdbfecf75b179937463231ac33a0c50"},
+    {file = "simsimd-3.7.4-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:f627746cd08a37855063f4512f3e67b6de0aa98babba122f6aa3a3d4027a5c3f"},
+    {file = "simsimd-3.7.4-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:7740c0e86d9d89dfd028af3029d06e6f4ff398b0c098557733fd0ade0ca81296"},
+    {file = "simsimd-3.7.4-cp310-cp310-win_amd64.whl", hash = "sha256:20c069c356e5e72bbd42c86ce3beada1001250712e1c64f3ccfc3d7cd430e921"},
+    {file = "simsimd-3.7.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:892aa7dbc1967b4158665addbb0524c20e29459e07fd3c1b701d5ce381b8ccc3"},
+    {file = "simsimd-3.7.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:6f9f4671a8c02addc2a0f61a4f40a8c01dc30c08d2a8d1fae445d62efcf98698"},
+    {file = "simsimd-3.7.4-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:b4b226d76648b748a3c408ddad2c3793e2e525c817cc40956b2337c13eb23148"},
+    {file = "simsimd-3.7.4-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:044225f563037ed3fda962cc8e99d6117ade45726e73a719201e97bd2cffbf51"},
+    {file = "simsimd-3.7.4-cp311-cp311-win_amd64.whl", hash = "sha256:ca30c281f38c2f608044ecfe293a23edf6da9da9e63d9bfd481bf8adea0ee3e0"},
+    {file = "simsimd-3.7.4-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:e8943f5353cb4201679a94f01d5600dd328ce9e30449b031a9136688fc4742da"},
+    {file = "simsimd-3.7.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:9fbbaccc953e08bdd1b6394de9854e11cd7f69c93c03ef53b12fe59dec5d12b1"},
+    {file = "simsimd-3.7.4-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:b0580a147eacb1d3251a589bc4edbd18fc35e8db6a529e60d9abb698725d6d63"},
+    {file = "simsimd-3.7.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:80c7b1d44cb0c81fe54ed3562e69cd914bd9f89ca95de1c028994b5058577fef"},
+    {file = "simsimd-3.7.4-cp312-cp312-win_amd64.whl", hash = "sha256:655459310c9d446fdc78d55247fa5779df036ac4d6d618a2febded1e62869a50"},
+    {file = "simsimd-3.7.4-cp36-cp36m-win_amd64.whl", hash = "sha256:88bbfd8f8c78566401cf08b3ba3b4243fcf0db02cb590dd21bb8b5fad6116e68"},
+    {file = "simsimd-3.7.4-cp37-cp37m-win_amd64.whl", hash = "sha256:ab44bfe022ce178e60efaa06d868535550880cc441f665dbb1dbe1357b3f03fa"},
+    {file = "simsimd-3.7.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:be2f5c6c2f5f21cb2bf4cfdeeaa54b05b54f566dea45aab2e9be6fb96341bb46"},
+    {file = "simsimd-3.7.4-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:9af75cead72712dc7e4dbc247d52d7fa2a993e7f94a307391e23083832f4a907"},
+    {file = "simsimd-3.7.4-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:325a1ab0174483ca0cf56defbca78d7ee35d586dc5ec6185ef2a81aaff95e8ef"},
+    {file = "simsimd-3.7.4-cp38-cp38-manylinux_2_28_x86_64.whl", hash = "sha256:e724046f2af3d884e940310d87e21c14dbae8009ed7e649549bbd7e9a5a0d5e7"},
+    {file = "simsimd-3.7.4-cp38-cp38-win_amd64.whl", hash = "sha256:105882f972a2b28ee336b1f68befee335d46369f7d45784b253c40e75e9f0f08"},
+    {file = "simsimd-3.7.4-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:b176eb3a8c11471eb8e8961ec5d62a0e17b1f699de8e7ea32ff2c2bfaf301aa3"},
+    {file = "simsimd-3.7.4-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:d8bf56970a4c713cfa36d4d921d3cc79342812788806af300d5dc044632f0591"},
+    {file = "simsimd-3.7.4-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:f7bec42a1d3db10cafbf9138bae63187ebb84f98a6725e6b7cfdad1b680b634b"},
+    {file = "simsimd-3.7.4-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:26b4fe10bcf0d12e9062bf836705e092aa965782abcf79ad9539a725dfdd247b"},
+    {file = "simsimd-3.7.4-cp39-cp39-win_amd64.whl", hash = "sha256:dbea097c04f1e8b026360c5b9dd6bcb062cbf70b4a886a5756accb631466224c"},
+]
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -7066,4 +7102,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.0,<3.12"
-content-hash = "f92e9e6633c536aa99e2aed191106b00c0bea2e719f2002bc696c321393c5e99"
+content-hash = "67c6d32b2dbeffc9eb40fbb40f1ffe5d5c472fbc7006b86a72c30fbe7037eaf9"

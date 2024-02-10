@@ -13,7 +13,6 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
-
 from wandbot.utils import clean_document_content
 
 DEFAULT_DOCUMENT_PROMPT = PromptTemplate.from_template(
@@ -131,16 +130,16 @@ def get_web_contexts(web_results):
         return []
     web_answer = web_results["web_answer"]
     # if web_answer:
-    #     output_documents += [
-    #         Document(
-    #             page_content=web_answer,
-    #             metadata={
-    #                 "source": "you.com",
-    #                 "source_type": "web_answer",
-    #                 "has_code": None,
-    #             },
-    #         )
-    #     ]
+    # output_documents += [
+    #     Document(
+    #         page_content=web_answer,
+    #         metadata={
+    #             "source": "you.com",
+    #             "source_type": "web_answer",
+    #             "has_code": None,
+    #         },
+    #     )
+    # ]
     return (
         output_documents
         + [
@@ -191,9 +190,9 @@ def load_fusion_retriever_chain(base_retriever, embeddings, top_k=5):
     cohere_rerank_chain = load_cohere_rerank_chain(top_k=top_k)
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=300,
+        chunk_size=256,
         chunk_overlap=0,
-        separators=["\n```\n", "\n\n", "\n"],
+        separators=["\n\n", "\n"],
         keep_separator=False,
     )
 
@@ -201,16 +200,16 @@ def load_fusion_retriever_chain(base_retriever, embeddings, top_k=5):
 
     ranked_retrieval_chain = (
         RunnableParallel(
-            context=combined_retrieval_chain
-            | splitter.split_documents
-            | (
-                lambda x: [
-                    doc
-                    for doc in x
-                    if len("".join(doc.page_content.strip().split())) > 10
-                ]
-            )
-            | redundant_filter.transform_documents,
+            context=combined_retrieval_chain,
+            # | splitter.split_documents
+            # | (
+            #     lambda x: [
+            #         doc
+            #         for doc in x
+            #         if len("".join(doc.page_content.strip().split())) > 10
+            #     ]
+            # )
+            # | redundant_filter.transform_documents,
             question=itemgetter("question"),
             language=itemgetter("language"),
         )
