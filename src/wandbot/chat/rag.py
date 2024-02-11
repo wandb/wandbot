@@ -2,7 +2,6 @@ from operator import itemgetter
 
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
-
 from wandbot.chat.response_synthesis import load_response_synthesizer_chain
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.query_handler.query_enhancer import load_query_enhancement_chain
@@ -32,7 +31,7 @@ def load_rag_chain(
     vectorstore_config = VectorStoreConfig(persist_dir=vector_store_path)
     vectorstore = load_vector_store_from_config(vectorstore_config)
     base_retriever = load_retriever_with_options(
-        vectorstore, search_type=search_type, search_kwargs={"top_k": top_k * 2}
+        vectorstore, search_type=search_type, search_kwargs={"top_k": top_k * 4}
     )
     parent_retriever = base_retriever | RunnableLambda(
         lambda docs: [

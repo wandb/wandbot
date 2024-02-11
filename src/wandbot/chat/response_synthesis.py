@@ -8,7 +8,6 @@ from langchain_core.prompts import (
     format_document,
 )
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
-
 from wandbot.retriever.fusion import combine_documents
 from wandbot.utils import clean_document_content
 
@@ -80,7 +79,7 @@ Here are guidelines you must follow when responding to user questions:
 **Response Formatting**
 - Always communicate with the user in Markdown.
 - Do not use headers in your output as it will be rendered in slack.
-- Always use footnotes to cite the sources in your answer.
+- Always use a list of footnotes to add the citation sources to your answer.
 
 **Example**:
 
@@ -141,6 +140,21 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
         "Question: {query_str}\n\n",
     ),
 ]
+
+
+# TODO: Add citation sources as a function calling api
+#  https://python.langchain.com/docs/use_cases/question_answering/citations#cite-documents
+# class cited_answer(BaseModel):
+#     """Answer the user question based only on the given sources, and cite the sources used."""
+#
+#     answer: str = Field(
+#         ...,
+#         description="The answer to the user question, which is based only on the given sources.",
+#     )
+#     citations: List[int] = Field(
+#         ...,
+#         description="The integer IDs of the SPECIFIC sources which justify the answer.",
+#     )
 
 
 def load_response_synthesizer_chain(model) -> Runnable:
