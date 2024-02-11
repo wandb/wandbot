@@ -5,7 +5,6 @@ from langchain.load import dumps, loads
 from langchain.prompts.prompt import PromptTemplate
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain.schema import Document, format_document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.runnables import (
     RunnableBranch,
@@ -13,7 +12,6 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
-
 from wandbot.utils import clean_document_content
 
 DEFAULT_DOCUMENT_PROMPT = PromptTemplate.from_template(
@@ -168,6 +166,8 @@ def load_fusion_retriever_chain(base_retriever, embeddings, top_k=5):
         base_retriever, "vector_search"
     )
 
+    redundant_filter = EmbeddingsRedundantFilter(embeddings=embeddings)
+
     combined_retrieval_chain = (
         RunnableParallel(
             question=query_retrieval_chain,
@@ -186,31 +186,14 @@ def load_fusion_retriever_chain(base_retriever, embeddings, top_k=5):
             "web_context",
         )
         | reciprocal_rank_fusion
+        | redundant_filter.transform_documents
     )
 
     cohere_rerank_chain = load_cohere_rerank_chain(top_k=top_k)
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=256,
-        chunk_overlap=0,
-        separators=["\n\n", "\n"],
-        keep_separator=False,
-    )
-
-    redundant_filter = EmbeddingsRedundantFilter(embeddings=embeddings)
-
     ranked_retrieval_chain = (
         RunnableParallel(
             context=combined_retrieval_chain,
-            # | splitter.split_documents
-            # | (
-            #     lambda x: [
-            #         doc
-            #         for doc in x
-            #         if len("".join(doc.page_content.strip().split())) > 10
-            #     ]
-            # )
-            # | redundant_filter.transform_documents,
             question=itemgetter("question"),
             language=itemgetter("language"),
         )

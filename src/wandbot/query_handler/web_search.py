@@ -32,8 +32,10 @@ class YouSearch:
             url = "https://api.ydc-index.io/rag"
 
             querystring = {
-                "query": "Weights & Biases, W&B, wandb or Weave " + query,
+                "query": "Answer the following question in the context of Weights & Biases, W&B, wandb and/or Weave\n"
+                + query,
                 "num_web_results": self.similarity_top_k,
+                "safesearch": "strict",
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
@@ -41,7 +43,10 @@ class YouSearch:
             else:
                 results = response.json()
 
-            snippets = [hit["snippet"] for hit in results["hits"]]
+            snippets = [
+                f'Title: {hit["title"]}\nDescription: {hit["description"]}\n{hit["snippet"]}'
+                for hit in results["hits"]
+            ]
             snippet_metadata = [
                 {
                     "source": hit["url"],
