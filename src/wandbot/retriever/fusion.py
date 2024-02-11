@@ -12,6 +12,7 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
+
 from wandbot.utils import clean_document_content
 
 DEFAULT_DOCUMENT_PROMPT = PromptTemplate.from_template(
