@@ -2,6 +2,7 @@ from operator import itemgetter
 
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
+
 from wandbot.chat.response_synthesis import load_response_synthesizer_chain
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.query_handler.query_enhancer import load_query_enhancement_chain
