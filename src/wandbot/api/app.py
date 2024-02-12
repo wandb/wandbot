@@ -32,9 +32,9 @@ import asyncio
 from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
 from fastapi import FastAPI, Response, status
 
+import wandb
 from wandbot.api.schemas import (
     APICreateChatThreadRequest,
     APIFeedbackRequest,
@@ -44,6 +44,9 @@ from wandbot.api.schemas import (
     APIQueryResponse,
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
+    APIRetrievalRequest,
+    APIRetrievalResponse,
+    APIRetrievalResult,
 )
 from wandbot.chat.chat import Chat
 from wandbot.chat.config import ChatConfig
@@ -80,7 +83,9 @@ async def backup_db():
                 [chat_thread for chat_thread in chat_threads]
             )
             last_backup = datetime.now().astimezone(timezone.utc)
-            logger.info(f"Backing up database to Table at {last_backup}")
+            logger.info(
+                f"Backing up database to Table at {last_backup}: Number of chat threads: {len(chat_table)}"
+            )
             wandb.log(
                 {"question_answers_db": wandb.Table(dataframe=chat_table)}
             )
@@ -219,6 +224,41 @@ async def feedback(
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
+
+
+@app.post(
+    "/retrieve",
+    response_model=APIRetrievalResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
+    """Retrieves the top k results for a given query.
+
+    Args:
+        request: The APIRetrievalRequest object containing the query and other parameters.
+
+    Returns:
+        The APIRetrievalResponse object containing the query and top k results.
+    """
+    results = chat.retriever(
+        query=request.query,
+        language=request.language,
+        top_k=request.top_k,
+        include_tags=request.include_tags,
+        exclude_tags=request.exclude_tags,
+    )
+
+    return APIRetrievalResponse(
+        query=request.query,
+        top_k=[
+            APIRetrievalResult(
+                text=result["text"],
+                score=result["score"],
+                metadata=result["metadata"],
+            )
+            for result in results
+        ],
+    )
 
 
 @app.on_event("shutdown")

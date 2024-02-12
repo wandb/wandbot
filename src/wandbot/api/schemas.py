@@ -15,6 +15,9 @@ Classes:
     APIFeedbackRequest: Request schema for creating feedback.
     APIFeedbackResponse: Response schema for feedback.
 """
+from typing import Any, List
+
+from pydantic import BaseModel
 
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import (
@@ -61,3 +64,23 @@ class APIFeedbackRequest(FeedbackCreate):
 
 class APIFeedbackResponse(Feedback):
     pass
+
+
+class APIRetrievalResult(BaseModel):
+    text: str
+    score: float
+    metadata: dict[str, Any]
+
+
+class APIRetrievalResponse(BaseModel):
+    query: str
+    top_k: List[APIRetrievalResult]
+
+
+class APIRetrievalRequest(BaseModel):
+    query: str
+    language: str = "en"
+    initial_k: int = 10
+    top_k: int = 5
+    include_tags: List[str] = []
+    exclude_tags: List[str] = []

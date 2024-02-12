@@ -17,15 +17,17 @@ Typical usage example:
 import json
 import os
 import pathlib
-from typing import Iterator
-from urllib.parse import urljoin
+from typing import Any, Dict, Iterator, List
+from urllib.parse import urljoin, urlparse
 
-import markdown
 import nbformat
-from langchain.document_loaders import TextLoader
-from langchain.document_loaders.base import BaseLoader
+import pandas as pd
+from google.cloud import bigquery
 from langchain.schema import Document
+from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
+from tqdm import tqdm
 
 import wandb
 from wandbot.ingestion.config import (
@@ -34,13 +36,20 @@ from wandbot.ingestion.config import (
     DocodileJapaneseStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
+    FCReportsStoreConfig,
+    SDKCodeStoreConfig,
+    SDKTestsStoreConfig,
+    WandbEduCodeStoreConfig,
+    WeaveCodeStoreConfig,
+    WeaveExamplesStoreConfig,
 )
 from wandbot.ingestion.utils import (
     EXTENSION_MAP,
     clean_contents,
+    extract_frontmatter,
     fetch_git_repo,
 )
-from wandbot.utils import get_logger
+from wandbot.utils import FastTextLangDetect, get_logger
 
 logger = get_logger(__name__)
 
@@ -59,8 +68,8 @@ class DataLoader(BaseLoader):
         Args:
             config: The configuration for the data store.
         """
-        self.config = config
-        self.metadata = None
+        self.config: DataStoreConfig = config
+        self.metadata: Dict[str, Any] = {}
 
     def lazy_load(
         self,
@@ -131,12 +140,51 @@ class DocodileDataLoader(DataLoader):
         Returns:
             The extracted slug.
         """
-        with open(file_path, "r") as file:
-            content = file.read()
-            md = markdown.Markdown(extensions=["meta"])
-            md.convert(content)
-            meta = md.Meta.get("slug", [""])
-            return meta[0]
+
+        meta = extract_frontmatter(file_path)
+        output = meta.get("slug", "")
+        return output
+
+    @staticmethod
+    def extract_description(file_path: pathlib.Path) -> str:
+        """Extracts the description from a file.
+
+        Args:
+            file_path: The path to the file.
+
+        Returns:
+            The extracted description.
+        """
+        meta = extract_frontmatter(file_path)
+        output = meta.get("description", "")
+        return output
+
+    @staticmethod
+    def extract_tags(source_url: str) -> List[str]:
+        """Extracts the tags from a source url.
+
+        Args:
+            source_url: The URL of the file.
+
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        parts_mapper = {
+            "ref": ["API Reference", "Technical Specifications"],
+            "guides": ["Guides"],
+            "tutorials": ["Tutorials"],
+        }
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+        return tags + ["Documentation"]
 
     def generate_site_url(
         self, base_path: pathlib.Path, file_path: pathlib.Path
@@ -214,6 +262,12 @@ class DocodileDataLoader(DataLoader):
                     document.metadata["source"]
                 ]
                 document.metadata["language"] = self.config.language
+                document.metadata["description"] = self.extract_description(
+                    f_name
+                )
+                document.metadata["tags"] = self.extract_tags(
+                    document.metadata["source"]
+                )
                 yield document
             except Exception as e:
                 logger.warning(
@@ -222,6 +276,31 @@ class DocodileDataLoader(DataLoader):
 
 
 class CodeDataLoader(DataLoader):
+    @staticmethod
+    def extract_tags(source_url: str) -> List[str]:
+        """Extracts the tags from a source url.
+
+        Args:
+            source_url: The URL of the file.
+
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        tree_slug = parts.index("tree")
+        parts = parts[tree_slug + 2 :]
+        parts_mapper = {"__init__.py": [], "__main__.py": []}
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ").replace("_", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+        return tags + ["Code"]
+
     def lazy_load(self) -> Iterator[Document]:
         """A lazy loader for code documents.
 
@@ -265,8 +344,14 @@ class CodeDataLoader(DataLoader):
                     (body, resources) = md_exporter.from_notebook_node(notebook)
                     cleaned_body = clean_contents(body)
                     document.page_content = cleaned_body
+                elif os.path.splitext(f_name)[-1] == ".md":
+                    document = TextLoader(f_name).load()[0]
+                    contents = document.page_content
+                    cleaned_body = clean_contents(contents)
+                    document.page_content = cleaned_body
                 else:
                     document = TextLoader(f_name).load()[0]
+
                 document.metadata["file_type"] = os.path.splitext(
                     document.metadata["source"]
                 )[-1]
@@ -276,11 +361,454 @@ class CodeDataLoader(DataLoader):
                 document.metadata["language"] = EXTENSION_MAP[
                     document.metadata["file_type"]
                 ]
+                document.metadata["description"] = ""
+                document.metadata["tags"] = self.extract_tags(
+                    document.metadata["source"]
+                )
                 yield document
             except Exception as e:
                 logger.warning(
                     f"Failed to load code in {f_name} with error {e}"
                 )
+
+
+class FCReportsDataLoader(DataLoader):
+    def get_reports_ids(self):
+        client = bigquery.Client(project=self.config.data_source.remote_path)
+
+        query = """
+            SELECT DISTINCT
+                lower(REGEXP_REPLACE(COALESCE(
+                REGEXP_EXTRACT(report_path, "(--[Vv]ml[^/?]+)"),
+                REGEXP_EXTRACT(report_path, "(/[Vv]ml[^/?]+)"), 
+                REGEXP_EXTRACT(report_path, "([Vv]ml[^/?]+)")),
+                "^[/-]+", "")) as reportID
+            FROM 
+                analytics.dim_reports
+            WHERE
+                is_public
+            """
+
+        report_ids_df = client.query(query).to_dataframe()
+        return report_ids_df
+
+    def get_reports_from_bigquery(self, report_ids: str, created_after=None):
+        client = bigquery.Client(project=self.config.data_source.remote_path)
+
+        query = f"""
+        SELECT 
+           created_at, 
+           description,
+           display_name, 
+           is_public, 
+           created_using,
+           report_id, 
+           project_id,
+           type,
+           name,
+           report_path, 
+           showcased_at, 
+           spec, 
+           stars_count, 
+           user_id, 
+           view_count
+        FROM 
+            analytics.dim_reports
+        WHERE
+            is_public
+            and LOWER(REGEXP_EXTRACT(report_path, r'reports/--(.*)')) in ({report_ids})
+        """
+
+        # # AND showcased_at IS NOT NULL
+
+        if created_after:
+            query += f"AND created_at >= '{created_after}'"
+
+        reports_df = client.query(query).to_dataframe()
+        return reports_df
+
+    def get_fully_connected_spec(self):
+        client = bigquery.Client(project=self.config.data_source.remote_path)
+
+        query = """
+            SELECT *
+            FROM `analytics.stg_mysql_views`
+            WHERE type = 'fullyConnected' 
+        """
+
+        fc_spec = client.query(query).to_dataframe()
+        return fc_spec
+
+    def convert_block_to_markdown(self, block):
+        """
+        Converts a single content block to its Markdown representation.
+        """
+        md_content = ""
+
+        # Handle different types of blocks
+        if block["type"] == "paragraph":
+            for child in block["children"]:
+                if "type" in child:
+                    if (
+                        child["type"] == "block-quote"
+                        or child["type"] == "callout-block"
+                    ):
+                        md_content += self.convert_block_to_markdown(child)
+                    elif "url" in child:
+                        md_content += (
+                            f"[{child['children'][0]['text']}]({child['url']})"
+                        )
+                    elif "inlineCode" in child and child["inlineCode"]:
+                        md_content += f"`{child.get('text', '')}`"
+                    else:
+                        md_content += child.get("text", "")
+                else:
+                    md_content += child.get("text", "")
+            md_content += "\n\n"
+
+        elif block["type"] == "heading":
+            md_content += "#" * block["level"] + " "
+            for child in block["children"]:
+                if "url" in child:
+                    md_content += (
+                        f"[{child['children'][0]['text']}]({child['url']})"
+                    )
+                else:
+                    md_content += child.get("text", "")
+            md_content += "\n\n"
+
+        elif block["type"] == "list":
+            for item in block["children"]:
+                if item["type"] == "list-item":
+                    md_content += "* "
+                    for child in item["children"]:
+                        if child.get("type") == "paragraph":
+                            for text_block in child["children"]:
+                                if (
+                                    "inlineCode" in text_block
+                                    and text_block["inlineCode"]
+                                ):
+                                    md_content += (
+                                        f"`{text_block.get('text', '')}`"
+                                    )
+                                else:
+                                    md_content += text_block.get("text", "")
+                        else:
+                            if "inlineCode" in child and child["inlineCode"]:
+                                md_content += f"`{child.get('text', '')}`"
+                            else:
+                                md_content += child.get("text", "")
+                    md_content += "\n"
+            md_content += "\n"
+
+        elif block["type"] == "code-block":
+            md_content += "```\n"
+            for line in block["children"]:
+                md_content += line["children"][0].get("text", "") + "\n"
+            md_content += "```\n\n"
+
+        elif block["type"] == "block-quote" or block["type"] == "callout-block":
+            md_content += "\n> "
+            for child in block["children"]:
+                md_content += child.get("text", "") + " "
+            md_content += "\n\n"
+
+        elif block["type"] == "horizontal-rule":
+            md_content += "\n---\n"
+
+        elif block["type"] == "latex":
+            latex_content = block.get("content", "")
+            md_content += f"$$\n{latex_content}\n$$\n\n"
+
+        return md_content
+
+    @staticmethod
+    def extract_panel_group_text(spec_dict):
+        # Initialize an empty list to store the content
+        content = ""
+
+        # Extract content under "panelGroups"
+        for block in spec_dict.get("panelGroups", []):
+            # content_list.append(block.get('content', ''))
+            content += block.get("content", "") + "\n"
+
+        return content
+
+    def spec_to_markdown(self, spec, report_id, report_name):
+        spec_dict = json.loads(spec)
+        markdown_text = ""
+        buggy_report_id = None
+        spec_type = ""
+        is_buggy = False
+
+        if "panelGroups" in spec:
+            markdown_text = self.extract_panel_group_text(spec_dict)
+            spec_type = "panelgroup"
+
+        else:
+            try:
+                for i, block in enumerate(spec_dict["blocks"]):
+                    try:
+                        markdown_text += self.convert_block_to_markdown(block)
+                        spec_type = "blocks"
+                    except Exception as e:
+                        logger.debug(
+                            f"Error converting block {i} in report_id: {report_id},"
+                            f" {report_name}:\n{e}\nSPEC DICT:\n{spec_dict}\n"
+                        )
+
+                        markdown_text = ""
+                        buggy_report_id = report_id
+                        is_buggy = True
+            except Exception as e:
+                logger.debug(
+                    f"Error finding 'blocks' in spec for report_id: {report_id}, {report_name} :\n{e}\n"
+                )
+                markdown_text = ""
+                buggy_report_id = report_id
+                is_buggy = True
+        return markdown_text, buggy_report_id, is_buggy, spec_type
+
+    @staticmethod
+    def extract_fc_report_ids(fc_spec_df):
+        fc_spec = json.loads(fc_spec_df["spec"].values[0])
+        reports_metadata = fc_spec["reportIDsWithTagV2IDs"]
+        df = pd.json_normalize(
+            reports_metadata, "tagIDs", ["id", "authors"]
+        ).rename(columns={0: "tagID", "id": "reportID"})
+
+        # Drop duplicates on 'reportID' column
+        df = df.drop_duplicates(subset="reportID")
+        df["reportID"] = df["reportID"].str.lower()
+        # drop the tagID column
+        df = df.drop(columns=["tagID"])
+        # convert authors to string, unpack it if it's a list
+        df["authors"] = df["authors"].astype(str)
+        return df
+
+    def cleanup_reports_df(self, reports_df):
+        markdown_ls = []
+        buggy_report_ids = []
+        spec_type_ls = []
+        is_buggy_ls = []
+        is_short_report_ls = []
+        for idx, row in tqdm(reports_df.iterrows()):
+            if row["spec"] is None or isinstance(row["spec"], float):
+                logger.debug(idx)
+                markdown_ls.append("spec-error")
+                buggy_report_ids.append(row["report_id"])
+                spec_type_ls.append("spec-error")
+                is_buggy_ls.append(True)
+                is_short_report_ls.append(True)
+
+            else:
+                (
+                    markdown,
+                    buggy_report_id,
+                    is_buggy,
+                    spec_type,
+                ) = self.spec_to_markdown(
+                    row["spec"], row["report_id"], row["display_name"]
+                )
+
+                markdown_ls.append(markdown)
+                buggy_report_ids.append(buggy_report_id)
+                spec_type_ls.append(spec_type)
+                is_buggy_ls.append(is_buggy)
+
+                # check if markdown has less than 100 characters
+                if len(markdown) < 100:
+                    is_short_report_ls.append(True)
+                else:
+                    is_short_report_ls.append(False)
+
+        reports_df["markdown_text"] = markdown_ls
+        reports_df["spec_type"] = spec_type_ls
+        reports_df["is_buggy"] = is_buggy_ls
+        reports_df["is_short_report"] = is_short_report_ls
+
+        reports_df["content"] = (
+            "\n# "
+            + reports_df["display_name"].astype(str)
+            + "\n\nDescription: "
+            + reports_df["description"].astype(str)
+            + "\n\nBody:\n\n"
+            + reports_df["markdown_text"].astype(str)
+        )
+
+        reports_df["character_count"] = reports_df["content"].map(len)
+
+        # reports_df["character_count"] = len(reports_df["content"])
+        reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
+
+        # tidy up the dataframe
+        reports_df.drop(columns=["markdown_text"], inplace=True)
+        reports_df.drop(columns=["spec"], inplace=True)
+        reports_df.sort_values(by=["created_at"], inplace=True, ascending=False)
+        reports_df.reset_index(drop=True, inplace=True)
+        return reports_df
+
+    def fetch_data(self):
+        report_ids_df = self.get_reports_ids()
+        fc_spec_df = self.get_fully_connected_spec()
+        fc_ids_df = self.extract_fc_report_ids(fc_spec_df)
+
+        logger.debug(
+            f"Before filtering, there are {len(report_ids_df)} reports"
+        )
+
+        report_ids_df = report_ids_df.merge(
+            fc_ids_df,
+            how="inner",
+            on="reportID",
+        )
+
+        logger.debug(
+            f"After filtering, there are {len(report_ids_df)} FC report IDs to fetch"
+        )
+
+        # Pass report ids into a string for BigQuery query
+        report_ids_str = ""
+        for idx in report_ids_df["reportID"].values:
+            report_ids_str += f"'{idx}',"
+        report_ids_str = report_ids_str[:-1]
+        reports_df = self.get_reports_from_bigquery(report_ids_str)
+
+        reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
+        reports_df["reportID"] = (
+            reports_df["report_path"]
+            .str.split("reports/--", n=1, expand=True)[1]
+            .str.lower()
+        )
+        reports_df["description"] = reports_df["description"].fillna("")
+        reports_df["display_name"] = reports_df["display_name"].fillna("")
+
+        logger.debug(f"{len(reports_df)} Fully Connected Reports fetched")
+
+        reports_df = self.cleanup_reports_df(reports_df)
+
+        reports_df.to_json(
+            self.config.data_source.local_path, lines=True, orient="records"
+        )
+
+        return self.config.data_source.local_path
+
+    def clean_invalid_unicode_escapes(self, text):
+        """
+        clean up invalid unicode escape sequences
+        """
+        # List of common escape sequences to retain
+        common_escapes = ["\\n", "\\t", "\\r", "\\\\", "\\'", '\\"']
+
+        # Replace each uncommon escape sequence with a space or other character
+        for i in range(256):
+            escape_sequence = f"\\{chr(i)}"
+            if escape_sequence not in common_escapes:
+                text = text.replace(
+                    escape_sequence, "  "
+                )  # replace with a space or any character of your choice
+                text = text.replace(
+                    "\ ", " "
+                )  # in case an invalid escape sequence was created above
+        return text
+
+    def parse_row(self, row):
+        row_dict = json.loads(row)
+        if (
+            not (row_dict["is_short_report"] or row_dict["is_buggy"])
+            and row_dict["character_count"] > 100
+        ):
+            try:
+                content = (
+                    repr(row_dict["content"])
+                    .encode("raw_unicode_escape")
+                    .decode("unicode_escape")
+                )
+            except UnicodeDecodeError as e:
+                # fix escape characters with raw_unicode_escape
+                content = self.clean_invalid_unicode_escapes(
+                    row_dict["content"]
+                )
+                content = content.encode("raw_unicode_escape").decode(
+                    "unicode_escape"
+                )
+
+            output = {
+                "content": content,
+                "source": row_dict["source"],
+                "description": row_dict["description"],
+            }
+
+            return output
+
+    def parse_data_dump(self, data_file):
+        for row in open(data_file):
+            parsed_row = self.parse_row(row)
+            if parsed_row:
+                yield parsed_row
+
+    @staticmethod
+    def extract_tags(source_url: str, report_content: str) -> List[str]:
+        """Extracts the tags from a source url and the FC Report content.
+
+        Args:
+            source_url: The URL of the file.
+            report_content: The content of the FC Report.
+
+        Returns:
+            The extracted tags.
+        """
+        parts = list(filter(lambda x: x, urlparse(source_url).path.split("/")))
+        parts_mapper = {
+            "ml-news": ["ml-news"],
+            "gradient-dissent": ["gradient-dissent"],
+            "event-announcement": ["event-announcements"],
+            "events": ["events"],
+            "announcements": ["announcements"],
+            "launch-releases": ["launch-releases"],
+        }
+        tags = []
+        for part in parts:
+            if part in parts_mapper:
+                tags.extend(parts_mapper.get(part, []))
+            else:
+                part = part.replace("-", " ")
+                tags.append(part)
+        tags = [tag.split(".")[0] for tag in tags]
+        tags = list(set([tag.title() for tag in tags]))
+
+        if ("wandb.log" or "wandb.init") in report_content:
+            tags.append("contains-wandb-code")
+
+        return tags
+
+    def lazy_load(self) -> Iterator[Document]:
+        """A lazy loader for code documents.
+
+        This method implements the lazy loading behavior for report documents.
+
+        Yields:
+            A Document object.
+        """
+        lang_detect = FastTextLangDetect()
+        data_dump_fame = self.fetch_data()
+        for parsed_row in self.parse_data_dump(data_dump_fame):
+            document = Document(
+                page_content=parsed_row["content"],
+                metadata={
+                    "source": parsed_row["source"],
+                    "language": lang_detect.detect_language(
+                        parsed_row["content"]
+                    ),
+                    "file_type": ".md",
+                    "description": parsed_row["description"],
+                    "tags": ["fc-report"]
+                    + self.extract_tags(
+                        parsed_row["source"], parsed_row["content"]
+                    ),
+                },
+            )
+            yield document
 
 
 def load(
@@ -314,12 +842,24 @@ def load(
     ja_docodile_loader = DocodileDataLoader(DocodileJapaneseStoreConfig())
     examples_code_loader = CodeDataLoader(ExampleCodeStoreConfig())
     examples_notebook_loader = CodeDataLoader(ExampleNotebookStoreConfig())
+    sdk_code_loader = CodeDataLoader(SDKCodeStoreConfig())
+    sdk_tests_loader = CodeDataLoader(SDKTestsStoreConfig())
+    weave_code_loader = CodeDataLoader(WeaveCodeStoreConfig())
+    weave_examples_loader = CodeDataLoader(WeaveExamplesStoreConfig())
+    wandb_edu_code_loader = CodeDataLoader(WandbEduCodeStoreConfig())
+    fc_reports_loader = FCReportsDataLoader(FCReportsStoreConfig())
 
     for loader in [
         en_docodile_loader,
         ja_docodile_loader,
         examples_code_loader,
         examples_notebook_loader,
+        sdk_code_loader,
+        sdk_tests_loader,
+        weave_code_loader,
+        weave_examples_loader,
+        wandb_edu_code_loader,
+        fc_reports_loader,
     ]:
         loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 

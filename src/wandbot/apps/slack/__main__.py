@@ -19,6 +19,7 @@ from slack_sdk.web import SlackResponse
 
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
+from wandbot.apps.slack.formatter import MrkdwnFormatter
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
@@ -50,6 +51,7 @@ api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 async def send_message(
     say: callable, message: str, thread: str = None
 ) -> SlackResponse:
+    message = MrkdwnFormatter()(message)
     if thread is not None:
         return await say(text=message, thread_ts=thread)
     else:

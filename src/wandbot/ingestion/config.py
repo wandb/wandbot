@@ -10,7 +10,7 @@ Typical usage example:
   data_store_config = DataStoreConfig()
   docodile_english_store_config = DocodileEnglishStoreConfig()
 """
-
+import datetime
 import pathlib
 from typing import List, Optional, Union
 from urllib.parse import urlparse
@@ -170,6 +170,18 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_examples")
 
 
+class WandbEduCodeStoreConfig(DataStoreConfig):
+    name: str = "wandb_edu_code_store"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/edu/tree/main/",
+        repo_path="https://github.com/wandb/edu",
+        base_path="",
+        file_pattern=["*.py", "*.ipynb", ".*md"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_wandb_edu")
+
+
 class WeaveJsStoreConfig(DataStoreConfig):
     name: str = "weave_code_store"
     data_source: DataSource = DataSource(
@@ -180,6 +192,34 @@ class WeaveJsStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("docstore_weave_js")
+
+
+class FCReportsStoreConfig(DataStoreConfig):
+    name: str = "fc_reports_store"
+    data_source: DataSource = DataSource(
+        remote_path="wandb-production",
+        repo_path="",
+        base_path="reports",
+        file_pattern=["*.json"],
+        is_git_repo=False,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("docstore_fc_reports")
+
+    @model_validator(mode="after")
+    def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
+        values.docstore_dir = (
+            values.data_source.cache_dir / values.name / values.docstore_dir
+        )
+        data_source = values.data_source
+
+        data_source.local_path = (
+            data_source.cache_dir
+            / values.name
+            / f"reports_{int(datetime.datetime.now().timestamp())}.json"
+        )
+        values.data_source = data_source
+
+        return values
 
 
 class VectorStoreConfig(BaseSettings):

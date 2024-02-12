@@ -24,8 +24,13 @@ from typing import Any, List
 import tiktoken
 from langchain.schema import Document as LcDocument
 from llama_index import Document as LlamaDocument
-from llama_index.node_parser import CodeSplitter, MarkdownNodeParser
+from llama_index.node_parser import (
+    CodeSplitter,
+    MarkdownNodeParser,
+    TokenTextSplitter,
+)
 from llama_index.schema import BaseNode, TextNode
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -100,10 +105,22 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     Returns:
         A Llama document.
     """
-    return LlamaDocument.from_langchain_format(document)
+    llama_document = LlamaDocument.from_langchain_format(document)
+    excluded_embed_metadata_keys = [
+        "file_type",
+        "source",
+        "language",
+    ]
+    excluded_llm_metadata_keys = [
+        "file_type",
+    ]
+    llama_document.excluded_embed_metadata_keys = excluded_embed_metadata_keys
+    llama_document.excluded_llm_metadata_keys = excluded_llm_metadata_keys
+
+    return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
     """Loads documents and returns a list of nodes.
 
     Args:
@@ -113,8 +130,12 @@ def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
     Returns:
         A list of nodes.
     """
-    md_parser = CustomMarkdownNodeParser()
-    code_parser = CustomCodeSplitter(language="python", max_chars=chunk_size)
+    md_parser = CustomMarkdownNodeParser(chunk_size=chunk_size)
+    code_parser = CustomCodeSplitter(
+        language="python", max_chars=chunk_size * 2
+    )
+    # Define the node parser
+    node_parser = TokenTextSplitter.from_defaults(chunk_size=chunk_size)
 
     llama_docs: List[LlamaDocument] = list(
         map(lambda x: convert_lc_to_llama(x), documents)
@@ -122,9 +143,22 @@ def load(documents: List[LcDocument], chunk_size: int = 1024) -> List[Any]:
 
     nodes: List[Any] = []
     for doc in llama_docs:
-        if doc.metadata["file_type"] == ".py":
-            parser = code_parser
-        else:
-            parser = md_parser
-        nodes.extend(parser.get_nodes_from_documents([doc]))
+        try:
+            if doc.metadata["file_type"] == ".py":
+                parser = code_parser
+            else:
+                parser = md_parser
+            nodes.extend(parser.get_nodes_from_documents([doc]))
+        except Exception as e:
+            logger.error(f"Error parsing document: {e}")
+            logger.warning(
+                f"Unable to parse document: {doc.metadata['source']} with custom parser, using default "
+                f"parser instead."
+            )
+            nodes.extend(node_parser.get_nodes_from_documents([doc]))
+
+    nodes = node_parser.get_nodes_from_documents(nodes)
+
+    nodes = list(filter(lambda x: len(x.get_content()) > 10, nodes))
+
     return nodes

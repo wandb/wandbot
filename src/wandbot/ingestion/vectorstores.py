@@ -62,14 +62,12 @@ def load(
         source_artifact_path, type="dataset"
     )
     artifact_dir: str = artifact.download()
-    storage_context = load_storage_context(
-        config.embedding_dim, str(config.persist_dir)
-    )
+    storage_context = load_storage_context(config.embedding_dim)
     service_context = load_service_context(
-        config.chat_model_name,
-        config.temperature,
-        str(config.embeddings_cache),
-        config.max_retries,
+        embeddings_cache=str(config.embeddings_cache),
+        llm="gpt-3.5-turbo-16k-0613",
+        temperature=config.temperature,
+        max_retries=config.max_retries,
     )
 
     document_files: List[pathlib.Path] = list(

@@ -21,24 +21,30 @@ Typical usage example:
     index = load_index(nodes, service_context, storage_context, "/path/to/persist")
 """
 import datetime
+import hashlib
+import json
 import logging
 import os
+import pathlib
+import sqlite3
 from typing import Any, List, Optional
 
 import faiss
-from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
-from langchain.storage import LocalFileStore
+import fasttext
 from llama_index import (
     ServiceContext,
     StorageContext,
     VectorStoreIndex,
     load_index_from_storage,
 )
-from llama_index.bridge.pydantic import Field
-from llama_index.llms import OpenAI
-from llama_index.postprocessor.types import BaseNodePostprocessor
-from llama_index.schema import NodeWithScore, QueryBundle
+from llama_index.embeddings import OpenAIEmbedding
+from llama_index.llms import LiteLLM
+from llama_index.llms.llm import LLM
+from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import FaissVectorStore
+from pydantic_settings import BaseSettings
+
+import wandb
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -63,7 +69,7 @@ class Timer:
 
     def __init__(self) -> None:
         """Initializes the timer."""
-        self.start = datetime.datetime.utcnow()
+        self.start = datetime.datetime.now().astimezone(datetime.timezone.utc)
         self.stop = self.start
 
     def __enter__(self) -> "Timer":
@@ -72,7 +78,7 @@ class Timer:
 
     def __exit__(self, *args: Any) -> None:
         """Stops the timer."""
-        self.stop = datetime.datetime.utcnow()
+        self.stop = datetime.datetime.now().astimezone(datetime.timezone.utc)
 
     @property
     def elapsed(self) -> float:
@@ -80,7 +86,7 @@ class Timer:
         return (self.stop - self.start).total_seconds()
 
 
-def load_embeddings(cache_dir: str) -> CacheBackedEmbeddings:
+def load_embeddings(cache_dir: str) -> OpenAIEmbedding:
     """Loads embeddings from cache or creates new ones if not found.
 
     Args:
@@ -89,18 +95,25 @@ def load_embeddings(cache_dir: str) -> CacheBackedEmbeddings:
     Returns:
         A cached embedder instance.
     """
-    underlying_embeddings = OpenAIEmbeddings()
+    # underlying_embeddings = OpenAIEmbeddings()
+    #
+    # embeddings_cache_fs = LocalFileStore(cache_dir)
+    # cached_embedder = CacheBackedEmbeddings.from_bytes_store(
+    #     underlying_embeddings,
+    #     embeddings_cache_fs,
+    #     namespace=underlying_embeddings.model + "/",
+    # )
+    #
+    # return cast(LCEmbeddings, cached_embedder)
+    embeddings = OpenAIEmbedding()
+    return embeddings
 
-    embeddings_cache_fs = LocalFileStore(cache_dir)
-    cached_embedder = CacheBackedEmbeddings.from_bytes_store(
-        underlying_embeddings,
-        embeddings_cache_fs,
-        namespace=underlying_embeddings.model + "/",
-    )
-    return cached_embedder
 
-
-def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
+def load_llm(
+    model_name: str,
+    temperature: float,
+    max_retries: int,
+) -> LLM:
     """Loads a language model with the specified parameters.
 
     Args:
@@ -111,20 +124,26 @@ def load_llm(model_name: str, temperature: float, max_retries: int) -> OpenAI:
     Returns:
         An instance of the loaded language model.
     """
-    llm = OpenAI(
+    import litellm
+    from litellm.caching import Cache
+
+    litellm.cache = Cache()
+
+    llm = LiteLLM(
         model=model_name,
         temperature=temperature,
-        streaming=True,
         max_retries=max_retries,
+        caching=True,
     )
+
     return llm
 
 
 def load_service_context(
-    llm: str,
-    temperature: float,
     embeddings_cache: str,
-    max_retries: int,
+    llm: str = "gpt-3.5-turbo-16k-0613",
+    temperature: float = 0.1,
+    max_retries: int = 2,
     callback_manager: Optional[Any] = None,
 ) -> ServiceContext:
     """Loads a service context with the specified parameters.
@@ -139,35 +158,33 @@ def load_service_context(
     Returns:
         A service context instance with the specified parameters.
     """
-    llm = load_llm(llm, temperature, max_retries=max_retries)
+
     embed_model = load_embeddings(embeddings_cache)
+    llm = load_llm(
+        model_name=llm,
+        temperature=temperature,
+        max_retries=max_retries,
+    )
+
     return ServiceContext.from_defaults(
         llm=llm, embed_model=embed_model, callback_manager=callback_manager
     )
 
 
-def load_storage_context(
-    embed_dimensions: int, persist_dir: str
-) -> StorageContext:
+def load_storage_context(embed_dimensions: int) -> StorageContext:
     """Loads a storage context with the specified parameters.
 
     Args:
         embed_dimensions: The dimensions of the embeddings.
-        persist_dir: The directory where the storage context is persisted.
 
     Returns:
         A storage context instance with the specified parameters.
     """
-    if os.path.isdir(persist_dir):
-        storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore.from_persist_dir(persist_dir),
-            persist_dir=persist_dir,
-        )
-    else:
-        faiss_index = faiss.IndexFlatL2(embed_dimensions)
-        storage_context = StorageContext.from_defaults(
-            vector_store=FaissVectorStore(faiss_index),
-        )
+
+    faiss_index = faiss.IndexFlatL2(embed_dimensions)
+    storage_context = StorageContext.from_defaults(
+        vector_store=FaissVectorStore(faiss_index),
+    )
     return storage_context
 
 
@@ -201,25 +218,109 @@ def load_index(
     return index
 
 
-class LanguageFilterPostprocessor(BaseNodePostprocessor):
-    """Language-based Node processor."""
+def cachew(cache_path: str = "./cache.db", logger=None):
+    """
+    Memoization decorator that caches the output of a method in a SQLite
+    database.
+    ref: https://www.kevinkatz.io/posts/memoize-to-sqlite
+    """
+    db_conn = sqlite3.connect(cache_path)
+    db_conn.execute(
+        "CREATE TABLE IF NOT EXISTS cache (hash TEXT PRIMARY KEY, result TEXT)"
+    )
 
-    languages: List[str] = Field(default=["en", "python"])
+    def memoize(func):
+        def wrapped(*args, **kwargs):
+            # Compute the hash of the <function name>:<argument>
+            xs = f"{func.__name__}:{repr(tuple(args))}:{repr(kwargs)}".encode(
+                "utf-8"
+            )
+            arg_hash = hashlib.sha256(xs).hexdigest()
 
-    @classmethod
-    def class_name(cls) -> str:
-        return "LanguageFilterPostprocessor"
+            # Check if the result is already cached
+            cursor = db_conn.cursor()
+            cursor.execute(
+                "SELECT result FROM cache WHERE hash = ?", (arg_hash,)
+            )
+            row = cursor.fetchone()
+            if row is not None:
+                if logger is not None:
+                    logger.debug(
+                        f"Cached result found for {arg_hash}. Returning it."
+                    )
+                return json.loads(row[0])
 
-    def _postprocess_nodes(
-        self,
-        nodes: List[NodeWithScore],
-        query_bundle: Optional[QueryBundle] = None,
-    ) -> List[NodeWithScore]:
-        """Postprocess nodes."""
+            # Compute the result and cache it
+            result = func(*args, **kwargs)
+            cursor.execute(
+                "INSERT INTO cache (hash, result) VALUES (?, ?)",
+                (arg_hash, json.dumps(result)),
+            )
+            db_conn.commit()
 
-        new_nodes = []
-        for node in nodes:
-            if node.metadata["language"] in self.languages:
-                new_nodes.append(node)
+            return result
 
-        return new_nodes
+        return wrapped
+
+    return memoize
+
+
+def create_no_result_dummy_node() -> NodeWithScore:
+    """
+    Creates a dummy node to be used when no results found.
+    This can be used instead of returning results that are not relevant
+    or have already been filtered out.
+    """
+    dummy_text = "No results found"
+    dummy_metadata = {
+        "source": "no-result",
+        "language": "en",
+        "description": "This is a dummy node when there are no results",
+        "title": "No Result Node",
+        "tags": ["no-result"],
+    }
+    dummy_text_node = TextNode(text=dummy_text, metadata=dummy_metadata)
+    return NodeWithScore(node=dummy_text_node, score=0.0)
+
+
+class FasttextModelConfig(BaseSettings):
+    fasttext_file_path: pathlib.Path = pathlib.Path(
+        "data/cache/models/lid.176.bin"
+    )
+    fasttext_artifact_name: str = (
+        "wandbot/wandbot_public/fasttext-lid.176.bin:v0"
+    )
+    fasttext_artifact_type: str = "fasttext-model"
+
+
+class FastTextLangDetect:
+    """Uses fasttext to detect the language of a text, from this file:
+    https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
+    """
+
+    def __init__(self, config: FasttextModelConfig = FasttextModelConfig()):
+        self.config = config
+        self._model = self._load_model()
+
+    def detect_language(self, text: str):
+        predictions = self.model.predict(text.replace("\n", " "))
+        return predictions[0][0].replace("__label__", "")
+
+    def detect_language_batch(self, texts: List[str]):
+        predictions = self.model.predict(texts)
+        return [p[0].replace("__label__", "") for p in predictions[0]]
+
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = self._load_model()
+        return self._model
+
+    def _load_model(self):
+        if not os.path.isfile(self.config.fasttext_file_path):
+            _ = wandb.run.use_artifact(
+                self.config.fasttext_artifact_name,
+                type=self.config.fasttext_artifact_type,
+            ).download(root=str(self.config.fasttext_file_path.parent))
+        self._model = fasttext.load_model(str(self.config.fasttext_file_path))
+        return self._model

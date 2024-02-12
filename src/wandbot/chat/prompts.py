@@ -21,8 +21,43 @@ from llama_index.llms import ChatMessage, MessageRole
 logger = logging.getLogger(__name__)
 
 
+def partial_format(s, **kwargs):
+    # Manually parse the string and extract the field names
+    place_holders = set()
+    field_name = ""
+    in_field = False
+    for c in s:
+        if c == "{" and not in_field:
+            in_field = True
+        elif c == "}" and in_field:
+            place_holders.add(field_name)
+            field_name = ""
+            in_field = False
+        elif in_field:
+            field_name += c
+    replacements = {k: kwargs.get(k, "{" + k + "}") for k in place_holders}
+
+    # Escape all curly braces
+    s = s.replace("{", "{{").replace("}", "}}")
+
+    # Replace the placeholders
+    for k, v in replacements.items():
+        s = s.replace("{{" + k + "}}", v)
+
+    return s
+
+
+ROLE_MAP = {
+    "system": MessageRole.SYSTEM,
+    "human": MessageRole.USER,
+    "assistant": MessageRole.ASSISTANT,
+}
+
+
 def load_chat_prompt(
-    f_name: Union[pathlib.Path, str] = None
+    f_name: Union[pathlib.Path, str] = None,
+    language_code: str = "en",
+    query_intent: str = "",
 ) -> ChatPromptTemplate:
     """
     Loads a chat prompt from a given file.
@@ -39,13 +74,19 @@ def load_chat_prompt(
         A ChatPromptTemplate object constructed from the data in the JSON file.
     """
     f_name = pathlib.Path(f_name)
-    template = json.load(f_name.open("r"))
-    messages = [
-        ChatMessage(
-            role=MessageRole.SYSTEM, content=template["system_template"]
-        ),
-        ChatMessage(role=MessageRole.USER, content=template["human_template"]),
-    ]
 
+    template = json.load(f_name.open("r"))
+
+    human_template = partial_format(
+        template["messages"][-1]["human"],
+        language_code=language_code,
+        query_intent=query_intent,
+    )
+
+    messages = []
+    for message in template["messages"][:-1]:
+        for k, v in message.items():
+            messages.append(ChatMessage(role=ROLE_MAP[k], content=v))
+    messages.append(ChatMessage(role=MessageRole.USER, content=human_template))
     prompt = ChatPromptTemplate(messages)
     return prompt
