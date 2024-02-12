@@ -20,6 +20,7 @@ This module is meant to be run as a script and not imported as a module. When ru
 ZendeskWandBotResponseSystem object and runs it in an event loop.
 
 """
+import os
 import asyncio
 from typing import List
 
@@ -78,6 +79,15 @@ def format_response(response: str) -> str:
     final_response = config.DISCBOTINTRO + response_str
     return f"{final_response}\n\n-WandBot 🤖"
 
+# Define a dummy client class
+class DummyResponse:
+    def __init__(self, answer: str) -> None:
+        self.answer = answer
+
+class DummyAPIClient:
+    async def query(self, question: str, chat_history: list, language: str) -> str:
+        return DummyResponse(answer="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.")
+
 
 class ZendeskWandBotResponseSystem:
     """Handles the interaction with the Zendesk system.
@@ -102,7 +112,10 @@ class ZendeskWandBotResponseSystem:
             "subdomain": config.ZENDESK_SUBDOMAIN,
         }
         self.zenpy_client = Zenpy(**self.user_creds)
-        self.api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
+        if os.getenv('ZENDESK_TEST_API_MODE') == "True":
+            self.api_client = DummyAPIClient()
+        else:
+            self.api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
         self.semaphore = asyncio.Semaphore(config.MAX_WANDBOT_REQUESTS)
         self.request_interval = config.REQUEST_INTERVAL
@@ -117,11 +130,12 @@ class ZendeskWandBotResponseSystem:
         Returns:
             list: A list of filtered tickets that are new and have not been answered by the bot.
         """
+        include_tags = ["bottest"] if os.getenv('ZENDESK_TEST_TICKET_MODE') == "True" else ["forum", "zopim_offline_message"]
         exclude_tags = ["answered_by_bot", "zopim_chat", "picked_up_by_bot"]
         new_tickets = self.zenpy_client.search(
             type="ticket",
             status="new",
-            tags=["forum", "zopim_offline_message"],
+            tags=include_tags,
             minus=[f"tags:{tag}" for tag in exclude_tags],
         )
         return new_tickets
@@ -142,6 +156,8 @@ class ZendeskWandBotResponseSystem:
         """
 
         try:
+            if os.getenv('ZENDESK_TEST_TICKET_MODE') == "True":
+                logger.info(f"Querying wandbot with question: {question}")
             response = await self.api_client.query(
                 question=question, chat_history=[], language=config.bot_language
             )
