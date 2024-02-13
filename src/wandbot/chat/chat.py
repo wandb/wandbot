@@ -28,12 +28,11 @@ Typical usage example:
 import wandb
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from weave.monitoring import StreamTable
-
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import load_rag_chain
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import Timer, get_logger
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -96,12 +95,12 @@ class Chat:
         return {
             "question": result["query"]["question"],
             "answer": result["answer"]["response"],
-            "sources": [
-                item["metadata"]["source"] for item in result["context"]
-            ],
+            "sources": "\n".join(
+                [item["metadata"]["source"] for item in result["context"]]
+            ),
             "source_documents": result["answer"]["context_str"],
             "system_prompt": result["answer"]["response_prompt"].to_string(),
-            "model": result["answer"]["response_model"].model_name,
+            "model": result["answer"]["response_model"],
         }
 
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:

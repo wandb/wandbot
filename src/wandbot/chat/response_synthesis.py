@@ -8,7 +8,6 @@ from langchain_core.prompts import (
     format_document,
 )
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
-
 from wandbot.retriever.fusion import combine_documents
 from wandbot.utils import clean_document_content
 
@@ -180,7 +179,7 @@ def load_response_synthesizer_chain(model) -> Runnable:
             context_str=itemgetter("context_str"),
             response_prompt=itemgetter("response_prompt"),
             response=itemgetter("response_prompt") | model | StrOutputParser(),
-            reponse_model=model,
+            response_model=RunnableLambda(lambda x: model.model_name),
         )
     )
 
