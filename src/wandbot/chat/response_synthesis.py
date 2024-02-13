@@ -143,7 +143,7 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
 ]
 
 
-# TODO: Add citation sources as a function calling api
+# TODO: Add citation sources using function calling api
 #  https://python.langchain.com/docs/use_cases/question_answering/citations#cite-documents
 # class cited_answer(BaseModel):
 #     """Answer the user question based only on the given sources, and cite the sources used."""
@@ -180,6 +180,7 @@ def load_response_synthesizer_chain(model) -> Runnable:
             context_str=itemgetter("context_str"),
             response_prompt=itemgetter("response_prompt"),
             response=itemgetter("response_prompt") | model | StrOutputParser(),
+            reponse_model=model,
         )
     )
 
