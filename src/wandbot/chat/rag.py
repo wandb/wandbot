@@ -75,7 +75,7 @@ def load_rag_chain(
                     for p in x["context"]
                 ]
             ),
-            result=response_synthesis_chain,
+            answer=response_synthesis_chain,
         ).with_config({"run_name": "response_synthesis"})
     )
 
