@@ -1,10 +1,8 @@
-from enum import Enum
-from typing import Any, List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
-
 from wandbot.retriever.base import Retriever
 
 router = APIRouter(
@@ -18,7 +16,7 @@ retriever: Retriever | None = None
 class APIRetrievalResult(BaseModel):
     text: str
     score: float
-    metadata: dict[str, Any]
+    metadata: Dict[str, Any]
 
 
 class APIRetrievalResponse(BaseModel):
@@ -26,25 +24,8 @@ class APIRetrievalResponse(BaseModel):
     top_k: List[APIRetrievalResult]
 
 
-class Indices(str, Enum):
-    """The indices available for retrieval."""
-
-    DOCODILE_EN = "docodile_en"
-    DOCODILE_JA = "docodile_ja"
-    WANDB_EXAMPLES_CODE = "wandb_examples_code"
-    WANDB_EXAMPLES_COLAB = "wandb_examples_colab"
-    WANDB_SDK_CODE = "wandb_sdk_code"
-    WANDB_SDK_TESTS = "wandb_sdk_tests"
-    WEAVE_SDK_CODE = "weave_sdk_code"
-    WEAVE_EXAMPLES = "weave_examples"
-    WANDB_EDU_CODE = "wandb_edu_code"
-    WEAVE_JS = "weave_js"
-    FC_REPORTS = "fc_reports"
-
-
 class APIRetrievalRequest(BaseModel):
     query: str
-    indices: List[Indices] | None = None
     language: str = "en"
     initial_k: int = 10
     top_k: int = 5
