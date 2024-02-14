@@ -1,5 +1,4 @@
 import enum
-import os
 from operator import itemgetter
 from typing import List
 
@@ -14,6 +13,8 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from wandbot.rag.utils import ChatModel
 
 
 class Labels(str, enum.Enum):
@@ -124,29 +125,36 @@ def get_intent_hints(intents: List[str]) -> str:
     return descriptions
 
 
+class CohereClassifierConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
+    cohere_api_key: str = Field(
+        ...,
+        description="The API key for the Cohere API",
+        env="COHERE_API_KEY",
+        validation_alias="cohere_api_key",
+    )
+    cohere_query_clf_model: str = Field(
+        ...,
+        description="The fine-tuned cohere model to use for classification",
+        env="COHERE_QUERY_CLF_MODEL",
+        validation_alias="cohere_query_clf_model",
+    )
+
+
 class CohereQueryClassifier:
-    def __init__(self, api_key: str, model: str) -> None:
-        self.client = cohere.Client(api_key)
-        self.model = model
+    config: CohereClassifierConfig = CohereClassifierConfig()
+
+    def __init__(self) -> None:
+        self.client = cohere.Client(self.config.cohere_api_key)
 
     def __call__(self, query: str) -> str:
         response = self.client.classify(
-            model=self.model,
+            model=self.config.cohere_query_clf_model,
             inputs=[query],
         )
         return get_intent_descriptions(response.classifications[0].predictions)
-
-
-def load_cohere_classify_chain(api_key: str, model: str) -> RunnableLambda:
-    cohere_classify_chain = RunnableLambda(
-        lambda x: {
-            "question": x["question"],
-            "intent_hints": CohereQueryClassifier(api_key, model)(
-                x["question"]
-            ),
-        }
-    )
-    return cohere_classify_chain
 
 
 intents_descriptions_str = "\n".join(
@@ -167,35 +175,10 @@ INTENT_PROMPT_MESSAGES = [
     ("human", "Enhance the following user query:\n{question}"),
     (
         "human",
-        "Here is my initial list of intent hints that maybe relevant:\n{intent_hints}",
+        "Here is an initial list of intent hints that maybe relevant:\n{intent_hints}",
     ),
     ("human", "Tip: Make sure to answer in the correct format"),
 ]
-
-
-def load_intent_extraction_chain(model: ChatOpenAI) -> Runnable:
-    intents_prompt = ChatPromptTemplate.from_messages(INTENT_PROMPT_MESSAGES)
-
-    intents_classification_chain = create_structured_output_runnable(
-        MultiLabel, model, intents_prompt
-    )
-
-    cohere_classify_chain = load_cohere_classify_chain(
-        api_key=os.environ["COHERE_API_KEY"],
-        model=os.environ["DEFAULT_QUERY_CLF_MODEL"],
-    )
-
-    intent_enhancement_chain = (
-        cohere_classify_chain
-        | intents_classification_chain
-        | RunnableLambda(lambda x: [intent.label.value for intent in x.intents])
-        | {
-            "intent_hints": get_intent_hints,
-            "intent_labels": RunnablePassthrough(),
-        }
-    )
-
-    return intent_enhancement_chain
 
 
 def check_avoid_intent(intents: List[str]) -> bool:
@@ -213,20 +196,69 @@ def check_avoid_intent(intents: List[str]) -> bool:
     )
 
 
-def load_intent_enhancement_chain(
-    model: ChatOpenAI,
-) -> Runnable:
-    intent_extraction_chain = load_intent_extraction_chain(model)
+class IntentsEnhancer:
+    model: ChatModel = ChatModel()
+    fallback_model: ChatModel = ChatModel(max_retries=6)
 
-    return RunnableParallel(
-        question=itemgetter("question"),
-        standalone_question=itemgetter("standalone_question"),
-        chat_history=itemgetter("chat_history"),
-        language=itemgetter("language"),
-        intents=(
-            {"question": itemgetter("standalone_question")}
-            | intent_extraction_chain
-        ),
-    ) | RunnablePassthrough.assign(
-        avoid_query=lambda x: check_avoid_intent(x["intents"]["intent_labels"])
-    )
+    def __init__(
+        self,
+        model: str = "gpt-4-0125-preview",
+        fallback_model: str = "gpt-3.5-turbo-1106",
+    ):
+        self.model = model
+        self.fallback_model = fallback_model
+
+        self.cohere_classifier = CohereQueryClassifier()
+        self.prompt = ChatPromptTemplate.from_messages(INTENT_PROMPT_MESSAGES)
+        self._chain = None
+
+    @property
+    def chain(self) -> Runnable:
+        if self._chain is None:
+            base_chain = self._load_chain(self.model)
+            fallback_chain = self._load_chain(self.fallback_model)
+            self._chain = base_chain.with_fallbacks([fallback_chain])
+
+        return self._chain
+
+    def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        # load the cohere classifier chain
+
+        cohere_classify_chain = RunnablePassthrough.assign(
+            intent_hints=lambda x: self.cohere_classifier(x["question"])
+        )
+
+        # load the intent extraction chain
+        intents_classification_chain = create_structured_output_runnable(
+            MultiLabel, model, self.prompt
+        )
+
+        intent_extraction_chain = (
+            cohere_classify_chain
+            | intents_classification_chain
+            | RunnableLambda(
+                lambda x: [intent.label.value for intent in x.intents]
+            )
+            | RunnableParallel(
+                intent_hints=get_intent_hints,
+                intent_labels=RunnablePassthrough(),
+            )
+        )
+
+        # load the intent enhancement chain
+        intent_enhancement_chain = RunnableParallel(
+            question=itemgetter("question"),
+            standalone_question=itemgetter("standalone_question"),
+            chat_history=itemgetter("chat_history"),
+            language=itemgetter("language"),
+            intents=(
+                {"question": itemgetter("standalone_question")}
+                | intent_extraction_chain
+            ),
+        ) | RunnablePassthrough.assign(
+            avoid_query=lambda x: check_avoid_intent(
+                x["intents"]["intent_labels"]
+            )
+        )
+
+        return intent_enhancement_chain

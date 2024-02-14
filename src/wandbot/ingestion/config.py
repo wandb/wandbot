@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -245,3 +244,4 @@ class VectorStoreConfig(BaseSettings):
     embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
+    artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"

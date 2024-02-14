@@ -1,4 +1,3 @@
-import os
 from operator import itemgetter
 from typing import Any, Dict, List
 
@@ -11,6 +10,7 @@ from langchain_core.runnables import (
     RunnablePassthrough,
 )
 from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class YouSearchResults(BaseModel):
@@ -20,21 +20,39 @@ class YouSearchResults(BaseModel):
     )
 
 
+class YouSearchConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
+    you_api_key: str = Field(
+        ...,
+        description="API key for you.com search API",
+        env="YOU_API_KEY",
+        validation_alias="you_api_key",
+    )
+    top_k: int = Field(
+        10,
+        description="Number of top k results to retrieve from you.com",
+    )
+    search_type: str = Field(
+        "rag",
+        description="Type of search to perform. Options: rag, retrieve",
+    )
+
+
 class YouSearch:
-    def __init__(self, api_key: str, similarity_top_k: int = 10):
-        self._api_key = api_key
-        self.similarity_top_k = similarity_top_k
+    config: YouSearchConfig = YouSearchConfig()
 
     def _rag(self, query: str) -> YouSearchResults:
         """Retrieve."""
         try:
-            headers = {"X-API-Key": self._api_key}
+            headers = {"X-API-Key": self.config.you_api_key}
             url = "https://api.ydc-index.io/rag"
 
             querystring = {
                 "query": "Answer the following question in the context of Weights & Biases, W&B, wandb and/or Weave\n"
                 + query,
-                "num_web_results": self.similarity_top_k,
+                "num_web_results": self.config.top_k,
                 "safesearch": "strict",
             }
             response = requests.get(url, headers=headers, params=querystring)
@@ -65,7 +83,7 @@ class YouSearch:
 
             return YouSearchResults(
                 web_answer=results["answer"],
-                web_context=search_hits[: self.similarity_top_k],
+                web_context=search_hits[: self.config.top_k],
             )
         except Exception as e:
             return YouSearchResults()
@@ -73,12 +91,12 @@ class YouSearch:
     def _retrieve(self, query: str) -> YouSearchResults:
         """Retrieve."""
         try:
-            headers = {"X-API-Key": self._api_key}
+            headers = {"X-API-Key": self.config.you_api_key}
             url = "https://api.ydc-index.io/search"
 
             querystring = {
                 "query": "Weights & Biases, W&B, wandb or Weave " + query,
-                "num_web_results": self.similarity_top_k,
+                "num_web_results": self.config.top_k,
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
@@ -108,103 +126,52 @@ class YouSearch:
 
             return YouSearchResults(
                 web_answer="",
-                web_context=search_hits[: self.similarity_top_k],
+                web_context=search_hits[: self.config.top_k],
             )
         except Exception as e:
             print(e)
             return YouSearchResults()
 
     def __call__(
-        self, question: str, search_type: str = "rag"
+        self,
+        question: str,
     ) -> Dict[str, Any]:
-        if search_type == "rag":
+        if self.config.search_type == "rag":
             web_results = self._rag(question)
         else:
             web_results = self._retrieve(question)
         return web_results.dict()
 
 
-def load_web_answer_chain(search_field: str, top_k: int = 5) -> Runnable:
-    you_search = YouSearch(os.environ["YOU_API_KEY"], top_k)
+class YouWebRagSearchEnhancer:
+    def __init__(self):
+        self.you_search = YouSearch()
+        self._chain = None
 
-    web_answer_chain = RunnablePassthrough().assign(
-        web_results=lambda x: you_search(
-            question=x["question"], search_type=x["search_type"]
-        )
-    )
+    @property
+    def chain(self) -> Runnable:
+        if self._chain is None:
+            search_chain = RunnablePassthrough().assign(
+                web_results=lambda x: self.you_search(question=x["question"])
+            )
 
-    branch = RunnableBranch(
-        (
-            lambda x: x["avoid"],
-            RunnableLambda(lambda x: None),
-        ),
-        (
-            lambda x: not x["avoid"],
-            web_answer_chain | itemgetter("web_results"),
-        ),
-        RunnableLambda(lambda x: None),
-    )
+            branch = RunnableBranch(
+                (
+                    lambda x: x["avoid"],
+                    RunnableLambda(lambda x: None),
+                ),
+                (
+                    lambda x: not x["avoid"],
+                    search_chain | itemgetter("web_results"),
+                ),
+                RunnableLambda(lambda x: None),
+            )
 
-    return (
-        RunnableParallel(
-            question=itemgetter(search_field),
-            search_type=itemgetter("search_type"),
-            avoid=itemgetter("avoid_query"),
-        )
-        | branch
-    )
-
-
-def load_web_search_chain(search_field: str, top_k: int = 5) -> Runnable:
-    you_search = YouSearch(os.environ["YOU_API_KEY"], top_k)
-
-    web_answer_chain = RunnablePassthrough().assign(
-        web_results=lambda x: you_search(
-            question=x["question"], search_type=x["search_type"]
-        )
-    )
-
-    branch = RunnableBranch(
-        (
-            lambda x: x["avoid"],
-            RunnableLambda(lambda x: None),
-        ),
-        (
-            lambda x: not x["avoid"],
-            web_answer_chain | itemgetter("web_results"),
-        ),
-        RunnableLambda(lambda x: None),
-    )
-
-    return (
-        RunnableParallel(
-            question=itemgetter(search_field),
-            search_type=itemgetter("search_type"),
-            avoid=itemgetter("avoid_query"),
-        )
-        | branch
-    )
-
-
-def load_web_answer_enhancement_chain(top_k: int = 5) -> Runnable:
-    web_answer_chain = load_web_answer_chain(
-        search_field="standalone_question", top_k=top_k
-    )
-
-    return (
-        RunnablePassthrough().assign(
-            search_type=lambda x: "rag",
-        )
-        | web_answer_chain
-    )
-
-
-def load_web_search_enhancement_chain(top_k: int = 5) -> Runnable:
-    web_answer_chain = load_web_answer_chain(
-        search_field="standalone_question", top_k=top_k
-    )
-
-    return (
-        RunnablePassthrough().assign(search_type=lambda x: "rag")
-        | web_answer_chain
-    )
+            self._chain = (
+                RunnableParallel(
+                    question=itemgetter("standalone_question"),
+                    avoid=itemgetter("avoid_query"),
+                )
+                | branch
+            )
+        return self._chain
