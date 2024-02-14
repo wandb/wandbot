@@ -36,6 +36,7 @@ import chromadb
 import fasttext
 import nest_asyncio
 import tiktoken
+import wandb
 from langchain_core.documents import Document
 from llama_index import ServiceContext, StorageContext, VectorStoreIndex
 from llama_index.embeddings import OpenAIEmbedding
@@ -43,9 +44,8 @@ from llama_index.llms import LiteLLM
 from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
 from llama_index.vector_stores import ChromaVectorStore
-from pydantic_settings import BaseSettings
-
-import wandb
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -299,13 +299,24 @@ def create_no_result_dummy_node() -> NodeWithScore:
 
 
 class FasttextModelConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
     fasttext_file_path: pathlib.Path = pathlib.Path(
         "data/cache/models/lid.176.bin"
     )
-    fasttext_artifact_name: str = (
-        "wandbot/wandbot_public/fasttext-lid.176.bin:v0"
+    fasttext_artifact_path: str = Field(
+        "wandbot/wandbot_public/fasttext-lid.176.bin:v0",
+        env="LANGDETECT_ARTIFACT_PATH",
+        validation_alias="langdetect_artifact_path",
     )
     fasttext_artifact_type: str = "fasttext-model"
+    wandb_project: str = Field(
+        "wandbot-dev", env="WANDB_PROJECT", validation_alias="wandb_project"
+    )
+    wandb_entity: str = Field(
+        "wandbot", env="WANDB_ENTITY", validation_alias="wandb_entity"
+    )
 
 
 class FastTextLangDetect:
@@ -333,10 +344,17 @@ class FastTextLangDetect:
 
     def _load_model(self):
         if not os.path.isfile(self.config.fasttext_file_path):
-            _ = wandb.run.use_artifact(
-                self.config.fasttext_artifact_name,
-                type=self.config.fasttext_artifact_type,
-            ).download(root=str(self.config.fasttext_file_path.parent))
+            if wandb.run is None:
+                api = wandb.Api()
+                artifact = api.artifact(self.config.fasttext_artifact_path)
+            else:
+                artifact = wandb.run.use_artifact(
+                    self.config.fasttext_artifact_path,
+                    type=self.config.fasttext_artifact_type,
+                )
+            _ = artifact.download(
+                root=str(self.config.fasttext_file_path.parent)
+            )
         self._model = fasttext.load_model(str(self.config.fasttext_file_path))
         return self._model
 

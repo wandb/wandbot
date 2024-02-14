@@ -27,10 +27,10 @@ Typical usage example:
 
 import wandb
 from langchain_community.callbacks import get_openai_callback
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.rag import load_rag_chain
+from wandbot.chat.rag import Pipeline
 from wandbot.chat.schemas import ChatRequest, ChatResponse
+from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import Timer, get_logger
 
 logger = get_logger(__name__)
@@ -62,39 +62,23 @@ class Chat:
         )
         self.run._label(repo="wandbot")
 
-        self.llm = ChatOpenAI(model=self.config.chat_model_name, temperature=0)
-        self.fallback_llm = ChatOpenAI(
-            model="gpt-4-1106-preview", temperature=0
-        )
-        self.embedding_fn = OpenAIEmbeddings(
-            model="text-embedding-3-small", dimensions=512
-        )
-        self.lang_detect_path = "data/cache/models/lid.176.bin"
-        self.vector_store_path = self.config.index_artifact
-        self.rag_chain = load_rag_chain(
-            model=self.llm,
-            fallback_model=self.fallback_llm,
-            embeddings_model=self.embedding_fn,
-            lang_detect_path=self.lang_detect_path,
-            vector_store_path=self.vector_store_path,
-            search_type="mmr",
-            top_k=15,
-        )
+        self.rag_pipeline = Pipeline(VectorStoreConfig())
 
     def _get_answer(self, question, chat_history):
-        result = self.rag_chain.invoke(
-            {"query": question, "chat_history": chat_history}
-        )
+        result = self.rag_pipeline(question, chat_history)
 
         return {
-            "question": result["query"]["question"],
-            "answer": result["answer"]["response"],
+            "question": result["enhanced_query"]["question"],
+            "answer": result["response"]["response"],
             "sources": "\n".join(
-                [item["metadata"]["source"] for item in result["context"]]
+                [
+                    item["metadata"]["source"]
+                    for item in result["retrieval_results"]["context"]
+                ]
             ),
-            "source_documents": result["answer"]["context_str"],
-            "system_prompt": result["answer"]["response_prompt"].to_string(),
-            "model": result["answer"]["response_model"],
+            "source_documents": result["response"]["context_str"],
+            "system_prompt": result["response"]["response_prompt"],
+            "model": result["response"]["response_model"],
         }
 
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
@@ -109,7 +93,7 @@ class Chat:
         try:
             with Timer() as timer, get_openai_callback() as oai_cb:
                 result = self._get_answer(
-                    chat_request.question, chat_request.chat_history
+                    chat_request.question, chat_request.chat_history or []
                 )
 
             usage_stats = {

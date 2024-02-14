@@ -1,36 +1,10 @@
 from operator import itemgetter
 
-from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    PromptTemplate,
-    format_document,
-)
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
-from wandbot.retriever.fusion import combine_documents
-from wandbot.utils import clean_document_content
-
-DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(
-    template="{page_content}\nlanguage: {language}\nintents: {intents}"
-)
-
-
-def create_query_str(enhanced_query, document_prompt=DEFAULT_QUESTION_PROMPT):
-    page_content = enhanced_query["standalone_question"]
-    metadata = {
-        "language": enhanced_query["language"],
-        "intents": (
-            enhanced_query["intents"]
-            if enhanced_query["language"] == "en"
-            else None
-        ),
-    }
-    doc = Document(page_content=page_content, metadata=metadata)
-    doc = clean_document_content(doc)
-    doc_string = format_document(doc, document_prompt)
-    return doc_string
-
+from langchain_openai import ChatOpenAI
+from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """As Wandbot - a support expert in Weights & Biases, wandb and weave. 
 Your goal to ensure customer success with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
@@ -151,30 +125,54 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
 #     )
 
 
-def load_response_synthesizer_chain(model) -> Runnable:
-    response_prompt = ChatPromptTemplate.from_messages(
-        RESPONSE_SYNTHESIS_PROMPT_MESSAGES
-    )
+class ResponseSynthesizer:
+    model: ChatModel = ChatModel()
+    fallback_model: ChatModel = ChatModel(max_retries=6)
 
-    response_synthesis_chain = (
-        RunnableLambda(
-            lambda x: {
-                "query_str": create_query_str(x["query"]),
-                "context_str": combine_documents(x["context"]),
-            }
+    def __init__(
+        self,
+        model: str = "gpt-4-0125-preview",
+        fallback_model: str = "gpt-3.5-turbo-1106",
+    ):
+        self.model = model
+        self.fallback_model = fallback_model
+        self.prompt = ChatPromptTemplate.from_messages(
+            RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )
-        | RunnableParallel(
-            query_str=itemgetter("query_str"),
-            context_str=itemgetter("context_str"),
-            response_prompt=response_prompt,
-        )
-        | RunnableParallel(
-            query_str=itemgetter("query_str"),
-            context_str=itemgetter("context_str"),
-            response_prompt=itemgetter("response_prompt"),
-            response=itemgetter("response_prompt") | model | StrOutputParser(),
-            response_model=RunnableLambda(lambda x: model.model_name),
-        )
-    )
+        self._chain = None
 
-    return response_synthesis_chain
+    @property
+    def chain(self) -> Runnable:
+        if self._chain is None:
+            base_chain = self._load_chain(self.model)
+            fallback_chain = self._load_chain(self.fallback_model)
+            self._chain = base_chain.with_fallbacks([fallback_chain])
+        return self._chain
+
+    def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        response_synthesis_chain = (
+            RunnableLambda(
+                lambda x: {
+                    "query_str": create_query_str(x["query"]),
+                    "context_str": combine_documents(x["context"]),
+                }
+            )
+            | RunnableParallel(
+                query_str=itemgetter("query_str"),
+                context_str=itemgetter("context_str"),
+                response_prompt=self.prompt,
+            )
+            | RunnableParallel(
+                query_str=itemgetter("query_str"),
+                context_str=itemgetter("context_str"),
+                response_prompt=RunnableLambda(
+                    lambda x: x["response_prompt"].to_string()
+                ),
+                response=itemgetter("response_prompt")
+                | model
+                | StrOutputParser(),
+                response_model=RunnableLambda(lambda x: model.model_name),
+            )
+        )
+
+        return response_synthesis_chain
