@@ -25,14 +25,15 @@ Typical usage example:
           print(f"Time taken: {response.time_taken}")
 """
 
-import wandb
 from langchain_community.callbacks import get_openai_callback
+from weave.monitoring import StreamTable
+
+import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import Pipeline
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import Timer, get_logger
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
