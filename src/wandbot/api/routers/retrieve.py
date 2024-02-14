@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
+
 from wandbot.retriever.base import Retriever
 
 router = APIRouter(
