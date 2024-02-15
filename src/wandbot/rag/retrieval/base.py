@@ -9,6 +9,7 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
+
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.utils import get_web_contexts, process_input_for_retrieval
 from wandbot.retriever import OpenAIEmbeddingsModel, VectorStore

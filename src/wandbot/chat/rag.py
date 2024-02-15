@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
+
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag import FusionRetrieval, QueryEnhancer, ResponseSynthesizer
 from wandbot.utils import Timer, get_logger
