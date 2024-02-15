@@ -8,7 +8,6 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
-
 from wandbot.rag.query_handler.history_handler import CondenseQuestion
 from wandbot.rag.query_handler.intents_enhancer import IntentsEnhancer
 from wandbot.rag.query_handler.keyword_search_enhancer import KeywordsEnhancer

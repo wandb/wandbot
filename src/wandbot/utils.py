@@ -30,23 +30,17 @@ import os
 import pathlib
 import re
 import sqlite3
-from typing import Any, Coroutine, List, Optional, Tuple
+import string
+from typing import Any, Coroutine, List, Tuple
 
-import chromadb
 import fasttext
 import nest_asyncio
 import tiktoken
+import wandb
 from langchain_core.documents import Document
-from llama_index import ServiceContext, StorageContext, VectorStoreIndex
-from llama_index.embeddings import OpenAIEmbedding
-from llama_index.llms import LiteLLM
-from llama_index.llms.llm import LLM
 from llama_index.schema import NodeWithScore, TextNode
-from llama_index.vector_stores import ChromaVectorStore
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-import wandb
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -69,6 +63,15 @@ def get_logger(name: str) -> logging.Logger:
 logger = get_logger(__name__)
 
 
+def strip_punctuation(text):
+    # Create a translation table mapping every punctuation character to None
+    translator = str.maketrans("", "", string.punctuation)
+
+    # Use the table to strip punctuation from the text
+    no_punct = text.translate(translator)
+    return no_punct
+
+
 class Timer:
     """A simple timer class for measuring elapsed time."""
 
@@ -89,146 +92,6 @@ class Timer:
     def elapsed(self) -> float:
         """Calculates the elapsed time in seconds."""
         return (self.stop - self.start).total_seconds()
-
-
-def load_embeddings(
-    model_name: str = "text-embedding-3-small", dimensions: int = 512
-) -> OpenAIEmbedding:
-    """Loads embeddings from cache or creates new ones if not found.
-
-    Args:
-        model_name: The name of the model to load.
-        dimensions: The dimensions of the embeddings.
-
-    Returns:
-        A cached embedder instance.
-    """
-    embeddings = OpenAIEmbedding(model=model_name, dimensions=dimensions)
-    return embeddings
-
-
-def load_llm(
-    model_name: str,
-    temperature: float,
-    max_retries: int,
-) -> LLM:
-    """Loads a language model with the specified parameters.
-
-    Args:
-        model_name: The name of the model to load.
-        temperature: The temperature parameter for the model.
-        max_retries: The maximum number of retries for loading the model.
-
-    Returns:
-        An instance of the loaded language model.
-    """
-    import litellm
-    from litellm.caching import Cache
-
-    litellm.cache = Cache()
-
-    llm = LiteLLM(
-        model=model_name,
-        temperature=temperature,
-        max_retries=max_retries,
-        caching=True,
-    )
-
-    return llm
-
-
-def load_service_context(
-    embeddings_model: str = "text-embedding-3-small",
-    embeddings_size: int = 512,
-    llm: str = "gpt-3.5-turbo-16k-0613",
-    temperature: float = 0.1,
-    max_retries: int = 2,
-    callback_manager: Optional[Any] = None,
-) -> ServiceContext:
-    """Loads a service context with the specified parameters.
-
-    Args:
-        embeddings_model: The name of the embeddings model to load.
-        embeddings_size: The size of the embeddings.
-        llm: The language model to load.
-        temperature: The temperature parameter for the model.
-        max_retries: The maximum number of retries for loading the model.
-        callback_manager: The callback manager for the service context (optional).
-
-    Returns:
-        A service context instance with the specified parameters.
-    """
-
-    embed_model = load_embeddings(
-        model_name=embeddings_model, dimensions=embeddings_size
-    )
-    llm = load_llm(
-        model_name=llm,
-        temperature=temperature,
-        max_retries=max_retries,
-    )
-
-    return ServiceContext.from_defaults(
-        llm=llm, embed_model=embed_model, callback_manager=callback_manager
-    )
-
-
-def load_storage_context(persist_dir: str | None = None) -> StorageContext:
-    """Loads a storage context with the specified parameters.
-
-    Args:
-        embedding_function: The embedding function to use in the vectorstore.
-        persist_dir: The directory where the storage context is persisted.
-
-    Returns:
-        A storage context instance with the specified parameters.
-    """
-
-    chroma_client = chromadb.PersistentClient(path=persist_dir)
-    chroma_collection = chroma_client.get_or_create_collection("docstore")
-    try:
-        storage_context = StorageContext.from_defaults(
-            vector_store=ChromaVectorStore(
-                chroma_collection=chroma_collection, persist_dir=persist_dir
-            ),
-            persist_dir=persist_dir,
-        )
-    except FileNotFoundError as e:
-        logger.debug(f"Error loading storage context: {e}")
-        storage_context = StorageContext.from_defaults(
-            vector_store=ChromaVectorStore(
-                chroma_collection=chroma_collection, persist_dir=persist_dir
-            ),
-        )
-    return storage_context
-
-
-def load_index(
-    nodes: List[TextNode],
-    service_context: ServiceContext,
-    storage_context: StorageContext,
-    persist_dir: str,
-) -> VectorStoreIndex:
-    """Loads an index from storage or creates a new one if not found.
-
-    Args:
-        nodes: The nodes to include in the index.
-        service_context: The service context for the index.
-        storage_context: The storage context for the index.
-        index_id: The ID of the index.
-        persist_dir: The directory where the index is persisted.
-
-    Returns:
-        An index instance with the specified parameters.
-    """
-    index = VectorStoreIndex(
-        nodes=nodes,
-        service_context=service_context,
-        storage_context=storage_context,
-        show_progress=True,
-    )
-    index.storage_context.persist(persist_dir=persist_dir)
-    return index
 
 
 def cachew(cache_path: str = "./cache.db", logger=None):
@@ -327,7 +190,8 @@ class FastTextLangDetect:
         self._model = self._load_model()
 
     def detect_language(self, text: str):
-        predictions = self.model.predict(text.replace("\n", " "))
+        cleaned_text = strip_punctuation(text).replace("\n", " ")
+        predictions = self.model.predict(cleaned_text)
         return predictions[0][0].replace("__label__", "")
 
     def detect_language_batch(self, texts: List[str]):
