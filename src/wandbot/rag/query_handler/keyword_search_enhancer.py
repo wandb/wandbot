@@ -11,6 +11,7 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
+
 from wandbot.rag.utils import ChatModel
 
 KEYWORDS_SYSTEM_PROMPT = (

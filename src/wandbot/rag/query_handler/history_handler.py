@@ -10,6 +10,7 @@ from langchain_core.runnables import (
     RunnablePassthrough,
 )
 from langchain_openai import ChatOpenAI
+
 from wandbot.rag.utils import ChatModel
 
 CONDENSE_PROMPT_SYSTEM_TEMPLATE = """Given the following conversation and a follow up question, rephrase the follow up \
