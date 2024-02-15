@@ -1,7 +1,6 @@
 from operator import itemgetter
 
 from langchain.load import dumps, loads
-from langchain.retrievers.document_compressors import CohereRerank
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.runnables import (
     Runnable,
@@ -10,10 +9,10 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
-
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.utils import get_web_contexts, process_input_for_retrieval
 from wandbot.retriever import OpenAIEmbeddingsModel, VectorStore
+from wandbot.retriever.reranking import CohereRerankChain
 
 
 def reciprocal_rank_fusion(results: list[list], k=60):
@@ -36,7 +35,7 @@ def reciprocal_rank_fusion(results: list[list], k=60):
     return [item[0] for item in ranked_results]
 
 
-class SimpleRetrievalChain:
+class RagRetrievalChain:
     def __init__(self, field: str = "question"):
         self.field = field
 
@@ -79,51 +78,11 @@ class SimpleRetrievalChain:
         return retrieval_chain
 
 
-class CohereRerankChain:
-    def __set_name__(self, owner, name):
-        self.public_name = name
-        self.private_name = "_" + name
-
-    def __get__(self, obj, obj_type=None):
-        if getattr(obj, "top_k") is None:
-            raise AttributeError(
-                "Top k must be set before using retrieval chain"
-            )
-
-        def load_rerank_chain(language):
-            if language == "en":
-                cohere_rerank = CohereRerank(
-                    top_n=obj.top_k, model="rerank-english-v2.0"
-                )
-            else:
-                cohere_rerank = CohereRerank(
-                    top_n=obj.top_k, model="rerank-multilingual-v2.0"
-                )
-
-            return lambda x: cohere_rerank.compress_documents(
-                documents=x["context"], query=x["question"]
-            )
-
-        cohere_rerank = RunnableBranch(
-            (
-                lambda x: x["language"] == "en",
-                load_rerank_chain("en"),
-            ),
-            (
-                lambda x: x["language"],
-                load_rerank_chain("ja"),
-            ),
-            load_rerank_chain("ja"),
-        )
-
-        return cohere_rerank
-
-
 class FusionRetrieval:
-    question_chain = SimpleRetrievalChain("question")
-    standalone_question_chain = SimpleRetrievalChain("standalone_question")
-    keywords_chain = SimpleRetrievalChain("keywords")
-    vector_search_chain = SimpleRetrievalChain("vector_search")
+    question_chain = RagRetrievalChain("question")
+    standalone_question_chain = RagRetrievalChain("standalone_question")
+    keywords_chain = RagRetrievalChain("keywords")
+    vector_search_chain = RagRetrievalChain("vector_search")
     web_context_chain = RunnableLambda(
         lambda x: get_web_contexts(x["web_results"])
     )
@@ -143,7 +102,7 @@ class FusionRetrieval:
         self.retriever = self.vector_store.as_parent_retriever(
             search_type=search_type, search_kwargs={"k": top_k * 4}
         )
-        self.embeddings_model = vector_store_config.embeddings_model
+        self.embeddings_model = vector_store_config.embeddings_model  # type: ignore
         self.top_k = top_k
         self.redundant_filter = EmbeddingsRedundantFilter(
             embeddings=self.embeddings_model

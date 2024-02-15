@@ -4,7 +4,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 from langchain_openai import ChatOpenAI
-
 from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """As Wandbot - a support expert in Weights & Biases, wandb and weave. 

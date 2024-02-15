@@ -3,15 +3,14 @@ from typing import Any, Dict, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
-
-from wandbot.retriever.base import Retriever
+from wandbot.retriever.base import SimpleRetrievalEngine
 
 router = APIRouter(
     prefix="/retrieve",
     tags=["retrievers"],
 )
 
-retriever: Retriever | None = None
+retriever: SimpleRetrievalEngine | None = None
 
 
 class APIRetrievalResult(BaseModel):
@@ -29,8 +28,7 @@ class APIRetrievalRequest(BaseModel):
     query: str
     language: str = "en"
     top_k: int = 5
-    include_tags: List[str] = []
-    include_web_results: bool = True
+    sources: List[str] | None = None
 
 
 @router.post(
@@ -48,12 +46,10 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
         The APIRetrievalResponse object containing the query and top k results.
     """
     results = retriever(
-        query=request.query,
-        indices=[idx.value for idx in request.indices],
+        question=request.query,
         language=request.language,
         top_k=request.top_k,
-        include_tags=request.include_tags,
-        include_web_results=request.include_web_results,
+        sources=request.sources,
     )
 
     return APIRetrievalResponse(
