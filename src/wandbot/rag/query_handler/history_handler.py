@@ -10,7 +10,6 @@ from langchain_core.runnables import (
     RunnablePassthrough,
 )
 from langchain_openai import ChatOpenAI
-
 from wandbot.rag.utils import ChatModel
 
 CONDENSE_PROMPT_SYSTEM_TEMPLATE = """Given the following conversation and a follow up question, rephrase the follow up \
@@ -39,8 +38,8 @@ class CondenseQuestion:
         model: str = "gpt-4-1106-preview",
         fallback_model="gpt-4-1106-preview",
     ):
-        self.model = model
-        self.fallback_model = fallback_model
+        self.model = model  # type: ignore
+        self.fallback_model = fallback_model  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(CONDENSE_PROMPT_MESSAGES)
         self._chain = None
 

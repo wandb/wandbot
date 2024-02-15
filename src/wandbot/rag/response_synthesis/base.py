@@ -134,8 +134,8 @@ class ResponseSynthesizer:
         model: str = "gpt-4-1106-preview",
         fallback_model: str = "gpt-4-1106-preview",
     ):
-        self.model = model
-        self.fallback_model = fallback_model
+        self.model = model  # type: ignore
+        self.fallback_model = fallback_model  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )

@@ -11,7 +11,6 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
-
 from wandbot.rag.utils import ChatModel
 
 KEYWORDS_SYSTEM_PROMPT = (
@@ -57,8 +56,8 @@ class KeywordsEnhancer:
         model: str = "gpt-4-1106-preview",
         fallback_model: str = "gpt-4-1106-preview",
     ):
-        self.model = model
-        self.fallback_model = fallback_model
+        self.model = model  # type: ignore
+        self.fallback_model = fallback_model  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(KEYWORDS_PROMPT_MESSAGES)
         self._chain = None
 

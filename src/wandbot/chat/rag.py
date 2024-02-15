@@ -1,10 +1,11 @@
 from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
-
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag import FusionRetrieval, QueryEnhancer, ResponseSynthesizer
-from wandbot.utils import Timer
+from wandbot.utils import Timer, get_logger
+
+logger = get_logger(__name__)
 
 
 def get_stats_dict_from_token_callback(token_callback):
@@ -44,12 +45,15 @@ class Pipeline:
             enhanced_query = self.query_enhancer.chain.invoke(
                 {"query": question, "chat_history": chat_history}
             )
+        logger.debug(f"Enhanced query: {enhanced_query}")
         with get_openai_callback() as retrieval_cb, Timer() as retrieval_tb:
             retrieval_results = self.retrieval.chain.invoke(enhanced_query)
+        logger.debug(f"Retrieval results: {retrieval_results}")
         with get_openai_callback() as response_cb, Timer() as response_tb:
             response = self.response_synthesizer.chain.invoke(
                 {"query": enhanced_query, "context": retrieval_results}
             )
+        logger.debug(f"Response: {response}")
 
         contexts = {
             "context": [
