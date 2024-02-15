@@ -38,7 +38,6 @@ import nest_asyncio
 import tiktoken
 import wandb
 from langchain_core.documents import Document
-from llama_index.schema import NodeWithScore, TextNode
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -139,24 +138,6 @@ def cachew(cache_path: str = "./cache.db", logger=None):
         return wrapped
 
     return memoize
-
-
-def create_no_result_dummy_node() -> NodeWithScore:
-    """
-    Creates a dummy node to be used when no results found.
-    This can be used instead of returning results that are not relevant
-    or have already been filtered out.
-    """
-    dummy_text = "No results found"
-    dummy_metadata = {
-        "source": "no-result",
-        "language": "en",
-        "description": "This is a dummy node when there are no results",
-        "title": "No Result Node",
-        "tags": ["no-result"],
-    }
-    dummy_text_node = TextNode(text=dummy_text, metadata=dummy_metadata)
-    return NodeWithScore(node=dummy_text_node, score=0.0)
 
 
 class FasttextModelConfig(BaseSettings):

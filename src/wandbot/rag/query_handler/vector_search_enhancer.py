@@ -10,7 +10,6 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
-
 from wandbot.rag.utils import ChatModel
 
 QUERY_REWRITE_SYSTEM_PROMPT = (
@@ -42,8 +41,8 @@ class VectorSearchEnhancer:
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model
-        self.fallback_model = fallback_model
+        self.model = model  # type: ignore
+        self.fallback_model = fallback_model  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(
             QUERY_REWRITE_PROMPT_MESSAGES
         )
