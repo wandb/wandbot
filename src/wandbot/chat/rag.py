@@ -1,7 +1,7 @@
+import json
 from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
-
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag import FusionRetrieval, QueryEnhancer, ResponseSynthesizer
 from wandbot.utils import Timer, get_logger
@@ -46,7 +46,7 @@ class Pipeline:
             enhanced_query = self.query_enhancer.chain.invoke(
                 {"query": question, "chat_history": chat_history}
             )
-        logger.debug(f"Enhanced query: {enhanced_query}")
+        logger.debug(f"Enhanced query: {json.dumps(enhanced_query, indent=2)}")
         with get_openai_callback() as retrieval_cb, Timer() as retrieval_tb:
             retrieval_results = self.retrieval.chain.invoke(enhanced_query)
         logger.debug(f"Retrieval results: {retrieval_results}")
