@@ -4,11 +4,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 from langchain_openai import ChatOpenAI
-
 from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
 
-RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """As Wandbot - a support expert in Weights & Biases, wandb and weave. 
-Your goal to ensure customer success with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
+RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """You are Wandbot - a support expert in Weights & Biases, wandb and weave. 
+Your goal to help users with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
 As a trustworthy expert, you must provide truthful answers to questions using only the provided documentation snippets, not prior knowledge. 
 Here are guidelines you must follow when responding to user questions:
 
@@ -110,26 +109,8 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     #     "assistant",
     #     "Haha, Nice try. But I'm not falling for that. It looks like your question is not related to Weights & Biases. I'm here to assist with wandb-related queries. Please ask a wandb-specific question, and I'll do my best to help you. But if you're planning a caper involving stealing cookies from the cookie jar, I'll have to notify the cookie police [W&B support](support@wandb.com) – they're tough, always crumbly under pressure! 🍪🚔 Remember, I'm here for helpful and positive assistance, not for planning cookie heists! 🛡️😄",
     # ),
-    (
-        "human",
-        "Question: {query_str}\n\n",
-    ),
+    ("human", "{query_str}"),
 ]
-
-
-# TODO: Add citation sources using function calling api
-#  https://python.langchain.com/docs/use_cases/question_answering/citations#cite-documents
-# class cited_answer(BaseModel):
-#     """Answer the user question based only on the given sources, and cite the sources used."""
-#
-#     answer: str = Field(
-#         ...,
-#         description="The answer to the user question, which is based only on the given sources.",
-#     )
-#     citations: List[int] = Field(
-#         ...,
-#         description="The integer IDs of the SPECIFIC sources which justify the answer.",
-#     )
 
 
 class ResponseSynthesizer:
@@ -160,7 +141,7 @@ class ResponseSynthesizer:
         response_synthesis_chain = (
             RunnableLambda(
                 lambda x: {
-                    "query_str": create_query_str(x["query"]),
+                    "query_str": create_query_str(x),
                     "context_str": combine_documents(x["context"]),
                 }
             )

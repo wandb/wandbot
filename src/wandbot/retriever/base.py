@@ -1,12 +1,11 @@
 from operator import itemgetter
 from typing import List
 
+import wandb
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
-
-import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
@@ -129,9 +128,9 @@ class SimpleRetrievalEngine:
             RunnableParallel(
                 question=itemgetter("question"),
                 language=itemgetter("language"),
-                context=itemgetter("question")
-                | retriever
-                | self.redundant_filter,
+                context=(
+                    itemgetter("question") | retriever | self.redundant_filter
+                ),
             )
             | self.cohere_rerank_chain
         )
