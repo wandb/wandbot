@@ -3,6 +3,7 @@ from typing import List
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
+
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
