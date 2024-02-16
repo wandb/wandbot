@@ -101,6 +101,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
+            self.chat_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
