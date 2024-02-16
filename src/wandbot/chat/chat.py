@@ -26,6 +26,8 @@ Typical usage example:
 """
 from typing import List
 
+from weave.monitoring import StreamTable
+
 import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import Pipeline, PipelineOutput

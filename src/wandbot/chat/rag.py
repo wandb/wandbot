@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
 from pydantic import BaseModel
+
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.rag.response_synthesis import ResponseSynthesizer
