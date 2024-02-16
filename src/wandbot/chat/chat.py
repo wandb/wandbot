@@ -33,6 +33,7 @@ from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import Timer, get_logger
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
