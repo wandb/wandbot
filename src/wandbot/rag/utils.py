@@ -3,7 +3,6 @@ import json
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
-
 from wandbot.utils import clean_document_content
 
 
@@ -30,19 +29,34 @@ class ChatModel:
 
 
 DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(
-    template="{page_content}\nlanguage: {language}\nintents: {intents}"
+    template="""# Query
+
+{page_content}
+
+---
+
+# Query Metadata
+
+Language: {language}
+
+Intents: 
+
+{intents}
+
+Sub-queries to consider answering: 
+
+{sub_queries}
+"""
 )
 
 
 def create_query_str(enhanced_query, document_prompt=DEFAULT_QUESTION_PROMPT):
-    page_content = enhanced_query["standalone_question"]
+    page_content = enhanced_query["standalone_query"]
     metadata = {
         "language": enhanced_query["language"],
-        "intents": (
-            enhanced_query["intents"]
-            if enhanced_query["language"] == "en"
-            else None
-        ),
+        "intents": enhanced_query["intents"],
+        "sub_queries": "\t"
+        + "\n\t".join(enhanced_query["sub_queries"]).strip(),
     }
     doc = Document(page_content=page_content, metadata=metadata)
     doc = clean_document_content(doc)

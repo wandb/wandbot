@@ -1,14 +1,6 @@
-from operator import itemgetter
 from typing import Any, Dict, List
 
 import requests
-from langchain_core.runnables import (
-    Runnable,
-    RunnableBranch,
-    RunnableLambda,
-    RunnableParallel,
-    RunnablePassthrough,
-)
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -42,6 +34,10 @@ class YouSearchConfig(BaseSettings):
 
 class YouSearch:
     config: YouSearchConfig = YouSearchConfig()
+
+    def __init__(self, config: YouSearchConfig = None):
+        if config is not None:
+            self.config = config
 
     def _rag(self, query: str) -> YouSearchResults:
         """Retrieve."""
@@ -141,37 +137,3 @@ class YouSearch:
         else:
             web_results = self._retrieve(question)
         return web_results.dict()
-
-
-class YouWebRagSearchEnhancer:
-    def __init__(self):
-        self.you_search = YouSearch()
-        self._chain = None
-
-    @property
-    def chain(self) -> Runnable:
-        if self._chain is None:
-            search_chain = RunnablePassthrough().assign(
-                web_results=lambda x: self.you_search(question=x["question"])
-            )
-
-            branch = RunnableBranch(
-                (
-                    lambda x: x["avoid"],
-                    RunnableLambda(lambda x: None),
-                ),
-                (
-                    lambda x: not x["avoid"],
-                    search_chain | itemgetter("web_results"),
-                ),
-                RunnableLambda(lambda x: None),
-            )
-
-            self._chain = (
-                RunnableParallel(
-                    question=itemgetter("standalone_question"),
-                    avoid=itemgetter("avoid_query"),
-                )
-                | branch
-            )
-        return self._chain

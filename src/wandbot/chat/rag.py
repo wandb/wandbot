@@ -1,9 +1,12 @@
-import json
+import datetime
 from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
+from pydantic import BaseModel
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.rag import FusionRetrieval, QueryEnhancer, ResponseSynthesizer
+from wandbot.rag.query_handler import QueryEnhancer
+from wandbot.rag.response_synthesis import ResponseSynthesizer
+from wandbot.rag.retrieval import FusionRetrieval
 from wandbot.utils import Timer, get_logger
 
 logger = get_logger(__name__)
@@ -26,6 +29,21 @@ def get_stats_dict_from_timer(timer):
     }
 
 
+class PipelineOutput(BaseModel):
+    question: str
+    answer: str
+    sources: str
+    source_documents: str
+    system_prompt: str
+    model: str
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    time_taken: float
+    start_time: datetime.datetime
+    end_time: datetime.datetime
+
+
 class Pipeline:
     def __init__(
         self,
@@ -42,38 +60,43 @@ class Pipeline:
     def __call__(
         self, question: str, chat_history: List[Tuple[str, str]] | None = None
     ):
+        if chat_history is None:
+            chat_history = []
+
         with get_openai_callback() as query_enhancer_cb, Timer() as query_enhancer_tb:
             enhanced_query = self.query_enhancer.chain.invoke(
                 {"query": question, "chat_history": chat_history}
             )
-        with get_openai_callback() as retrieval_cb, Timer() as retrieval_tb:
+
+        with Timer() as retrieval_tb:
             retrieval_results = self.retrieval.chain.invoke(enhanced_query)
+
         with get_openai_callback() as response_cb, Timer() as response_tb:
-            response = self.response_synthesizer.chain.invoke(
-                {"query": enhanced_query, "context": retrieval_results}
-            )
+            response = self.response_synthesizer.chain.invoke(retrieval_results)
 
-        contexts = {
-            "context": [
-                {"page_content": item.page_content, "metadata": item.metadata}
-                for item in retrieval_results
-            ]
-        }
+        output = PipelineOutput(
+            question=enhanced_query["standalone_query"],
+            answer=response["response"],
+            sources="\n".join(
+                [
+                    item.metadata["source"]
+                    for item in retrieval_results["context"]
+                ]
+            ),
+            source_documents=response["context_str"],
+            system_prompt=response["response_prompt"],
+            model=response["response_model"],
+            total_tokens=query_enhancer_cb.total_tokens
+            + response_cb.total_tokens,
+            prompt_tokens=query_enhancer_cb.prompt_tokens
+            + response_cb.prompt_tokens,
+            completion_tokens=query_enhancer_cb.completion_tokens
+            + response_cb.completion_tokens,
+            time_taken=query_enhancer_tb.elapsed
+            + retrieval_tb.elapsed
+            + response_tb.elapsed,
+            start_time=query_enhancer_tb.start,
+            end_time=response_tb.stop,
+        )
 
-        return {
-            "enhanced_query": {
-                **enhanced_query,
-                **get_stats_dict_from_token_callback(query_enhancer_cb),
-                **get_stats_dict_from_timer(query_enhancer_tb),
-            },
-            "retrieval_results": {
-                **contexts,
-                **get_stats_dict_from_token_callback(retrieval_cb),
-                **get_stats_dict_from_timer(retrieval_tb),
-            },
-            "response": {
-                **response,
-                **get_stats_dict_from_token_callback(response_cb),
-                **get_stats_dict_from_timer(response_tb),
-            },
-        }
+        return output

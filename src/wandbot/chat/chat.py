@@ -24,14 +24,13 @@ Typical usage example:
           print(f"WandBot: {response.answer}")
           print(f"Time taken: {response.time_taken}")
 """
-
-from langchain_community.callbacks import get_openai_callback
-from weave.monitoring import StreamTable
+from typing import List
 
 import wandb
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.rag import Pipeline
+from wandbot.chat.rag import Pipeline, PipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
+from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import Timer, get_logger
 
@@ -66,22 +65,17 @@ class Chat:
 
         self.rag_pipeline = Pipeline(VectorStoreConfig())
 
-    def _get_answer(self, question, chat_history):
-        result = self.rag_pipeline(question, chat_history)
+    def _get_answer(
+        self, question: str, chat_history: List[QuestionAnswer]
+    ) -> PipelineOutput:
+        history = []
+        for item in chat_history:
+            history.append(("user", item.question))
+            history.append(("assistant", item.answer))
 
-        return {
-            "question": result["enhanced_query"]["question"],
-            "answer": result["response"]["response"],
-            "sources": "\n".join(
-                [
-                    item["metadata"]["source"]
-                    for item in result["retrieval_results"]["context"]
-                ]
-            ),
-            "source_documents": result["response"]["context_str"],
-            "system_prompt": result["response"]["response_prompt"],
-            "model": result["response"]["response_model"],
-        }
+        result = self.rag_pipeline(question, history)
+
+        return result
 
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
@@ -93,30 +87,20 @@ class Chat:
             An instance of `ChatResponse` representing the chat response.
         """
         try:
-            with Timer() as timer, get_openai_callback() as oai_cb:
-                result = self._get_answer(
-                    chat_request.question, chat_request.chat_history or []
-                )
+            result = self._get_answer(
+                chat_request.question, chat_request.chat_history or []
+            )
+
+            result_dict = result.model_dump()
 
             usage_stats = {
-                "total_tokens": oai_cb.total_tokens,
-                "prompt_tokens": oai_cb.prompt_tokens,
-                "completion_tokens": oai_cb.completion_tokens,
+                "total_tokens": result.total_tokens,
+                "prompt_tokens": result.prompt_tokens,
+                "completion_tokens": result.completion_tokens,
             }
-            result.update(
-                dict(
-                    **{
-                        "question": chat_request.question,
-                        "time_taken": timer.elapsed,
-                        "start_time": timer.start,
-                        "end_time": timer.stop,
-                        "application": chat_request.application,
-                    },
-                    **usage_stats,
-                )
-            )
+            result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            return ChatResponse(**result)
+            return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
                 result = {
@@ -137,5 +121,4 @@ class Chat:
                     "end_time": timer.stop,
                 }
             )
-            usage_stats = {}
             return ChatResponse(**result)

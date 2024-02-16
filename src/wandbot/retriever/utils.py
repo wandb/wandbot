@@ -16,6 +16,7 @@ class OpenAIEmbeddingsModel:
     def __set__(self, obj, value):
         model = OpenAIEmbeddings(
             model=value,
+            tiktoken_model_name="text-embedding-ada-002",
             dimensions=self.dimensions,
         )
         setattr(obj, self.private_name, model)
