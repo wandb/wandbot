@@ -39,8 +39,8 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
             "accessory": {
                 "type": "button",
                 "text": {"type": "plain_text", "text": "Ad Copy"},
-                "value": "adcopygpt",
-                "action_id": "adcopygpt",
+                "value": "adcopy",
+                "action_id": "adcopy",
             },
         },
         {
@@ -86,3 +86,85 @@ async def get_initial_message(app, message, channel_id, token):
 
     message = result["messages"][0]
     return message
+
+
+def get_adcopy_blocks() -> List[Dict[str, Any]]:
+    blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "What kind of ad copy are you looking for ?",
+            },
+        },
+        {"type": "divider"},
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "*Options:*"},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Executive Awareness*\n More clicks among Non-Technical audience",
+            },
+            "accessory": {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Executive Awareness",
+                },
+                "value": "executive_awareness",
+                "action_id": "executive_awareness",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Executive Sign-ups*\n Better conversion among Non-Technical audience",
+            },
+            "accessory": {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Executive Sign-Ups",
+                },
+                "value": "executive_signups",
+                "action_id": "executive_signups",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Practitioner Awareness*\n More clicks among Technical audience",
+            },
+            "accessory": {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Practitioner Awareness",
+                },
+                "value": "practitioner_awareness",
+                "action_id": "practitioner_awareness",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Practitioner Sign-Ups*\n Better conversion among Technical audience",
+            },
+            "accessory": {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Practitioner Sign-Ups",
+                },
+                "value": "practitioner_signups",
+                "action_id": "practitioner_signups",
+            },
+        },
+    ]
+    return blocks

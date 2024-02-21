@@ -20,7 +20,11 @@ from slack_sdk.web import SlackResponse
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.slack.formatter import MrkdwnFormatter
-from wandbot.apps.slack.utils import get_init_block, get_initial_message
+from wandbot.apps.slack.utils import (
+    get_adcopy_blocks,
+    get_init_block,
+    get_initial_message,
+)
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
@@ -154,6 +158,70 @@ async def docsbot_handler(
 
     except Exception as e:
         logger.error(f"Error posting message: {e}")
+
+
+@app.action("adcopy")
+async def adcopy_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    """
+    Handles the command when the app is mentioned in a message.
+    :param ack:
+    :param body:
+    :param say:
+    :param logger:
+    :return:
+    """
+
+    await ack()
+
+    logger.info(f"Received message: {body}")
+    initial_message = await get_initial_message(
+        app, body["message"], body["channel"].get("id"), config.SLACK_BOT_TOKEN
+    )
+    logger.info(f"Initial message: {initial_message}")
+
+    thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
+        "ts", None
+    )
+
+    adcopy_blocks = get_adcopy_blocks()
+
+    say = partial(say, token=config.SLACK_BOT_TOKEN)
+    await say(blocks=adcopy_blocks, thread_ts=thread_ts)
+
+
+@app.action("executive_awareness")
+async def executive_awareness_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    """
+    Handles the command when the app is mentioned in a message.
+    :param ack:
+    :param body:
+    :param say:
+    :param logger:
+    :return:
+    """
+
+    await ack()
+
+    logger.info(f"Received message: {body}")
+    initial_message = await get_initial_message(
+        app, body["message"], body["channel"].get("id"), config.SLACK_BOT_TOKEN
+    )
+    logger.info(f"Initial message: {initial_message}")
+    query = initial_message.get("text")
+    api_response = await api_client.generate_ads(
+        query=query, action="awareness", persona="executive"
+    )
+
+    thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
+        "ts", None
+    )
+    say = partial(say, token=config.SLACK_BOT_TOKEN)
+
+    await say(api_response.ad_copies, thread_ts=thread_ts)
 
 
 def parse_reaction(reaction: str) -> int:

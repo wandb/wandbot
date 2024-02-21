@@ -15,7 +15,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
-
+from wandbot.api.routers.adcopy import AdCopyRequest, AdCopyResponse
 from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
 from wandbot.api.routers.database import (
     APIFeedbackRequest,
@@ -61,6 +61,7 @@ class APIClient:
             str(self.url), "data/question_answer"
         )
         self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
+        self.generate_ads_endpoint = urljoin(str(self.url), "generate_ads")
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
@@ -588,5 +589,49 @@ class AsyncAPIClient(APIClient):
             top_k=top_k,
         )
         response = await self._retrieve(request)
+
+        return response
+
+    async def _generate_ads(
+        self, request: AdCopyRequest
+    ) -> AdCopyResponse | None:
+        """Private method to generate ad copy.
+
+        Args:
+            request: The request object containing the query string and language.
+
+        Returns:
+            The response from the API. None if the status code is not 200.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.generate_ads_endpoint,
+                json=json.loads(request.model_dump_json()),
+            ) as response:
+                if response.status == 200:
+                    response = await response.json()
+                    return AdCopyResponse(**response)
+                else:
+                    return None
+
+    async def generate_ads(
+        self, query: str, action: str, persona: str
+    ) -> AdCopyResponse:
+        """Generates ad copy given query.
+
+        Args:
+            query: The query string.
+            action: The action to generate ad copy for.
+            persona: The persona to generate ad copy for.
+
+        Returns:
+            List of generated ad copy.
+        """
+        request = AdCopyRequest(
+            query=query,
+            action=action,
+            persona=persona,
+        )
+        response = await self._generate_ads(request)
 
         return response

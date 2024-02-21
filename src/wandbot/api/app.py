@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import wandb
 from fastapi import FastAPI
+from wandbot.api.routers import adcopy as adcopy_router
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
     retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
         vector_store=vector_store
     )
+    adcopy_router.ads_engine = adcopy_router.AdCopyEngine(chat=chat_router.chat)
 
     async def backup_db():
         """Periodically backs up the database to a table.
@@ -105,6 +107,7 @@ app = FastAPI(
 app.include_router(chat_router.router)
 app.include_router(database_router.router)
 app.include_router(retrieve_router.router)
+app.include_router(adcopy_router.router)
 
 
 if __name__ == "__main__":
