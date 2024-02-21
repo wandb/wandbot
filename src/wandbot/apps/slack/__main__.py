@@ -191,20 +191,16 @@ async def adcopy_handler(
     await say(blocks=adcopy_blocks, thread_ts=thread_ts)
 
 
-@app.action("executive_awareness")
-async def executive_awareness_handler(
-    ack: callable, body: dict, say: callable, logger: logging.Logger
+async def handle_adcopy_action(
+    body: dict, say: callable, action: str, persona: str, logger: logging.Logger
 ) -> None:
     """
     Handles the command when the app is mentioned in a message.
-    :param ack:
     :param body:
     :param say:
     :param logger:
     :return:
     """
-
-    await ack()
 
     logger.info(f"Received message: {body}")
     initial_message = await get_initial_message(
@@ -213,7 +209,7 @@ async def executive_awareness_handler(
     logger.info(f"Initial message: {initial_message}")
     query = initial_message.get("text")
     api_response = await api_client.generate_ads(
-        query=query, action="awareness", persona="executive"
+        query=query, action=action, persona=persona
     )
 
     thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
@@ -222,6 +218,38 @@ async def executive_awareness_handler(
     say = partial(say, token=config.SLACK_BOT_TOKEN)
 
     await say(api_response.ad_copies, thread_ts=thread_ts)
+
+
+@app.action("executive_awareness")
+async def executive_awareness_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    await ack()
+    await handle_adcopy_action(body, say, "awareness", "executive", logger)
+
+
+@app.action("executive_signups")
+async def executive_signups_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    await ack()
+    await handle_adcopy_action(body, say, "signups", "executive", logger)
+
+
+@app.action("technical_awareness")
+async def technical_awareness_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    await ack()
+    await handle_adcopy_action(body, say, "awareness", "technical", logger)
+
+
+@app.action("technical_signups")
+async def technical_signups_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
+) -> None:
+    await ack()
+    await handle_adcopy_action(body, say, "signups", "technical", logger)
 
 
 def parse_reaction(reaction: str) -> int:
