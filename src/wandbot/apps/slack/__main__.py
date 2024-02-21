@@ -17,10 +17,10 @@ from functools import partial
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.web import SlackResponse
-
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.slack.formatter import MrkdwnFormatter
+from wandbot.apps.slack.utils import get_init_block, get_initial_message
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
 
@@ -60,13 +60,25 @@ async def send_message(
 
 
 @app.event("app_mention")
-async def command_handler(
-    body: dict, say: callable, logger: logging.Logger
+async def handle_mention(
+    event: dict, say: callable, logger: logging.Logger
+) -> None:
+    original_msg_ts = event.get("ts")
+    user = event.get("user")
+    init_block = get_init_block(user=user)
+    say = partial(say, token=config.SLACK_BOT_TOKEN)
+    await say(blocks=init_block, thread_ts=original_msg_ts)
+
+
+@app.action("docsbot")
+async def docsbot_handler(
+    ack: callable, body: dict, say: callable, logger: logging.Logger
 ) -> None:
     """
     Handles the command when the app is mentioned in a message.
 
     Args:
+        ack (function): The function to acknowledge the event.
         body (dict): The event body containing the message details.
         say (function): The function to send a message.
         logger (Logger): The logger instance for logging errors.
@@ -74,12 +86,20 @@ async def command_handler(
     Raises:
         Exception: If there is an error posting the message.
     """
+    await ack()
+
+    logger.info(f"Received message: {body}")
+    initial_message = await get_initial_message(
+        app, body["message"], body["channel"].get("id"), config.SLACK_BOT_TOKEN
+    )
+    logger.info(f"Initial message: {initial_message}")
+
     try:
-        query = body["event"].get("text")
-        user = body["event"].get("user")
-        thread_id = body["event"].get("thread_ts", None) or body["event"].get(
-            "ts", None
-        )
+        query = initial_message.get("text")
+        user = initial_message.get("user")
+        thread_id = initial_message.get(
+            "thread_ts", None
+        ) or initial_message.get("ts", None)
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
         chat_history = await api_client.get_chat_history(
@@ -112,13 +132,13 @@ async def command_handler(
         )
 
         await app.client.reactions_add(
-            channel=body["event"]["channel"],
+            channel=body["channel"].get("id"),
             timestamp=sent_message["ts"],
             name="thumbsup",
             token=config.SLACK_BOT_TOKEN,
         )
         await app.client.reactions_add(
-            channel=body["event"]["channel"],
+            channel=body["channel"].get("id"),
             timestamp=sent_message["ts"],
             name="thumbsdown",
             token=config.SLACK_BOT_TOKEN,
