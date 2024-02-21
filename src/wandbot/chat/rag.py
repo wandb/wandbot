@@ -3,11 +3,10 @@ from typing import List, Tuple
 
 from langchain_community.callbacks import get_openai_callback
 from pydantic import BaseModel
-
-from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.rag.response_synthesis import ResponseSynthesizer
 from wandbot.rag.retrieval import FusionRetrieval
+from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +29,7 @@ def get_stats_dict_from_timer(timer):
     }
 
 
-class PipelineOutput(BaseModel):
+class RAGPipelineOutput(BaseModel):
     question: str
     answer: str
     sources: str
@@ -45,16 +44,17 @@ class PipelineOutput(BaseModel):
     end_time: datetime.datetime
 
 
-class Pipeline:
+class RAGPipeline:
     def __init__(
         self,
-        vector_store_config: VectorStoreConfig,
+        vector_store: VectorStore,
         top_k: int = 15,
         search_type: str = "mmr",
     ):
+        self.vector_store = vector_store
         self.query_enhancer = QueryEnhancer()
         self.retrieval = FusionRetrieval(
-            vector_store_config, top_k=top_k, search_type=search_type
+            vector_store=vector_store, top_k=top_k, search_type=search_type
         )
         self.response_synthesizer = ResponseSynthesizer()
 
@@ -75,7 +75,7 @@ class Pipeline:
         with get_openai_callback() as response_cb, Timer() as response_tb:
             response = self.response_synthesizer.chain.invoke(retrieval_results)
 
-        output = PipelineOutput(
+        output = RAGPipelineOutput(
             question=enhanced_query["standalone_query"],
             answer=response["response"],
             sources="\n".join(
