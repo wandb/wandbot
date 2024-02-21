@@ -26,15 +26,14 @@ Typical usage example:
 """
 from typing import List
 
-from weave.monitoring import StreamTable
-
 import wandb
 from wandbot.chat.config import ChatConfig
-from wandbot.chat.rag import Pipeline, PipelineOutput
+from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
-from wandbot.ingestion.config import VectorStoreConfig
+from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -45,19 +44,21 @@ class Chat:
     Attributes:
         config: An instance of ChatConfig containing configuration settings.
         run: An instance of wandb.Run for logging experiment information.
-        wandb_callback: An instance of WandbCallbackHandler for handling Wandb callbacks.
-        token_counter: An instance of TokenCountingHandler for counting tokens.
-        callback_manager: An instance of CallbackManager for managing callbacks.
-        qa_prompt: A string representing the chat prompt.
     """
 
-    def __init__(self, config: ChatConfig):
+    config: ChatConfig = ChatConfig()
+
+    def __init__(
+        self, vector_store: VectorStore, config: ChatConfig | None = None
+    ):
         """Initializes the Chat instance.
 
         Args:
             config: An instance of ChatConfig containing configuration settings.
         """
-        self.config = config
+        self.vector_store = vector_store
+        if config is not None:
+            self.config = config
         self.run = wandb.init(
             project=self.config.wandb_project,
             entity=self.config.wandb_entity,
@@ -70,11 +71,11 @@ class Chat:
             entity_name=self.config.wandb_entity,
         )
 
-        self.rag_pipeline = Pipeline(VectorStoreConfig())
+        self.rag_pipeline = RAGPipeline(vector_store=vector_store)
 
     def _get_answer(
         self, question: str, chat_history: List[QuestionAnswer]
-    ) -> PipelineOutput:
+    ) -> RAGPipelineOutput:
         history = []
         for item in chat_history:
             history.append(("user", item.question))

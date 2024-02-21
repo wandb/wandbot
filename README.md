@@ -111,8 +111,8 @@ We employed a few auto evaluation strategies to speed up the iteration process o
 
 ## Overview of the Implementation
 
-1. Creating Document Embeddings with FAISS
-2. Constructing the Q&A Pipeline using llama-index
+1. Creating Document Embeddings with ChromaDB
+2. Constructing the Q&A RAGPipeline
 3. Selection of Models and Implementation of Fallback Mechanism
 4. Deployment of the Q&A Bot on FastAPI, Discord, and Slack
 5. Utilizing Weights & Biases Tables for Logging and Analysis

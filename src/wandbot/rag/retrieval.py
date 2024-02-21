@@ -3,8 +3,6 @@ from typing import List
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
-
-from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
@@ -57,15 +55,16 @@ def rerank_results(
 class FusionRetrieval:
     def __init__(
         self,
-        vector_store_config: VectorStoreConfig,
+        vector_store: VectorStore,
         top_k: int = 5,
         search_type: str = "mmr",
     ):
-        self.vectorstore = VectorStore.from_config(vector_store_config)
+        self.vectorstore = vector_store
         self.top_k = top_k
+        self.search_type = search_type
 
         self.retriever = self.vectorstore.as_parent_retriever(
-            search_type=search_type, search_kwargs={"k": self.top_k}
+            search_type=self.search_type, search_kwargs={"k": self.top_k}
         )
 
         self._chain = None

@@ -1,12 +1,11 @@
 from operator import itemgetter
 from typing import List
 
+import wandb
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
-
-import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
@@ -16,10 +15,17 @@ class VectorStore:
     embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel(
         dimensions=512
     )
+    config: VectorStoreConfig = VectorStoreConfig()
 
     def __init__(
-        self, embeddings_model: str, collection_name: str, persist_dir: str
+        self,
+        embeddings_model: str,
+        collection_name: str,
+        persist_dir: str,
+        config: VectorStoreConfig = None,
     ):
+        if config is not None:
+            self.config = config
         self.embeddings_model = embeddings_model  # type: ignore
         self.vectorstore = Chroma(
             collection_name=collection_name,
@@ -34,6 +40,7 @@ class VectorStore:
                 embeddings_model=config.embeddings_model,
                 collection_name=config.name,
                 persist_dir=str(config.persist_dir),
+                config=config,
             )
         if wandb.run is None:
             api = wandb.Api()
@@ -46,6 +53,7 @@ class VectorStore:
             embeddings_model=config.embeddings_model,
             collection_name=config.name,
             persist_dir=str(config.persist_dir),
+            config=config,
         )
 
     def as_retriever(self, search_type="mmr", search_kwargs=None):
@@ -81,13 +89,9 @@ class SimpleRetrievalEngine:
         dimensions=768
     )
 
-    def __init__(
-        self,
-        vector_store_config: VectorStoreConfig,
-        top_k=5,
-    ):
-        self.vector_store = VectorStore.from_config(vector_store_config)
-        self.embeddings_model = vector_store_config.embeddings_model  # type: ignore
+    def __init__(self, vector_store: VectorStore, top_k=5):
+        self.vector_store = vector_store
+        self.embeddings_model = vector_store.config.embeddings_model  # type: ignore
         self.redundant_filter = EmbeddingsRedundantFilter(
             embeddings=self.embeddings_model
         ).transform_documents

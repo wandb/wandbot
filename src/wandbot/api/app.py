@@ -33,13 +33,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import FastAPI
-
 import wandb
+from fastapi import FastAPI
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
 from wandbot.ingestion.config import VectorStoreConfig
+from wandbot.retriever import VectorStore
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -56,10 +56,11 @@ async def lifespan(app: FastAPI):
     Returns:
         None
     """
-    chat_router.chat = chat_router.Chat(chat_router.chat_config)
+    vector_store = VectorStore.from_config(VectorStoreConfig())
+    chat_router.chat = chat_router.Chat(vector_store=vector_store)
     database_router.db_client = database_router.DatabaseClient()
     retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-        VectorStoreConfig()
+        vector_store=vector_store
     )
 
     async def backup_db():
