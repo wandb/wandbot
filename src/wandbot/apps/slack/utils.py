@@ -144,10 +144,10 @@ def get_adcopy_blocks() -> List[Dict[str, Any]]:
                 "type": "button",
                 "text": {
                     "type": "plain_text",
-                    "text": "Practitioner Awareness",
+                    "text": "Technical Awareness",
                 },
-                "value": "practitioner_awareness",
-                "action_id": "practitioner_awareness",
+                "value": "technical_awareness",
+                "action_id": "technical_awareness",
             },
         },
         {
@@ -160,10 +160,10 @@ def get_adcopy_blocks() -> List[Dict[str, Any]]:
                 "type": "button",
                 "text": {
                     "type": "plain_text",
-                    "text": "Practitioner Sign-Ups",
+                    "text": "Technical Sign-Ups",
                 },
-                "value": "practitioner_signups",
-                "action_id": "practitioner_signups",
+                "value": "technical_signups",
+                "action_id": "technical_signups",
             },
         },
     ]
