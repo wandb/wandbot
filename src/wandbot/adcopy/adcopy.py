@@ -1,7 +1,7 @@
+import json
 from operator import itemgetter
 from typing import Any, Dict, List
 
-import pandas as pd
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableParallel
@@ -9,58 +9,6 @@ from langchain_openai import ChatOpenAI
 from wandbot.chat.chat import Chat
 from wandbot.chat.schemas import ChatRequest
 from wandbot.rag.utils import ChatModel
-
-
-def create_additional_context(row):
-    required_cols = [
-        "Long headline",
-        "Headline 1",
-        "Headline 2",
-        "Headline 3",
-        "Headline 4",
-        "Headline 5",
-        "Headline 6",
-        "Headline 7",
-        "Headline 8",
-        "Headline 9",
-        "Headline 10",
-        "Headline 11",
-        "Headline 12",
-        "Headline 13",
-        "Headline 14",
-        "Description 1",
-        "Description 2",
-        "Description 3",
-        "Description 4",
-        "Description 5",
-        "Call to action text",
-        "Call to action headline",
-    ]
-
-    output_str = ""
-    for col in required_cols:
-        if row[col] != "--" and row[col]:
-            output_str += col + " : " + row[col] + "\n"
-
-    return output_str.strip()
-
-
-def get_contexts(data_table):
-    data_table["Clicks"] = data_table["Clicks"].str.replace(",", "").astype(int)
-    data_table["additional_context"] = data_table.fillna("").apply(
-        create_additional_context, axis=1
-    )
-
-    awareness_table = data_table[data_table["Clicks"] > 500][
-        "additional_context"
-    ]
-
-    conversion_table = data_table[
-        (data_table["Cost / conv."] > 0.01) & (data_table["Cost / conv."] < 100)
-    ]["additional_context"]
-
-    return {"awareness": awareness_table, "signups": conversion_table}
-
 
 AD_FORMATS = {
     "Short headline": 6,
@@ -101,11 +49,11 @@ class AdCopyEngine:
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.data_table = pd.read_csv("data/adcopy/ad_report.csv")
-        self.contexts = get_contexts(self.data_table)
         self.chat = chat
-        self.model = model
-        self.fallback_model = fallback_model
+        self.model = model  # type: ignore
+        self.fallback_model = fallback_model  # type: ignore
+
+        self.contexts = json.load(open("data/adcopy/ad_contexts.json", "r"))
 
         self.wandbot_query_prompt = open(
             "data/adcopy/wandbot_query_prompt.md", "r"
@@ -179,18 +127,3 @@ class AdCopyEngine:
             base_str = f"*{result['ad_format']} for {persona.title()} {action.title()}*\n\n{result['headlines']}\n\n"
             str_output += base_str + "\n\n"
         return str_output
-
-
-if __name__ == "__main__":
-    from wandbot.ingestion.config import VectorStoreConfig
-    from wandbot.retriever.base import VectorStore
-
-    vectorstore = VectorStore.from_config(VectorStoreConfig())
-    chat = Chat(vectorstore)
-    adcopy_engine = AdCopyEngine(chat=chat)
-
-    query = "How to train a GPT-3 model?"
-    persona = "technical"
-    action = "awareness"
-    results = adcopy_engine(query, persona, action)
-    print(results)
