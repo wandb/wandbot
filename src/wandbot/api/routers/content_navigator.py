@@ -17,6 +17,7 @@ class ContentNavigatorResponse(BaseModel):
 
     slack_response: str
     rejected_slack_response: str = ""
+    response_items_count: int = 0
 
 
 router = APIRouter(
@@ -34,12 +35,17 @@ async def generate_content_suggestions(request: ContentNavigatorQuery):
         )
         response_data = response.json()
     
-    if response_data.get("slack_response", "") == "":
+    slack_response = response_data.get("slack_response", "")
+    rejected_slack_response = response_data.get("rejected_slack_response", "")
+    response_items_count = response_data.get("response_items_count", 0)
+
+    if slack_response == "":
         slack_response = "It looks like there is an issue with the Content Navigator app at \
 the moment, please try again later."
 
     return ContentNavigatorResponse(
         slack_response=slack_response,
-        rejected_slack_response=response_data.get("rejected_slack_response", "")
+        rejected_slack_response=rejected_slack_response,
+        response_items_count=response_items_count,
     )
 

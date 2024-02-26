@@ -16,15 +16,16 @@ async def handle_content_navigator_action(
     initial_message = await get_initial_message_from_thread(
         slack_client, body["message"], body["channel"].get("id")
     )
-    logger.info(f"Initial message: {initial_message}")
-    query = initial_message.get("text")
-    user_id = initial_message.get("user", "")
-    api_response = await api_client.generate_content_suggestions(
-        query=query, user_id=user_id
-    )
-
     thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
         "ts", None
+    )
+    query = initial_message.get("text")
+    user_id = initial_message.get("user", "")
+
+    logger.info(f"Initial message: {initial_message}")
+    await say("Working on it...", thread_ts=thread_ts)
+    api_response = await api_client.generate_content_suggestions(
+        query=query, user_id=user_id
     )
 
     # if there are any content suggestions, send them
