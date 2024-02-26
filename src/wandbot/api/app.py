@@ -36,6 +36,7 @@ import pandas as pd
 import wandb
 from fastapi import FastAPI
 from wandbot.api.routers import adcopy as adcopy_router
+from wandbot.api.routers import content_navigator as content_navigator_router
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
@@ -108,6 +109,8 @@ app.include_router(chat_router.router)
 app.include_router(database_router.router)
 app.include_router(retrieve_router.router)
 app.include_router(adcopy_router.router)
+app.include_router(adcopy_router.router)
+app.include_router(content_navigator_router.router)
 
 
 if __name__ == "__main__":
