@@ -201,6 +201,7 @@ def create_youtube_chat_input_handler() -> callable:
         await ack()
         logger.info(f"Received message: {body}")
         url = body["actions"][0]["value"]
+        await say("Working on in it...", thread_ts=body["message"]["thread_ts"],)
         video_confirmation_block = get_video_confirmation_blocks(url)
         await say(
             blocks=video_confirmation_block,

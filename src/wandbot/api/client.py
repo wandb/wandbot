@@ -617,7 +617,7 @@ class AsyncAPIClient(APIClient):
                     response = await response.json()
                     return AdCopyResponse(**response)
                 else:
-                    return None
+                    return AdCopyResponse(ad_copies="")
 
     async def generate_ads(
         self, query: str, action: str, persona: str

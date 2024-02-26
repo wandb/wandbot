@@ -1,3 +1,4 @@
+import re
 import logging
 from typing import Any, Dict, List
 
@@ -123,15 +124,20 @@ async def handle_adcopy_action(
     initial_message = await get_initial_message_from_thread(
         slack_client, body["message"], body["channel"].get("id")
     )
-    logger.info(f"Initial message: {initial_message}")
+    thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
+        "ts", None
+    )
     query = initial_message.get("text")
+    query = re.sub(r"\<@\w+\>", "", query).strip()
+    logger.info(f"Initial message: {initial_message}")
+
+    await say(f"Working on generating ads for '{persona}' focussed on '{action}' \
+for the query: '{query}'...", thread_ts=thread_ts)
+
     api_response = await api_client.generate_ads(
         query=query, action=action, persona=persona
     )
 
-    thread_ts = initial_message.get("thread_ts", None) or initial_message.get(
-        "ts", None
-    )
     await say(api_response.ad_copies, thread_ts=thread_ts)
 
 

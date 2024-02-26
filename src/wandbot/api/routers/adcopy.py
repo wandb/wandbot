@@ -42,4 +42,4 @@ def generate_ads(request: AdCopyRequest):
         action=request.action.value,
     )
 
-    return {"ad_copies": response}
+    return AdCopyResponse(ad_copies=response)
