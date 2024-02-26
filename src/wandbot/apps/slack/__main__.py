@@ -24,6 +24,9 @@ from wandbot.apps.slack.handlers.ad_copy import (
     create_technical_awareness_handler,
     create_technical_signups_handler,
 )
+from wandbot.apps.slack.handlers.content_navigator import (
+    create_content_navigator_handler,
+)
 from wandbot.apps.slack.handlers.docsbot import (
     create_docsbot_handler,
     create_reaction_added_handler,
@@ -184,13 +187,13 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Find Content*\n Suggest Fully Connected articles related to your query",
+                "text": "*Find Content*\n Suggest W&B articles, whitepapers, courses etc related to your query",
             },
             "accessory": {
                 "type": "button",
-                "text": {"type": "plain_text", "text": "Content Suggestor"},
-                "value": "content_suggestor",
-                "action_id": "content_suggestor",
+                "text": {"type": "plain_text", "text": "Content Navigator"},
+                "value": "content_navigator",
+                "action_id": "content_navigator",
             },
         },
         {
@@ -208,3 +211,13 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
         },
     ]
     return initial_block
+
+# --------------------------------------
+# Handlers for the Content Navigator
+# --------------------------------------
+
+app.action("content_navigator")(
+    create_content_navigator_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)

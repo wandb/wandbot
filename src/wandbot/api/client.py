@@ -17,6 +17,7 @@ import aiohttp
 import requests
 from wandbot.api.routers.adcopy import AdCopyRequest, AdCopyResponse
 from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
+from wandbbot.api.routers.content_navigator import ContentNavigatorRequest, ContentNavigatorResponse
 from wandbot.api.routers.database import (
     APIFeedbackRequest,
     APIFeedbackResponse,
@@ -62,6 +63,7 @@ class APIClient:
         )
         self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
         self.generate_ads_endpoint = urljoin(str(self.url), "generate_ads")
+        self.generate_content_suggestions_endpoint = urljoin(str(self.url), "generate_content_suggestions")
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
@@ -635,3 +637,47 @@ class AsyncAPIClient(APIClient):
         response = await self._generate_ads(request)
 
         return response
+    
+    async def _generate_content_suggestions(
+            self, request: ContentNavigatorRequest
+    ) -> ContentNavigatorResponse | None:
+        """Call the content navigator API.
+
+        Args:
+            request: The request object containing the query string and username.
+
+        Returns:
+            The response from the API. None if the status code is not 200.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.generate_content_suggestions_endpoint,
+                json=json.loads(request.model_dump_json()),
+            ) as response:
+                if response.status == 200:
+                    response = await response.json()
+                    return ContentNavigatorResponse(**response)
+                else:
+                    return None
+
+    async def generate_content_suggestions(
+            self, username: str, query: str
+    ) -> ContentNavigatorResponse:
+        """Generates content suggestions given query.
+
+        Args:
+            username: The username of the user.
+            query: The query string.
+
+        Returns:
+            List of generated content suggestions.
+        """
+        request = ContentNavigatorRequest(
+            username=username,
+            query=query,
+        )
+
+        response = await self._generate_content_suggestions(request)
+
+        return response
+            
