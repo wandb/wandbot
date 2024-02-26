@@ -62,85 +62,6 @@ app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 slack_client = app.client
 
-
-# --------------------------------------
-# Main Wandbot Mention Handler
-# --------------------------------------
-@app.event("app_mention")
-async def handle_mention(event: dict, say: callable) -> None:
-    original_msg_ts = event.get("ts")
-    user = event.get("user")
-    init_block = get_init_block(user=user)
-    await say(blocks=init_block, thread_ts=original_msg_ts)
-
-
-# --------------------------------------
-# Handlers for the Docsbot
-# --------------------------------------
-app.action("docsbot")(
-    create_docsbot_handler(
-        config=config, slack_client=slack_client, api_client=api_client
-    )
-)
-
-app.event("reaction_added")(
-    create_reaction_added_handler(
-        slack_client=slack_client, api_client=api_client
-    )
-)
-
-
-# --------------------------------------
-# Handlers for the Ad Copy Generator
-# --------------------------------------
-
-app.action("adcopy")(create_adcopy_init_handler(slack_client=slack_client))
-
-app.action("executive_awareness")(
-    create_executive_awareness_handler(
-        slack_client=slack_client, api_client=api_client
-    )
-)
-
-app.action("executive_signups")(
-    create_executive_signups_handler(
-        slack_client=slack_client, api_client=api_client
-    )
-)
-
-app.action("technical_awareness")(
-    create_technical_awareness_handler(
-        slack_client=slack_client, api_client=api_client
-    )
-)
-
-app.action("technical_signups")(
-    create_technical_signups_handler(
-        slack_client=slack_client, api_client=api_client
-    )
-)
-
-
-# --------------------------------------
-# Handlers for the YouTube Chat
-# --------------------------------------
-
-app.action("yt_assistant")(
-    create_youtube_chat_init_handler(slack_client=slack_client)
-)
-
-app.action("chat_youtube")(create_youtube_chat_input_handler())
-
-
-async def main():
-    handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
-    await handler.start_async()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-
 def get_init_block(user: str) -> List[Dict[str, Any]]:
     initial_block = [
         {
@@ -213,6 +134,75 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
     return initial_block
 
 # --------------------------------------
+# Main Wandbot Mention Handler
+# --------------------------------------
+@app.event("app_mention")
+async def handle_mention(event: dict, say: callable) -> None:
+    original_msg_ts = event.get("ts")
+    user = event.get("user")
+    init_block = get_init_block(user=user)
+    await say(blocks=init_block, thread_ts=original_msg_ts)
+
+
+# --------------------------------------
+# Handlers for the Docsbot
+# --------------------------------------
+app.action("docsbot")(
+    create_docsbot_handler(
+        config=config, slack_client=slack_client, api_client=api_client
+    )
+)
+
+app.event("reaction_added")(
+    create_reaction_added_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)
+
+
+# --------------------------------------
+# Handlers for the Ad Copy Generator
+# --------------------------------------
+
+app.action("adcopy")(create_adcopy_init_handler(slack_client=slack_client))
+
+app.action("executive_awareness")(
+    create_executive_awareness_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)
+
+app.action("executive_signups")(
+    create_executive_signups_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)
+
+app.action("technical_awareness")(
+    create_technical_awareness_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)
+
+app.action("technical_signups")(
+    create_technical_signups_handler(
+        slack_client=slack_client, api_client=api_client
+    )
+)
+
+
+# --------------------------------------
+# Handlers for the YouTube Chat
+# --------------------------------------
+
+app.action("yt_assistant")(
+    create_youtube_chat_init_handler(slack_client=slack_client)
+)
+
+app.action("chat_youtube")(create_youtube_chat_input_handler())
+
+
+# --------------------------------------
 # Handlers for the Content Navigator
 # --------------------------------------
 
@@ -221,3 +211,11 @@ app.action("content_navigator")(
         slack_client=slack_client, api_client=api_client
     )
 )
+
+async def main():
+    handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)
+    await handler.start_async()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
