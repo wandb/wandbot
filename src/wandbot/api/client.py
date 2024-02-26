@@ -15,9 +15,12 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
+from wandbbot.api.routers.content_navigator import (
+    ContentNavigatorRequest,
+    ContentNavigatorResponse,
+)
 from wandbot.api.routers.adcopy import AdCopyRequest, AdCopyResponse
 from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
-from wandbbot.api.routers.content_navigator import ContentNavigatorRequest, ContentNavigatorResponse
 from wandbot.api.routers.database import (
     APIFeedbackRequest,
     APIFeedbackResponse,
