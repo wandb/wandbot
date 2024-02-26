@@ -664,7 +664,7 @@ class AsyncAPIClient(APIClient):
                     return None
 
     async def generate_content_suggestions(
-            self, username: str, query: str
+            self, user_id: str, query: str
     ) -> ContentNavigatorResponse:
         """Generates content suggestions given query.
 
@@ -676,7 +676,7 @@ class AsyncAPIClient(APIClient):
             List of generated content suggestions.
         """
         request = ContentNavigatorRequest(
-            username=username,
+            user_id=user_id,
             query=query,
         )
 

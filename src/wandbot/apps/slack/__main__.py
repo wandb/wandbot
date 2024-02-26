@@ -82,7 +82,7 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*W&B Technical Support*\n Technical support for the W&B app and SDK",
+                "text": "*Get W&B Technical Support*\n Technical support for the W&B app and SDK",
             },
             "accessory": {
                 "type": "button",
@@ -108,7 +108,7 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Find Content*\n Suggest W&B articles, whitepapers, courses etc related to your query",
+                "text": "*Suggest W&B Content*\n Suggest W&B articles, whitepapers, courses etc related to your query",
             },
             "accessory": {
                 "type": "button",

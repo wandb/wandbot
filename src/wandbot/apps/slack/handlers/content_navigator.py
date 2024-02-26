@@ -23,7 +23,7 @@ async def handle_content_navigator_action(
     user_id = initial_message.get("user", "")
 
     logger.info(f"Initial message: {initial_message}")
-    await say("Working on it...", thread_ts=thread_ts)
+    await say("Working on finding relevant W&B content...", thread_ts=thread_ts)
     api_response = await api_client.generate_content_suggestions(
         query=query, user_id=user_id
     )
