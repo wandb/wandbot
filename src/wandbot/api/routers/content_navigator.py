@@ -6,7 +6,7 @@ from starlette import status
 
 CONTENT_NAVIGATOR_ENDPOINT = "https://wandb-content-navigator.replit.app/get_content"
 
-class ContentNavigatorQuery(BaseModel):
+class ContentNavigatorRequest(BaseModel):
     """A user query to be used by the content navigator app"""
 
     user_id: str = None
@@ -27,7 +27,7 @@ router = APIRouter(
 
 
 @router.post("/", response_model=ContentNavigatorResponse, status_code=status.HTTP_200_OK)
-async def generate_content_suggestions(request: ContentNavigatorQuery):
+async def generate_content_suggestions(request: ContentNavigatorRequest):
     async with httpx.AsyncClient(timeout=1200.0) as content_client:
         response = await content_client.post(
             CONTENT_NAVIGATOR_ENDPOINT,
