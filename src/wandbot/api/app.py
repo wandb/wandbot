@@ -109,7 +109,6 @@ app.include_router(chat_router.router)
 app.include_router(database_router.router)
 app.include_router(retrieve_router.router)
 app.include_router(adcopy_router.router)
-app.include_router(adcopy_router.router)
 app.include_router(content_navigator_router.router)
 
 
