@@ -12,11 +12,15 @@ def main():
     entity = os.environ.get("WANDB_ENTITY", "wandbot")
 
     raw_artifact = prepare_data.load(project, entity)
+    logger.info("Loaded all the data sources...")
 
     preprocessed_artifact = preprocess_data.load(project, entity, raw_artifact)
+    logger.info(f"Data sources preprocessed and stored at {preprocessed_artifact}")
+
     vectorstore_artifact = vectorstores.load(
         project, entity, preprocessed_artifact
     )
+    logger.info(f"Preprocessed chunks embedded and stored at {vectorstore_artifact}")
 
     create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
     print(vectorstore_artifact)
