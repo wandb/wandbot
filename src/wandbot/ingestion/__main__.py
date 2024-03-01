@@ -22,7 +22,7 @@ def main():
     )
     logger.info(f"Preprocessed chunks embedded and stored at {vectorstore_artifact}")
 
-    create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
+    # create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
     print(vectorstore_artifact)
 
 

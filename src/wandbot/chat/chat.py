@@ -65,11 +65,11 @@ class Chat:
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        self.chat_table = StreamTable(
-            table_name="chat_logs",
-            project_name=self.config.wandb_project,
-            entity_name=self.config.wandb_entity,
-        )
+        # self.chat_table = StreamTable(
+        #     table_name="chat_logs",
+        #     project_name=self.config.wandb_project,
+        #     entity_name=self.config.wandb_entity,
+        # )
 
         self.rag_pipeline = RAGPipeline(vector_store=vector_store)
 
@@ -108,7 +108,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            self.chat_table.log(result_dict)
+            # self.chat_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:

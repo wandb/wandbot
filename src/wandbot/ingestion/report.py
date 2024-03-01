@@ -75,6 +75,7 @@ def get_metadata_from_artifacts(
     for metadata_file in vectorstore_metadata_files:
         with metadata_file.open("r") as f:
             docstore_data = json.load(f)
+            # TODO: KeyError: 'docstore/ref_doc_info' (the docstore.json is empty)
             nodes = docstore_data["docstore/ref_doc_info"]
             vectorstore_metadata["num_documents"] = len(nodes)
             for node in nodes:
