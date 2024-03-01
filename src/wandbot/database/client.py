@@ -14,7 +14,8 @@ Typical usage example:
 """
 
 import json
-from typing import Any, List
+from datetime import datetime, timedelta
+from typing import Any, List, Collection
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -23,10 +24,16 @@ from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
 from wandbot.database.models import QuestionAnswer as QuestionAnswerModel
+from wandbot.database.models import (
+    YoutubeAssistantThread as YoutubeAssistantThreadModel,
+)
 from wandbot.database.schemas import ChatThreadCreate as ChatThreadCreateSchema
 from wandbot.database.schemas import Feedback as FeedbackSchema
 from wandbot.database.schemas import (
     QuestionAnswerCreate as QuestionAnswerCreateSchema,
+)
+from wandbot.database.schemas import (
+    YoutubeAssistantThreadCreate as YoutubeAssistantThreadCreateSchema,
 )
 from wandbot.utils import get_logger
 
@@ -87,7 +94,18 @@ class Database:
             instance: The instance of the owner class.
             value: The new session object.
         """
-        self.db = value
+        if value is not None:
+            engine: Any = create_engine(
+                url=value, connect_args=self.db_config.connect_args
+            )
+        else:
+            engine: Any = create_engine(
+                url=self.db_config.SQLALCHEMY_DATABASE_URL,
+                connect_args=self.db_config.connect_args,
+            )
+        self.SessionLocal: Any = sessionmaker(
+            autocommit=False, autoflush=False, bind=engine
+        )
 
     def __set_name__(self, owner, name) -> None:
         """Sets the name of the database.
@@ -109,7 +127,7 @@ class DatabaseClient:
             database: The URL of the database. If None, the default URL is used.
         """
         if database is not None:
-            self.database = Database(database=database)
+            self.database = database
 
     def get_chat_thread(
         self, application: str, thread_id: str
@@ -271,3 +289,92 @@ class DatabaseClient:
                 for question_answer in question_answers
             ]
             return question_answers
+
+    def get_youtube_assistant_thread(
+        self, thread_id: str
+    ) -> YoutubeAssistantThreadModel | None:
+        """Gets a youtube chat thread from the database.
+
+        Args:
+            assistant_thread_id: The ID of the youtube chat thread.
+
+        Returns:
+            The youtube chat thread model if found, None otherwise.
+        """
+        youtube_assistant_thread: YoutubeAssistantThreadModel | None = (
+            self.database.query(YoutubeAssistantThreadModel)
+            .filter(YoutubeAssistantThreadModel.thread_id == thread_id)
+            .first()
+        )
+        return youtube_assistant_thread
+
+    def create_youtube_assistant_thread(
+        self, youtube_assistant_thread: YoutubeAssistantThreadCreateSchema
+    ) -> YoutubeAssistantThreadModel:
+        """Creates a youtube chat thread in the database.
+
+        Args:
+            youtube_assistant_thread: The youtube chat thread to create.
+
+        Returns:
+            The created youtube chat thread.
+        """
+        try:
+            youtube_assistant_thread: YoutubeAssistantThreadModel = (
+                YoutubeAssistantThreadModel(
+                    **youtube_assistant_thread.model_dump()
+                )
+            )
+            youtube_assistant_thread.created_at = datetime.utcnow()
+            youtube_assistant_thread.updated_at = datetime.utcnow()
+            self.database.add(youtube_assistant_thread)
+            self.database.flush()
+            self.database.commit()
+            self.database.refresh(youtube_assistant_thread)
+        except Exception as e:
+            logger.error(f"Create youtube chat thread failed with error: {e}")
+            self.database.rollback()
+        return youtube_assistant_thread
+
+    def update_youtube_assistant_thread_time(
+        self, thread_id: str
+    ) -> YoutubeAssistantThreadModel:
+        """Updates a youtube chat thread in the database.
+
+        Args:
+            youtube_assistant_thread: The youtube chat thread to update.
+
+        Returns:
+            The updated youtube chat thread.
+        """
+        youtube_assistant_thread: YoutubeAssistantThreadModel = (
+            self.get_youtube_assistant_thread(thread_id=thread_id)
+        )
+        try:
+            youtube_assistant_thread.updated_at = datetime.utcnow()
+            self.database.add(youtube_assistant_thread)
+            self.database.flush()
+            self.database.commit()
+            self.database.refresh(youtube_assistant_thread)
+        except Exception as e:
+            logger.error(f"Update youtube chat thread failed with error: {e}")
+            self.database.rollback()
+        return youtube_assistant_thread
+
+    def delete_old_youtube_assistant_threads(
+        self, time_delta: timedelta = timedelta(hours=24)
+    ) -> Collection[YoutubeAssistantThreadCreateSchema]:
+        """Deletes YoutubeAssistantThread records that have not been updated in the last 24 hours."""
+        cutoff_time = datetime.now() - time_delta
+        old_threads = self.database.query(YoutubeAssistantThreadModel).filter(
+            YoutubeAssistantThreadModel.updated_at < cutoff_time
+        )
+        threads = [
+            YoutubeAssistantThreadCreateSchema.model_validate(thread)
+            for thread in old_threads.all()
+        ]
+
+        old_threads.delete(synchronize_session=False)
+        self.database.commit()
+
+        return threads

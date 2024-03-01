@@ -1,10 +1,11 @@
+from io import BytesIO
 from typing import Any, Dict, List
 
 from pydantic import AfterValidator, BaseModel, Field, HttpUrl, computed_field
 from pytube import YouTube
 from typing_extensions import Annotated
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.formatters import TextFormatter
+from youtube_transcript_api.formatters import SRTFormatter
 
 HttpUrlString = Annotated[HttpUrl, AfterValidator(str)]
 
@@ -59,6 +60,15 @@ class YoutubeVideoInfoWithTranscript(YoutubeVideoInfo):
     @computed_field
     @property
     def transcript_bytes(self) -> bytes:
-        return (
-            TextFormatter().format_transcript(self.transcript).encode("utf-8")
-        )
+        return SRTFormatter().format_transcript(self.transcript).encode("utf-8")
+
+
+class YoutubeVideoInforWithAudio(YoutubeVideoInfo):
+    @computed_field
+    @property
+    def audio(self) -> bytes:
+        buffer = BytesIO()
+        YouTube(self.url).streams.filter(
+            only_audio=True
+        ).first().stream_to_buffer(buffer)
+        return buffer.getvalue()

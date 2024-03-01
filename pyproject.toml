@@ -46,6 +46,7 @@ langchain-experimental = "^0.0.50"
 simsimd = "^3.7.4"
 youtube-transcript-api = "^0.6.2"
 pytube = "^15.0.0"
+pydub = "^0.25.1"
 
 [tool.poetry.dev-dependencies]
 #fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.

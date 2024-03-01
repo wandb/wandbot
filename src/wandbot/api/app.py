@@ -35,9 +35,10 @@ from datetime import datetime, timezone
 import pandas as pd
 import wandb
 from fastapi import FastAPI
+
 from wandbot.api.routers import adcopy as adcopy_router
-from wandbot.api.routers import content_navigator as content_navigator_router
 from wandbot.api.routers import chat as chat_router
+from wandbot.api.routers import content_navigator as content_navigator_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
 from wandbot.ingestion.config import VectorStoreConfig
@@ -94,7 +95,20 @@ async def lifespan(app: FastAPI):
                 )
             await asyncio.sleep(600)
 
+    async def delete_old_youtube_threads():
+        """Periodically deletes old YoutubeAssistantThread records.
+
+        This function runs periodically and deletes YoutubeAssistantThread records that have not been updated in the last 24 hours.
+
+        Returns:
+            None
+        """
+        while True:
+            database_router.db_client.delete_old_youtube_assistant_threads()
+            await asyncio.sleep(24 * 60 * 60)  # sleep for 24 hours
+
     _ = asyncio.create_task(backup_db())
+    _ = asyncio.create_task(delete_old_youtube_threads())
     yield
     if wandb.run is not None:
         wandb.run.finish()
