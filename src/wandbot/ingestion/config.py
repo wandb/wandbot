@@ -246,3 +246,24 @@ class VectorStoreConfig(BaseSettings):
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
     artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
+
+
+class OpenAIEmbeddingConfig(BaseSettings):
+    model: str = "text-embedding-3-small"
+    dimensions: int = 512
+
+
+class CohereEmbeddingConfig(BaseSettings):
+    model: str = "embed-english-v3.0"
+    input_type: str = "search_document"
+
+
+class HuggingFaceEmbeddingConfig(BaseSettings):
+    model: str = "huggingface/microsoft/codebert-base"
+
+class VoyageEmbeddingConfig(BaseSettings):
+    model: str = "voyage-lite-01-instruct"
+    
+
+class MistralEmbeddingConfig(BaseSettings):
+    model: str = "mistral/mistral-embed"
