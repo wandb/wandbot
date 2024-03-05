@@ -65,6 +65,12 @@ WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY="wandbot"
 ```
 
+The best practive would be to create a `.env` file in the root of this repo and execute this command in your terminal:
+
+```
+set -o allexport; source .env; set +o allexport
+```
+
 Once these environment variables are set, you can start the Q&A bot application using the following commands:
 
 ```bash
