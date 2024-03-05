@@ -10,7 +10,7 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from tree_sitter import Node
 from tree_sitter_languages import get_language, get_parser
 
-from wandbot.ingestion.preprocess.markdown import (
+from wandbot.ingestion.preprocessors.markdown import (
     CustomMarkdownTextSplitter,
     create_id_from_document,
 )

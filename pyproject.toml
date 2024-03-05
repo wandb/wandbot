@@ -12,7 +12,7 @@ include = ["src/**/*", "LICENSE", "README.md"]
 [tool.poetry.dependencies]
 python = ">=3.10.0,<3.12"
 numpy = "^1.26.1"
-wandb = "<=0.16.1"
+wandb = "<=0.16.3"
 tiktoken = "^0.5.1"
 pandas = "^2.1.2"
 unstructured = "^0.12.3"
