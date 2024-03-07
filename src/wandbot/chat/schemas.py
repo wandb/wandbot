@@ -17,7 +17,7 @@ Typical usage example:
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
     chat_history: List[QuestionAnswer] | None = None
     application: str | None = None
     language: str = "en"
+    images: Optional[List[str]] = None
 
 
 class ChatResponse(BaseModel):

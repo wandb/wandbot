@@ -24,7 +24,10 @@ Typical usage example:
           print(f"WandBot: {response.answer}")
           print(f"Time taken: {response.time_taken}")
 """
-from typing import List
+
+from typing import List, Optional
+
+from weave.monitoring import StreamTable
 
 import wandb
 from wandbot.chat.config import ChatConfig
@@ -33,7 +36,6 @@ from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -65,23 +67,27 @@ class Chat:
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        self.chat_table = StreamTable(
-            table_name="chat_logs",
-            project_name=self.config.wandb_project,
-            entity_name=self.config.wandb_entity,
-        )
+        # self.chat_table = StreamTable(
+        #     table_name="chat_logs",
+        #     project_name=self.config.wandb_project,
+        #     entity_name=self.config.wandb_entity,
+        # )
 
         self.rag_pipeline = RAGPipeline(vector_store=vector_store)
 
     def _get_answer(
-        self, question: str, chat_history: List[QuestionAnswer]
+        self,
+        question: str,
+        chat_history: List[QuestionAnswer],
+        images: Optional[List[str]] = None,
     ) -> RAGPipelineOutput:
         history = []
         for item in chat_history:
             history.append(("user", item.question))
             history.append(("assistant", item.answer))
+            # TODO: Add image prompts to history
 
-        result = self.rag_pipeline(question, history)
+        result = self.rag_pipeline(question, history, images=images)
 
         return result
 
@@ -95,8 +101,11 @@ class Chat:
             An instance of `ChatResponse` representing the chat response.
         """
         try:
+            logger.info(chat_request.images[0][:10])
             result = self._get_answer(
-                chat_request.question, chat_request.chat_history or []
+                chat_request.question,
+                chat_request.chat_history or [],
+                images=chat_request.images,
             )
 
             result_dict = result.model_dump()
@@ -108,7 +117,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            self.chat_table.log(result_dict)
+            # self.chat_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:

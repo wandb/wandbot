@@ -15,7 +15,7 @@ Typical usage example:
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, List, Collection
+from typing import Any, Collection, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker

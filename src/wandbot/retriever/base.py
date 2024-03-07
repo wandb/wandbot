@@ -1,17 +1,16 @@
 from operator import itemgetter
 from typing import List
 
-import wandb
+from chromadb.config import Settings as ChromaSettings
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
+
+import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
-
-from chromadb.config import Settings as ChromaSettings
-
 
 
 class VectorStore:
@@ -34,7 +33,7 @@ class VectorStore:
             collection_name=collection_name,
             embedding_function=self.embeddings_model,  # type: ignore
             persist_directory=persist_dir,
-            client_settings=ChromaSettings(anonymized_telemetry=False)
+            client_settings=ChromaSettings(anonymized_telemetry=False),
         )
 
     @classmethod

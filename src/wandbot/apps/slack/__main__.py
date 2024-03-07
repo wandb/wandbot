@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.slack.handlers.ad_copy import (
@@ -61,6 +62,7 @@ else:
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 slack_client = app.client
+
 
 def get_init_block(user: str) -> List[Dict[str, Any]]:
     initial_block = [
@@ -132,6 +134,7 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
         },
     ]
     return initial_block
+
 
 # --------------------------------------
 # Main Wandbot Mention Handler
@@ -211,6 +214,7 @@ app.action("content_navigator")(
         slack_client=slack_client, api_client=api_client
     )
 )
+
 
 async def main():
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)

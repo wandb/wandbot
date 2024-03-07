@@ -1,8 +1,8 @@
-import wandb
 from fastapi import APIRouter
 from starlette import status
 from starlette.responses import Response
 
+import wandb
 from wandbot.database.client import DatabaseClient
 from wandbot.database.database import engine
 from wandbot.database.models import Base
@@ -13,8 +13,8 @@ from wandbot.database.schemas import (
     FeedbackCreate,
     QuestionAnswer,
     QuestionAnswerCreate,
-    YoutubeAssistantThreadCreate,
     YoutubeAssistantThread,
+    YoutubeAssistantThreadCreate,
 )
 from wandbot.utils import get_logger
 

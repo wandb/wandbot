@@ -47,6 +47,10 @@ Intents:
 Sub-queries to consider answering: 
 
 {sub_queries}
+
+Context from attached images:
+
+{image_context}
 """
 )
 
@@ -58,6 +62,7 @@ def create_query_str(enhanced_query, document_prompt=DEFAULT_QUESTION_PROMPT):
         "intents": enhanced_query["intents"],
         "sub_queries": "\t"
         + "\n\t".join(enhanced_query["sub_queries"]).strip(),
+        "image_context": enhanced_query["image_context"],
     }
     doc = Document(page_content=page_content, metadata=metadata)
     doc = clean_document_content(doc)

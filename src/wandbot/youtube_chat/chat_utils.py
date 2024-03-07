@@ -9,14 +9,12 @@ from pydantic import BaseModel
 from tenacity import (
     retry,
     retry_if_result,
-    wait_exponential,
     stop_after_attempt,
+    wait_exponential,
 )
 
 from wandbot.database.client import DatabaseClient
-from wandbot.database.schemas import (
-    YoutubeAssistantThreadCreate,
-)
+from wandbot.database.schemas import YoutubeAssistantThreadCreate
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

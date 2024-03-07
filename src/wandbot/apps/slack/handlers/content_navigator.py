@@ -1,6 +1,7 @@
 import logging
 
 from slack_sdk.web.async_client import AsyncWebClient
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.utils import get_initial_message_from_thread
 
@@ -32,15 +33,20 @@ async def handle_content_navigator_action(
     if api_response.response_items_count > 0:
         await say(api_response.slack_response, thread_ts=thread_ts)
     else:
-        await say("No content suggestions found. Try rephrasing your query, but note \
+        await say(
+            "No content suggestions found. Try rephrasing your query, but note \
 there may also not be any relevant pieces of content for this query. Add '--debug' to \
 your query and try again to see a detailed resoning for each suggestion.",
-                thread_ts=thread_ts)
-    
+            thread_ts=thread_ts,
+        )
+
     # if debug mode is enabled, send the rejected suggestions as well
     if len(api_response.rejected_slack_response) > 1:
-        await say("REJECTED SUGGESTIONS:\n{api_response.rejected_slack_response}", thread_ts=thread_ts)
-        
+        await say(
+            "REJECTED SUGGESTIONS:\n{api_response.rejected_slack_response}",
+            thread_ts=thread_ts,
+        )
+
 
 def create_content_navigator_handler(
     slack_client: AsyncWebClient, api_client: AsyncAPIClient
