@@ -70,9 +70,8 @@ class RAGPipeline:
         model = ChatAnthropic(model="claude-3-opus-20240229")
         system_message = SystemMessage(
             content="""You are a Weights & Biases support expert.
-            Your goal is to describe the attached screenshots in the context of the user query.
-            You are provided with a support ticket and a set of screenshots related to the issue.
-            Provide a detailed description of the image in the context of the query such that the ticket can be answered correctly while incorporating the image info."""
+            Your goal is to describe the attached screenshots in the context of the user query. You are provided with a support ticket and screenshots related to the issue.
+            Provide a detailed description of the image in the context of the query so that the ticket can be answered correctly while incorporating the image info."""
         )
         prompt = [
             {
