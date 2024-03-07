@@ -15,12 +15,13 @@ from urllib.parse import urljoin
 
 import aiohttp
 import requests
+
+from wandbot.api.routers.adcopy import AdCopyRequest, AdCopyResponse
+from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
 from wandbot.api.routers.content_navigator import (
     ContentNavigatorRequest,
     ContentNavigatorResponse,
 )
-from wandbot.api.routers.adcopy import AdCopyRequest, AdCopyResponse
-from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
 from wandbot.api.routers.database import (
     APIFeedbackRequest,
     APIFeedbackResponse,
@@ -66,7 +67,9 @@ class APIClient:
         )
         self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
         self.generate_ads_endpoint = urljoin(str(self.url), "generate_ads")
-        self.generate_content_suggestions_endpoint = urljoin(str(self.url), "generate_content_suggestions")
+        self.generate_content_suggestions_endpoint = urljoin(
+            str(self.url), "generate_content_suggestions"
+        )
 
     def _get_chat_thread(
         self, request: APIGetChatThreadRequest
@@ -640,9 +643,9 @@ class AsyncAPIClient(APIClient):
         response = await self._generate_ads(request)
 
         return response
-    
+
     async def _generate_content_suggestions(
-            self, request: ContentNavigatorRequest
+        self, request: ContentNavigatorRequest
     ) -> ContentNavigatorResponse | None:
         """Call the content navigator API.
 
@@ -664,7 +667,7 @@ class AsyncAPIClient(APIClient):
                     return None
 
     async def generate_content_suggestions(
-            self, user_id: str, query: str
+        self, user_id: str, query: str
     ) -> ContentNavigatorResponse:
         """Generates content suggestions given query.
 
@@ -683,4 +686,3 @@ class AsyncAPIClient(APIClient):
         response = await self._generate_content_suggestions(request)
 
         return response
-            

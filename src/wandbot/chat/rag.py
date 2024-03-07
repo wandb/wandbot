@@ -1,8 +1,12 @@
 import datetime
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from langchain_community.callbacks import get_openai_callback
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
+
 from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.rag.response_synthesis import ResponseSynthesizer
 from wandbot.rag.retrieval import FusionRetrieval
@@ -58,11 +62,50 @@ class RAGPipeline:
         )
         self.response_synthesizer = ResponseSynthesizer()
 
+    def generate_multi_modal_initial_response(
+        self, question: str, images: List[str]
+    ) -> str:
+        model = ChatOpenAI(model="gpt-4-vision-preview", max_tokens=500)
+        system_message = SystemMessage(
+            content="""You are a Weights & Biases support expert.
+            Your goal is to answer the user's question and provide them with the best possible solution.
+            You are provided with a support ticket and a set of screenshots related to the issue.
+            Provide a detailed solution to the user query based on the ticket and the screenshots."""
+        )
+        prompt = [
+            {
+                "type": "text",
+                "text": question,
+            }
+        ]
+        for img in images:
+            prompt += [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img}"},
+                }
+            ]
+        message = HumanMessage(content=prompt)
+        response = model.invoke([system_message, message])
+        logger.info(response.content)
+        return response.content
+
     def __call__(
-        self, question: str, chat_history: List[Tuple[str, str]] | None = None
+        self,
+        question: str,
+        chat_history: List[Tuple[str, str]] | None = None,
+        images: Optional[List[str]] = None,
     ):
         if chat_history is None:
             chat_history = []
+
+        if images is not None:
+            multi_modal_response = self.generate_multi_modal_initial_response(
+                question, images
+            )
+            question = (
+                f"Is the following statement correct?\n{multi_modal_response}"
+            )
 
         with get_openai_callback() as query_enhancer_cb, Timer() as query_enhancer_tb:
             enhanced_query = self.query_enhancer.chain.invoke(

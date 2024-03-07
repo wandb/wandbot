@@ -1,6 +1,6 @@
 import json
-import random
 import logging
+import random
 from operator import itemgetter
 from typing import Any, Dict, List
 
@@ -8,6 +8,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableParallel
 from langchain_openai import ChatOpenAI
+
 from wandbot.chat.chat import Chat
 from wandbot.chat.schemas import ChatRequest
 from wandbot.rag.utils import ChatModel
@@ -79,7 +80,9 @@ class AdCopyEngine:
         self, query: str, persona: str, action: str
     ) -> Dict[str, Any]:
         wandbot_response = self.query_wandbot(query)
-        additional_context = "\n".join(random.choices(self.contexts[action], k=2))
+        additional_context = "\n".join(
+            random.choices(self.contexts[action], k=2)
+        )
         persona_prompt = (
             TECHNICAL_PROMPT if persona == "technical" else EXECUTIVE_PROMPT
         )
@@ -122,7 +125,9 @@ class AdCopyEngine:
         return chain
 
     def __call__(self, query: str, persona: str, action: str) -> str:
-        logging.info(f"Generating ad copy for {persona} {action} with query: '{query}'")
+        logging.info(
+            f"Generating ad copy for {persona} {action} with query: '{query}'"
+        )
         inputs = self.build_inputs_for_ad_formats(query, persona, action)
         outputs = self.chain.batch(inputs)
         str_output = ""

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter
 from starlette import status
 
@@ -38,12 +40,14 @@ def query(
     Returns:
         The APIQueryResponse object containing the result of the query.
     """
+    logger.info(request.images[0][:10])
     result = chat(
         ChatRequest(
             question=request.question,
             chat_history=request.chat_history,
             language=request.language,
             application=request.application,
+            images=request.images,
         ),
     )
     result = APIQueryResponse(**result.model_dump())
