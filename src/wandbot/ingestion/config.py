@@ -11,12 +11,18 @@ Typical usage example:
   docodile_english_store_config = DocodileEnglishStoreConfig()
 """
 
+import os
 import datetime
 import pathlib
 from typing import List, Optional, Dict, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+    field_validator
+)
 from pydantic_settings import BaseSettings
 
 from wandbot.utils import get_logger
@@ -238,15 +244,20 @@ class FCReportsStoreConfig(DataStoreConfig):
 
         return values
 
-
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
     artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
     # Optional fields for flexibility
-    embedding_dim: Optional[int] = None
-    input_type: Optional[str] = None
+    embedding_dim: int | None = None
+    input_type: str | None = None
+
+    @field_validator('artifact_url')
+    def set_artifact_url(cls, v: str) -> str:
+        wandb_project = os.environ.get("WANDB_PROJECT", "wandbot-dev")
+        wandb_entity = os.environ.get("WANDB_ENTITY", "wandbot")
+        return f"{wandb_entity}/{wandb_project}/chroma_index:latest"
     
     def get_lite_llm_embeddings_params(self) -> Dict[str, Union[str, Optional[int]]]:
         """
@@ -258,7 +269,7 @@ class VectorStoreConfig(BaseSettings):
             "dimensions": self.embedding_dim,
             "input_type": self.input_type,
         }
-
+# TODO: add separate persist dir per configs
 class OpenAIEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "text-embedding-3-small"
     embedding_dim: int = 512
@@ -267,6 +278,7 @@ class OpenAIEmbeddingConfig(VectorStoreConfig):
 class CohereEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "embed-english-v3.0"
     input_type: str = "search_document"
+    batch_size:int = 96
 
 
 class HuggingFaceEmbeddingConfig(VectorStoreConfig):

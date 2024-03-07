@@ -67,7 +67,6 @@ def load(
     )
     artifact_dir: str = artifact.download()
 
-    # TODO: Change to LiteLLM Embeddings
     embedding_fn = LiteLLMEmbeddings(
         **vectorstore_config.get_lite_llm_embeddings_params()
     )

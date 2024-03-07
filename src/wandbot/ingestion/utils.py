@@ -40,7 +40,7 @@ from bs4 import BeautifulSoup, Comment
 from git import Repo
 from pydantic_settings import BaseSettings
 
-from litellm import embedding
+from litellm import embedding, aembedding
 from langchain_core.embeddings import Embeddings
 
 from wandbot.utils import get_logger
