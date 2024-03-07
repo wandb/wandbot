@@ -22,7 +22,10 @@ from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
-from wandbot.ingestion.utils import get_embedding_config
+from wandbot.ingestion.utils import (
+    get_embedding_config,
+    LiteLLMEmbeddings,
+)
 from wandbot.utils import get_logger, RAGPipelineConfig
 
 logger = get_logger(__name__)
@@ -54,6 +57,8 @@ def load(
     vectorstore_config = get_embedding_config(
         config.embeddings.type, config.embeddings.config
     )
+    logger.info(f"Using the following vectorstore config {vectorstore_config}")
+
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="create_vectorstore"
     )
@@ -63,8 +68,8 @@ def load(
     artifact_dir: str = artifact.download()
 
     # TODO: Change to LiteLLM Embeddings
-    embedding_fn = OpenAIEmbeddings(
-        model=vectorstore_config.embeddings_model, dimensions=vectorstore_config.embedding_dim
+    embedding_fn = LiteLLMEmbeddings(
+        **vectorstore_config.get_lite_llm_embeddings_params()
     )
     vectorstore_dir = vectorstore_config.persist_dir
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +92,8 @@ def load(
     for batch_idx in trange(0, len(transformed_documents), vectorstore_config.batch_size):
         batch = transformed_documents[batch_idx : batch_idx + vectorstore_config.batch_size]
         chroma.add_documents(batch)
+        # TODO: remove break
+        break
     chroma.persist()
 
     result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")

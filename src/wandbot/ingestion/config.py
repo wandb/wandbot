@@ -13,7 +13,7 @@ Typical usage example:
 
 import datetime
 import pathlib
-from typing import List, Optional
+from typing import List, Optional, Dict, Union
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
@@ -244,7 +244,20 @@ class VectorStoreConfig(BaseSettings):
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
     artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
-
+    # Optional fields for flexibility
+    embedding_dim: Optional[int] = None
+    input_type: Optional[str] = None
+    
+    def get_lite_llm_embeddings_params(self) -> Dict[str, Union[str, Optional[int]]]:
+        """
+        Converts the configuration into a dictionary of parameters
+        suitable for initializing LiteLLMEmbeddings.
+        """
+        return {
+            "model": self.embeddings_model,
+            "dimensions": self.embedding_dim,
+            "input_type": self.input_type,
+        }
 
 class OpenAIEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "text-embedding-3-small"
