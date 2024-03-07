@@ -38,8 +38,17 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
+from pydantic_settings import BaseSettings
 
 from wandbot.utils import get_logger
+
+from wandbot.ingestion.config import (
+    CohereEmbeddingConfig,
+    HuggingFaceEmbeddingConfig,
+    MistralEmbeddingConfig,
+    OpenAIEmbeddingConfig,
+    VoyageEmbeddingConfig,
+)
 
 logger = get_logger(__name__)
 
@@ -288,3 +297,25 @@ def extract_frontmatter(file_path: pathlib.Path) -> Dict[str, Any]:
     with open(file_path, "r") as f:
         contents = frontmatter.load(f)
         return {k: contents[k] for k in contents.keys()}
+
+
+def get_embedding_config(embedding_type: str, config_values: dict) -> BaseSettings:
+    """
+    Get the embedding configuration based on the embedding type and config values.
+
+    Args:
+        embedding_type: The type of the embedding defined in the yaml file.
+        config_values: The configuration values specific to the embedding type.
+    """
+    if embedding_type == "OpenAIEmbedding":
+        return OpenAIEmbeddingConfig(**config_values)
+    elif embedding_type == "CohereEmbedding":
+        return CohereEmbeddingConfig(**config_values)
+    elif embedding_type == "HuggingFaceEmbedding":
+        return HuggingFaceEmbeddingConfig(**config_values)
+    elif embedding_type == "VoyageEmbedding":
+        return VoyageEmbeddingConfig(**config_values)
+    elif embedding_type == "MistralEmbedding":
+        return MistralEmbeddingConfig(**config_values)
+    else:
+        raise ValueError(f"Unsupported embedding type: {embedding_type}")

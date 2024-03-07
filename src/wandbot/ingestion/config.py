@@ -241,8 +241,27 @@ class FCReportsStoreConfig(DataStoreConfig):
 
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
-    embeddings_model: str = "text-embedding-3-small"
-    embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
     artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
+
+
+class OpenAIEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "text-embedding-3-small"
+    embedding_dim: int = 512
+
+
+class CohereEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "embed-english-v3.0"
+    input_type: str = "search_document"
+
+
+class HuggingFaceEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "huggingface/microsoft/codebert-base"
+
+class VoyageEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "voyage-lite-01-instruct"
+
+
+class MistralEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "mistral/mistral-embed"

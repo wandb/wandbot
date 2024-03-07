@@ -34,6 +34,7 @@ from wandbot.utils import (
     filter_smaller_documents,
     get_logger,
     make_document_tokenization_safe,
+    RAGPipelineConfig,
 )
 
 logger = get_logger(__name__)
@@ -162,6 +163,7 @@ def load(
     project: str,
     entity: str,
     source_artifact_path: str,
+    config: RAGPipelineConfig,
     result_artifact_name: str = "transformed_data",
 ) -> str:
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
@@ -179,7 +181,7 @@ def load(
     lang_detect = FastTextLangDetect()
     transformer = DocumentTransformer(
         lang_detect=lang_detect,
-        max_size=512,
+        max_size=config.chunk_size,
         min_size=5,
         length_function=length_function,
     )
@@ -192,12 +194,12 @@ def load(
             transformed_documents = process_document_file(
                 documents, transformer
             )
-            config = json.load((document_file.parent / "config.json").open())
+            data_source_config = json.load((document_file.parent / "config.json").open())
             metadata = json.load(
                 (document_file.parent / "metadata.json").open()
             )
             cache_dir = (
-                pathlib.Path(config["data_source"]["cache_dir"]).parent
+                pathlib.Path(data_source_config["data_source"]["cache_dir"]).parent
                 / "transformed_data"
             )
 
@@ -210,9 +212,9 @@ def load(
                 for document in transformed_documents:
                     of.write(json.dumps(document.dict()) + "\n")
 
-            config["chunk_size"] = 512
+            data_source_config["chunk_size"] = config.chunk_size
             with open(transformed_file.parent / "config.json", "w") as of:
-                json.dump(config, of)
+                json.dump(data_source_config, of)
 
             metadata["num_transformed_documents"] = len(transformed_documents)
             with open(transformed_file.parent / "metadata.json", "w") as of:

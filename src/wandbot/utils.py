@@ -27,18 +27,19 @@ import hashlib
 import json
 import logging
 import os
+import yaml
 import pathlib
 import re
 import sqlite3
 import string
-from typing import Any, Coroutine, List, Tuple
 
 import fasttext
 import nest_asyncio
 import tiktoken
 from langchain_core.documents import Document
-from pydantic import Field
+from pydantic import Field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Any, Coroutine, List, Tuple, Optional
 
 import wandb
 
@@ -299,3 +300,35 @@ def filter_smaller_documents(
     return [
         document for document in documents if filter_small_document(document)
     ]
+
+
+class FeatureToggle(BaseModel):
+    enabled: bool
+
+
+class EmbeddingsConfig(BaseModel):
+    type: str
+    config: dict
+
+
+class RAGPipelineConfig(BaseModel):
+    llm: str
+    embeddings: EmbeddingsConfig
+    re_ranker: dict
+    search_api: dict
+    query_enhancer: FeatureToggle
+    reciprocal_rerank_fusion: FeatureToggle
+    chunk_size: int
+    top_k: int
+    project: Optional[str] = None
+    entity: Optional[str] = None
+
+
+def load_config(config_path: str) -> RAGPipelineConfig:
+    """Load and return the YAML configuration as a Pydantic model."""
+    config_path = pathlib.Path(__file__).parent / config_path
+    logger.info(f"Loading configuration from {config_path}")
+
+    with open(config_path, 'r') as file:
+        raw_config = yaml.safe_load(file)
+    return RAGPipelineConfig(**raw_config)

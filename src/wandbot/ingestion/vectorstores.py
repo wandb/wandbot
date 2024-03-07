@@ -22,8 +22,8 @@ from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
-from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.utils import get_logger
+from wandbot.ingestion.utils import get_embedding_config
+from wandbot.utils import get_logger, RAGPipelineConfig
 
 logger = get_logger(__name__)
 
@@ -32,6 +32,7 @@ def load(
     project: str,
     entity: str,
     source_artifact_path: str,
+    config: RAGPipelineConfig,
     result_artifact_name: str = "wandbot_index",
 ) -> str:
     """Load the vector store.
@@ -50,7 +51,9 @@ def load(
     Raises:
         wandb.Error: An error occurred during the loading process.
     """
-    config: VectorStoreConfig = VectorStoreConfig()
+    vectorstore_config = get_embedding_config(
+        config.embeddings.type, config.embeddings.config
+    )
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="create_vectorstore"
     )
@@ -59,11 +62,11 @@ def load(
     )
     artifact_dir: str = artifact.download()
 
-    # Todo: Change to LiteLLM Embeddings
+    # TODO: Change to LiteLLM Embeddings
     embedding_fn = OpenAIEmbeddings(
-        model=config.embeddings_model, dimensions=config.embedding_dim
+        model=vectorstore_config.embeddings_model, dimensions=vectorstore_config.embedding_dim
     )
-    vectorstore_dir = config.persist_dir
+    vectorstore_dir = vectorstore_config.persist_dir
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
 
     document_files: List[pathlib.Path] = list(
@@ -77,19 +80,19 @@ def load(
                 transformed_documents.append(Document(**json.loads(line)))
 
     chroma = Chroma(
-        collection_name=config.name,
+        collection_name=vectorstore_config.name,
         embedding_function=embedding_fn,
-        persist_directory=str(config.persist_dir),
+        persist_directory=str(vectorstore_config.persist_dir),
     )
-    for batch_idx in trange(0, len(transformed_documents), config.batch_size):
-        batch = transformed_documents[batch_idx : batch_idx + config.batch_size]
+    for batch_idx in trange(0, len(transformed_documents), vectorstore_config.batch_size):
+        batch = transformed_documents[batch_idx : batch_idx + vectorstore_config.batch_size]
         chroma.add_documents(batch)
     chroma.persist()
 
     result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")
 
     result_artifact.add_dir(
-        local_path=str(config.persist_dir),
+        local_path=str(vectorstore_config.persist_dir),
     )
     run.log_artifact(result_artifact)
 

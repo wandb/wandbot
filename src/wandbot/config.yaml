@@ -1,0 +1,19 @@
+llm: "gpt-4-1106-preview"
+embeddings:
+  type: "OpenAIEmbedding"
+  config:
+    embeddings_model: "text-embedding-3-small"
+    embedding_dim: 512
+re_ranker:
+  enabled: true
+  provider: "Cohere"
+  model: "rerank-english-v2"
+search_api:
+  enabled: true
+  url: "http://You.com LLM web search"
+query_enhancer:
+  enabled: true
+reciprocal_rerank_fusion:
+  enabled: true
+chunk_size: 512
+top_k: 5
