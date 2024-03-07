@@ -192,7 +192,10 @@ class EnhancedQuery(BaseModel):
         )
 
     def parse_output(
-        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
+        self,
+        query: str,
+        chat_history: Optional[List[Tuple[str, str]]] = None,
+        image_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Parse the output of the model"""
         question = clean_question(query)
@@ -237,6 +240,7 @@ class EnhancedQuery(BaseModel):
             "avoid_query": self.avoid_query,
             "chat_history": chat_history,
             "all_queries": all_queries,
+            "image_context": image_context,
         }
 
 
@@ -299,10 +303,13 @@ class QueryEnhancer:
             query=itemgetter("query"),
             chat_history=itemgetter("chat_history"),
             enhanced_query=full_query_enhancer_chain,
+            image_context=itemgetter("image_context"),
         )
         chain = intermediate_chain | RunnableLambda(
             lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"])
+                x["query"],
+                convert_to_messages(x["chat_history"]),
+                image_context=x["image_context"],
             )
         )
 

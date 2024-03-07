@@ -1,6 +1,7 @@
 import datetime
 from typing import List, Optional, Tuple
 
+from langchain_anthropic import ChatAnthropic
 from langchain_community.callbacks import get_openai_callback
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -65,12 +66,13 @@ class RAGPipeline:
     def generate_multi_modal_initial_response(
         self, question: str, images: List[str]
     ) -> str:
-        model = ChatOpenAI(model="gpt-4-vision-preview", max_tokens=500)
+        # model = ChatOpenAI(model="gpt-4-vision-preview", max_tokens=500)
+        model = ChatAnthropic(model="claude-3-opus-20240229")
         system_message = SystemMessage(
             content="""You are a Weights & Biases support expert.
-            Your goal is to answer the user's question and provide them with the best possible solution.
+            Your goal is to describe the attached screenshots in the context of the user query.
             You are provided with a support ticket and a set of screenshots related to the issue.
-            Provide a detailed solution to the user query based on the ticket and the screenshots."""
+            Provide a detailed description of the image in the context of the query such that the ticket can be answered correctly while incorporating the image info."""
         )
         prompt = [
             {
@@ -87,7 +89,6 @@ class RAGPipeline:
             ]
         message = HumanMessage(content=prompt)
         response = model.invoke([system_message, message])
-        logger.info(response.content)
         return response.content
 
     def __call__(
@@ -99,17 +100,19 @@ class RAGPipeline:
         if chat_history is None:
             chat_history = []
 
-        if images is not None:
-            multi_modal_response = self.generate_multi_modal_initial_response(
-                question, images
-            )
-            question = (
-                f"Is the following statement correct?\n{multi_modal_response}"
-            )
+        multi_modal_response = (
+            self.generate_multi_modal_initial_response(question, images)
+            if images is not None
+            else ""
+        )
 
         with get_openai_callback() as query_enhancer_cb, Timer() as query_enhancer_tb:
             enhanced_query = self.query_enhancer.chain.invoke(
-                {"query": question, "chat_history": chat_history}
+                {
+                    "query": question,
+                    "chat_history": chat_history,
+                    "image_context": multi_modal_response,
+                }
             )
 
         with Timer() as retrieval_tb:
