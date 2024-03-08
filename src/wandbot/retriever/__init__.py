@@ -1,4 +1,4 @@
-from .base import VectorStore, VectorStoreV2
+from .base import VectorStore
 from .utils import OpenAIEmbeddingsModel
 
-__all__ = ["VectorStore", "VectorStoreV2", "OpenAIEmbeddingsModel"]
+__all__ = ["VectorStore", "OpenAIEmbeddingsModel"]

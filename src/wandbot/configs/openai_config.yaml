@@ -6,11 +6,8 @@ embeddings:
     embedding_dim: 512
 re_ranker:
   enabled: true
-  provider: "Cohere"
-  model: "rerank-english-v2"
 search_api:
   enabled: true
-  url: "http://You.com LLM web search"
 query_enhancer:
   enabled: true
 reciprocal_rerank_fusion:

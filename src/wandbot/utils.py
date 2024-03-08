@@ -314,8 +314,8 @@ class EmbeddingsConfig(BaseModel):
 class RAGPipelineConfig(BaseModel):
     llm: str
     embeddings: EmbeddingsConfig
-    re_ranker: dict
-    search_api: dict
+    re_ranker: FeatureToggle
+    search_api: FeatureToggle
     query_enhancer: FeatureToggle
     reciprocal_rerank_fusion: FeatureToggle
     chunk_size: int
