@@ -55,7 +55,7 @@ def get_logger(name: str) -> logging.Logger:
     """
     logging.basicConfig(
         format="%(asctime)s : %(levelname)s : %(message)s",
-        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "WARNING")),
+        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "CRITICAL")),
     )
     logger = logging.getLogger(name)
     return logger

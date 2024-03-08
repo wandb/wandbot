@@ -244,6 +244,7 @@ class FCReportsStoreConfig(DataStoreConfig):
 
         return values
 
+
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
@@ -269,24 +270,32 @@ class VectorStoreConfig(BaseSettings):
             "dimensions": self.embedding_dim,
             "input_type": self.input_type,
         }
-# TODO: add separate persist dir per configs
+    
+
 class OpenAIEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "text-embedding-3-small"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/openai/{embeddings_model}")
     embedding_dim: int = 512
 
 
 class CohereEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "embed-english-v3.0"
     input_type: str = "search_document"
-    batch_size:int = 96
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/cohere/{embeddings_model}")
+    batch_size: int = 96
+
+
+class VoyageEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "voyage/voyage-lite-01-instruct"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/{embeddings_model}")
+    batch_size: int = 96
 
 
 class HuggingFaceEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "huggingface/microsoft/codebert-base"
-
-class VoyageEmbeddingConfig(VectorStoreConfig):
-    embeddings_model: str = "voyage-lite-01-instruct"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/hf/{embeddings_model.split('/')[-1]}")
 
 
 class MistralEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "mistral/mistral-embed"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/{embeddings_model}")
