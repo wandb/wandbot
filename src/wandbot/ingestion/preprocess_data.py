@@ -167,7 +167,7 @@ def load(
     result_artifact_name: str = "transformed_data",
 ) -> str:
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
-        project=project, entity=entity, job_type="preprocess_data"
+        project=project, entity=entity, job_type="preprocess_data", config=config.model_dump()
     )
     artifact: wandb.Artifact = run.use_artifact(
         source_artifact_path, type="dataset"

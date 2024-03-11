@@ -60,7 +60,7 @@ def load(
     logger.info(f"Using the following vectorstore config {vectorstore_config}")
 
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
-        project=project, entity=entity, job_type="create_vectorstore"
+        project=project, entity=entity, job_type="create_vectorstore", config=config.model_dump()
     )
     artifact: wandb.Artifact = run.use_artifact(
         source_artifact_path, type="dataset"
