@@ -23,7 +23,7 @@ class VectorStore:
 
     def __init__(
         self,
-        config: VectorStoreConfig = None,
+        config: VectorStoreConfig | None = None,
     ):
         if config is not None:
             self.config = config
