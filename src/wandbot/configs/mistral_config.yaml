@@ -7,15 +7,14 @@ fallback_llm:
   temperature: 0.1
   max_retries: 6
 embeddings:
-  type: "OpenAIEmbedding"
+  type: "MistralEmbedding"
   config:
-    embeddings_model: "text-embedding-3-small"
-    embedding_dim: 512
+    embeddings_model: "mistral/mistral-embed"
 retrieval_re_ranker:
   enabled: False
 use_you_search_api:
   enabled: False
 query_enhancer_followed_by_rerank_fusion:
   enabled: True
-chunk_size: 512
+chunk_size: 1024
 top_k: 5

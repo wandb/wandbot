@@ -76,7 +76,7 @@ class RAGPipeline:
 
     def __call__(
         self, question: str, chat_history: List[Tuple[str, str]] | None = None
-    ):
+    ) -> RAGPipelineOutput: 
         if chat_history is None:
             chat_history = []
 

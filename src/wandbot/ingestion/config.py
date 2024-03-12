@@ -299,3 +299,4 @@ class HuggingFaceEmbeddingConfig(VectorStoreConfig):
 class MistralEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "mistral/mistral-embed"
     persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/{embeddings_model}")
+    batch_size: int = 32
