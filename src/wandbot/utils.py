@@ -302,6 +302,12 @@ def filter_smaller_documents(
     ]
 
 
+class LLMConfig(BaseModel):
+    model: str
+    temperature: float
+    max_retries: int
+
+
 class FeatureToggle(BaseModel):
     enabled: bool
 
@@ -312,7 +318,8 @@ class EmbeddingsConfig(BaseModel):
 
 
 class RAGPipelineConfig(BaseModel):
-    llm: str
+    llm: LLMConfig
+    fallback_llm: LLMConfig
     embeddings: EmbeddingsConfig
     retrieval_re_ranker: FeatureToggle
     use_you_search_api: FeatureToggle

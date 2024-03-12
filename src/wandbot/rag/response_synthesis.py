@@ -12,6 +12,7 @@ from wandbot.rag.utils import (
     combine_simple_documents,
     create_simple_query_str
 )
+from wandbot.utils import RAGPipelineConfig
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """You are Wandbot - a support expert in Weights & Biases, wandb and weave. 
 Your goal to help users with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
@@ -126,11 +127,19 @@ class SimpleResponseSynthesizer:
 
     def __init__(
         self,
+        config: RAGPipelineConfig | None = None,
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = model if not config else config.llm.model   # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model # type: ignore
+
+        if config:
+            self.model.temperature = config.llm.temperature
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = config.fallback_llm.temperature
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
         self.prompt = ChatPromptTemplate.from_messages(
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )
@@ -179,11 +188,19 @@ class ResponseSynthesizer:
 
     def __init__(
         self,
+        config: RAGPipelineConfig | None = None,
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = model if not config else config.llm.model   # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model # type: ignore
+
+        if config:
+            self.model.temperature = config.llm.temperature
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = config.fallback_llm.temperature
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
         self.prompt = ChatPromptTemplate.from_messages(
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )

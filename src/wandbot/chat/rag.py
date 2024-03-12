@@ -62,19 +62,17 @@ class RAGPipeline:
             self.retrieval = FusionRetrieval(
                 vector_store=vector_store, top_k=top_k, search_type=search_type
             )
-            self.response_synthesizer = ResponseSynthesizer()
+            self.response_synthesizer = ResponseSynthesizer(config=config)
         else:
             if config.retrieval_re_ranker.enabled:
                 self.retrieval = SimpleRetrievalEngineWithRerank(
                     vector_store=vector_store, top_k=top_k, search_type=search_type
                 )
-                self.response_synthesizer = SimpleResponseSynthesizer()
             else:
-                print("SIMPLE RETRIEVAL ENGINE")
                 self.retrieval = SimpleRetrievalEngine(
                     vector_store=vector_store, top_k=top_k, search_type=search_type
                 )
-                self.response_synthesizer = SimpleResponseSynthesizer()
+            self.response_synthesizer = SimpleResponseSynthesizer(config=config)
 
     def __call__(
         self, question: str, chat_history: List[Tuple[str, str]] | None = None
