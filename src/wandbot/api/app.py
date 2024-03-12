@@ -68,11 +68,17 @@ async def lifespan(app: FastAPI):
         None
     """
     vector_store = VectorStore.from_config(vectorstore_config)
-    chat_router.chat = chat_router.Chat(vector_store=vector_store)
+    chat_router.chat = chat_router.Chat(vector_store=vector_store, config=config)
     database_router.db_client = database_router.DatabaseClient()
-    retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-        vector_store=vector_store
-    )
+    if not config.retrieval_re_ranker.enabled:
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            vector_store=vector_store
+        )
+    else:
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngineWithRerank(
+            vector_store=vector_store
+        )
+
 
     async def backup_db():
         """Periodically backs up the database to a table.

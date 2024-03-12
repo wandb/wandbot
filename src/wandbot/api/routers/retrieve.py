@@ -4,14 +4,17 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette import status
 
-from wandbot.retriever.base import SimpleRetrievalEngine
+from wandbot.retriever.base import (
+    SimpleRetrievalEngine,
+    SimpleRetrievalEngineWithRerank,
+)
 
 router = APIRouter(
     prefix="/retrieve",
     tags=["retrievers"],
 )
 
-retriever: SimpleRetrievalEngine | None = None
+retriever: SimpleRetrievalEngineWithRerank | None = None
 
 
 class APIRetrievalResult(BaseModel):

@@ -93,7 +93,6 @@ class SimpleRetrievalEngine:
         language: str | None = None,
         top_k: int = 5,
         search_type="mmr",
-        sources: List[str] = None,
     ) -> SimpleRetrievalEngineOutput:
         if language is not None:
             language_filter = {"language": language}
