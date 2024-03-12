@@ -192,7 +192,10 @@ class EnhancedQuery(BaseModel):
         )
 
     def parse_output(
-        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None # TODO: add check for web search
+        self,
+        query: str,
+        chat_history: Optional[List[Tuple[str, str]]] = None,
+        config: RAGPipelineConfig | None = None
     ) -> Dict[str, Any]:
         """Parse the output of the model"""
         question = clean_question(query)
@@ -202,17 +205,24 @@ class EnhancedQuery(BaseModel):
         else:
             standalone_query = self.standalone_query
 
-        if self.avoid_query: # TODO: or config.use_you_search_api
+        use_search_api = True if config is None else config.use_you_search_api.enabled
+
+        if use_search_api:
+            if self.avoid_query:
+                keywords = []
+                sub_queries = []
+                vector_search_queries = []
+            else:
+                keywords = [keyword.keyword for keyword in self.keywords]
+                sub_queries = [sub_query.query for sub_query in self.sub_queries]
+                vector_search_queries = [
+                    vector_search_query.query
+                    for vector_search_query in self.vector_search_queries
+                ]
+        else:
             keywords = []
             sub_queries = []
             vector_search_queries = []
-        else:
-            keywords = [keyword.keyword for keyword in self.keywords]
-            sub_queries = [sub_query.query for sub_query in self.sub_queries]
-            vector_search_queries = [
-                vector_search_query.query
-                for vector_search_query in self.vector_search_queries
-            ]
         intents_descriptions = ""
         for intent in self.intents:
             intents_descriptions += (
@@ -234,7 +244,7 @@ class EnhancedQuery(BaseModel):
             "sub_queries": sub_queries,
             "vector_search_queries": vector_search_queries,
             "language": self.language,
-            "avoid_query": self.avoid_query,
+            "avoid_query": self.avoid_query if use_search_api else True,
             "chat_history": chat_history,
             "all_queries": all_queries,
         }
@@ -274,6 +284,7 @@ class QueryEnhancer:
             self.fallback_model.temperature = config.fallback_llm.temperature
             self.fallback_model.max_retries = config.fallback_llm.max_retries
 
+        self.config=config
         self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
         self._chain = None
 
@@ -310,7 +321,7 @@ class QueryEnhancer:
         )
         chain = intermediate_chain | RunnableLambda(
             lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"]) #, config
+                x["query"], convert_to_messages(x["chat_history"]), self.config
             )
         )
 

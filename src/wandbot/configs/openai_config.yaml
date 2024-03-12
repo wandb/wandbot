@@ -14,7 +14,7 @@ embeddings:
 retrieval_re_ranker:
   enabled: False
 use_you_search_api:
-  enabled: true
+  enabled: True
 query_enhancer_followed_by_rerank_fusion:
   enabled: False
 chunk_size: 512
