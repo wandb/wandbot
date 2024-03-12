@@ -17,7 +17,7 @@ from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
 
 from wandbot.rag.utils import ChatModel
-from wandbot.utils import get_logger
+from wandbot.utils import get_logger, RAGPipelineConfig
 
 logger = get_logger(__name__)
 
@@ -261,11 +261,19 @@ class QueryEnhancer:
 
     def __init__(
         self,
+        config: RAGPipelineConfig | None = None, 
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = model if not config else config.llm.model   # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model # type: ignore
+
+        if config:
+            self.model.temperature = config.llm.temperature
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = config.fallback_llm.temperature
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
         self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
         self._chain = None
 

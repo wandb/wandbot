@@ -58,7 +58,7 @@ class RAGPipeline:
         self.config = config
 
         if config.query_enhancer_followed_by_rerank_fusion.enabled:
-            self.query_enhancer = QueryEnhancer()
+            self.query_enhancer = QueryEnhancer(config=config)
             self.retrieval = FusionRetrieval(
                 vector_store=vector_store, top_k=top_k, search_type=search_type
             )
