@@ -314,14 +314,13 @@ class EmbeddingsConfig(BaseModel):
 class RAGPipelineConfig(BaseModel):
     llm: str
     embeddings: EmbeddingsConfig
-    re_ranker: FeatureToggle
-    search_api: FeatureToggle
-    query_enhancer: FeatureToggle
-    reciprocal_rerank_fusion: FeatureToggle
+    retrieval_re_ranker: FeatureToggle
+    use_you_search_api: FeatureToggle
+    query_enhancer_followed_by_rerank_fusion: FeatureToggle
     chunk_size: int
     top_k: int
-    project: Optional[str] = None
-    entity: Optional[str] = None
+    project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
+    entity: str | None = Field("wandbot", env="WANDB_ENTITY")
 
 
 def load_config(config_path: str) -> RAGPipelineConfig:

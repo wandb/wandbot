@@ -192,7 +192,7 @@ class EnhancedQuery(BaseModel):
         )
 
     def parse_output(
-        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
+        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None # TODO: add check for web search
     ) -> Dict[str, Any]:
         """Parse the output of the model"""
         question = clean_question(query)
@@ -202,7 +202,7 @@ class EnhancedQuery(BaseModel):
         else:
             standalone_query = self.standalone_query
 
-        if self.avoid_query:
+        if self.avoid_query: # TODO: or config.use_you_search_api
             keywords = []
             sub_queries = []
             vector_search_queries = []
@@ -302,7 +302,7 @@ class QueryEnhancer:
         )
         chain = intermediate_chain | RunnableLambda(
             lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"])
+                x["query"], convert_to_messages(x["chat_history"]) #, config
             )
         )
 

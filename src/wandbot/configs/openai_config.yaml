@@ -4,13 +4,11 @@ embeddings:
   config:
     embeddings_model: "text-embedding-3-small"
     embedding_dim: 512
-re_ranker:
+retrieval_re_ranker:
   enabled: true
-search_api:
+use_you_search_api:
   enabled: true
-query_enhancer:
-  enabled: true
-reciprocal_rerank_fusion:
+query_enhancer_followed_by_rerank_fusion:
   enabled: true
 chunk_size: 512
 top_k: 5

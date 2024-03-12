@@ -5,10 +5,10 @@ import wandb
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
-from langchain_core.runnables import RunnableLambda, RunnableParallel
+from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
-from wandbot.retriever.utils import OpenAIEmbeddingsModel
+from wandbot.retriever.utils import CustomDocument, SimpleRetrievalEngineOutput
 
 from wandbot.ingestion.utils import LiteLLMEmbeddings
 from wandbot.ingestion.config import OpenAIEmbeddingConfig
@@ -82,6 +82,63 @@ class VectorStore:
 
 
 class SimpleRetrievalEngine:
+    def __init__(self, vector_store: VectorStore, top_k=5):
+        self.vector_store = vector_store
+        self.embeddings_model = vector_store.embeddings_model  # type: ignore
+        self.top_k = top_k
+
+    def __call__(
+        self,
+        question: str,
+        language: str | None = None,
+        top_k: int = 5,
+        search_type="mmr",
+        sources: List[str] = None,
+    ) -> SimpleRetrievalEngineOutput:
+        if language is not None:
+            language_filter = {"language": language}
+        if language_filter:
+            search_kwargs = {"k": top_k * 4, "filter": language_filter}
+        else:
+            search_kwargs = {"k": top_k * 4}
+
+        self.top_k = top_k
+
+        retriever = self.vector_store.as_parent_retriever(
+            search_type=search_type, search_kwargs=search_kwargs
+        )
+
+        retrieval_chain = (
+            RunnableParallel(
+                question=itemgetter("question"),
+                language=itemgetter("language"),
+                context=(
+                    itemgetter("question") | retriever
+                ),
+            )
+        )
+        results = retrieval_chain.invoke(
+            {"question": question, "language": language, "top_k": top_k}
+        )
+
+        outputs = []
+        for result in results["context"]:
+            metadata_dict = {
+                k: v
+                for k, v in result.metadata.items()
+                if k
+                not in ["source_content", "id", "parent_id"]
+            }
+            outputs.append(
+                CustomDocument(page_content=result.page_content, metadata=metadata_dict)
+            )
+
+        return SimpleRetrievalEngineOutput(
+            question=results.get("question"), language=results.get("language"), context=outputs
+        )
+
+
+class SimpleRetrievalEngineWithRerank:
     cohere_rerank_chain = CohereRerankChain()
 
     def __init__(self, vector_store: VectorStore, top_k=5):
@@ -99,7 +156,7 @@ class SimpleRetrievalEngine:
         top_k: int = 5,
         search_type="mmr",
         sources: List[str] = None,
-    ):
+    ) -> SimpleRetrievalEngineOutput:
         filters = {}
         source_filter = None
         language_filter = None
@@ -137,10 +194,10 @@ class SimpleRetrievalEngine:
         results = retrieval_chain.invoke(
             {"question": question, "language": language, "top_k": top_k}
         )
+
         outputs = []
         for result in results:
-            result_dict = {
-                "text": result.page_content,
+            metadata_dict = {
                 "score": result.metadata["relevance_score"],
             }
             metadata_dict = {
@@ -149,7 +206,11 @@ class SimpleRetrievalEngine:
                 if k
                 not in ["relevance_score", "source_content", "id", "parent_id"]
             }
-            result_dict["metadata"] = metadata_dict
-            outputs.append(result_dict)
 
-        return outputs
+            outputs.append(CustomDocument(page_content=result.page_content, metadata=metadata_dict))
+
+        return SimpleRetrievalEngineOutput(
+            question=question, 
+            language=language,
+            context=outputs
+        )

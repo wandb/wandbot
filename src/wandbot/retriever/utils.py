@@ -1,3 +1,5 @@
+from typing import List
+from pydantic import BaseModel
 from langchain_openai import OpenAIEmbeddings
 
 
@@ -20,3 +22,14 @@ class OpenAIEmbeddingsModel:
             dimensions=self.dimensions,
         )
         setattr(obj, self.private_name, model)
+
+
+class CustomDocument(BaseModel):
+    page_content: str
+    metadata: dict
+
+
+class SimpleRetrievalEngineOutput(BaseModel):
+    question: str
+    language: str
+    context: List[CustomDocument]

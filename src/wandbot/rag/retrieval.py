@@ -29,7 +29,7 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
 
 
 def run_web_search(query, avoid=False) -> list:
-    if avoid:
+    if avoid: # TODO: hack to incorporate if config.avoid_web_search is True
         return []
     yousearch = YouSearch(YouSearchConfig())
     web_results = yousearch(query)

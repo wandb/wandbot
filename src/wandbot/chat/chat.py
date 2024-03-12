@@ -32,7 +32,7 @@ from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
-from wandbot.utils import Timer, get_logger
+from wandbot.utils import Timer, get_logger, RAGPipelineConfig
 # from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
@@ -49,7 +49,10 @@ class Chat:
     config: ChatConfig = ChatConfig()
 
     def __init__(
-        self, vector_store: VectorStore, config: ChatConfig | None = None
+        self, 
+        vector_store: VectorStore,
+        config: RAGPipelineConfig,
+        chat_config: ChatConfig | None = None
     ):
         """Initializes the Chat instance.
 
@@ -57,21 +60,17 @@ class Chat:
             config: An instance of ChatConfig containing configuration settings.
         """
         self.vector_store = vector_store
-        if config is not None:
-            self.config = config
+        self.config = config
+        if chat_config is not None:
+            self.chat_config = chat_config
         self.run = wandb.init(
-            project=self.config.wandb_project,
-            entity=self.config.wandb_entity,
+            project=self.config.project,
+            entity=self.config.entity,
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        # self.chat_table = StreamTable(
-        #     table_name="chat_logs",
-        #     project_name=self.config.wandb_project,
-        #     entity_name=self.config.wandb_entity,
-        # )
 
-        self.rag_pipeline = RAGPipeline(vector_store=vector_store)
+        self.rag_pipeline = RAGPipeline(vector_store=vector_store, config=config)
 
     def _get_answer(
         self, question: str, chat_history: List[QuestionAnswer]
@@ -108,7 +107,6 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            # self.chat_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
