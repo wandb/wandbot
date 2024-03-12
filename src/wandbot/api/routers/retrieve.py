@@ -56,6 +56,7 @@ async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
         sources=request.sources,
     )
 
+    # TODO: Fix this
     return APIRetrievalResponse(
         query=request.query,
         top_k=[

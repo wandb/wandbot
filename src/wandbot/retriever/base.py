@@ -27,7 +27,6 @@ class VectorStore:
     ):
         if config is not None:
             self.config = config
-        print(self.config)
         self.embeddings_model = LiteLLMEmbeddings(
             **config.get_lite_llm_embeddings_params()
         )  # type: ignore
@@ -82,10 +81,11 @@ class VectorStore:
 
 
 class SimpleRetrievalEngine:
-    def __init__(self, vector_store: VectorStore, top_k=5):
+    def __init__(self, vector_store: VectorStore, top_k: int=5, search_type: str="mmr"):
         self.vector_store = vector_store
         self.embeddings_model = vector_store.embeddings_model  # type: ignore
         self.top_k = top_k
+        self.search_type = search_type
 
     def __call__(
         self,
@@ -140,13 +140,14 @@ class SimpleRetrievalEngine:
 class SimpleRetrievalEngineWithRerank:
     cohere_rerank_chain = CohereRerankChain()
 
-    def __init__(self, vector_store: VectorStore, top_k=5):
+    def __init__(self, vector_store: VectorStore, top_k: int=5, search_type: str="mmr"):
         self.vector_store = vector_store
         self.embeddings_model = vector_store.embeddings_model  # type: ignore
         self.redundant_filter = EmbeddingsRedundantFilter(
             embeddings=self.embeddings_model
         ).transform_documents
         self.top_k = top_k
+        self.search_type = search_type
 
     def __call__(
         self,
