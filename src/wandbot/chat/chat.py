@@ -103,6 +103,7 @@ class Chat:
                 "total_tokens": result.total_tokens,
                 "prompt_tokens": result.prompt_tokens,
                 "completion_tokens": result.completion_tokens,
+                "completion_cost": result.completion_cost,
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
