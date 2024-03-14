@@ -4,31 +4,21 @@ from typing import List, Tuple
 from langchain_community.callbacks import get_openai_callback
 from pydantic import BaseModel
 
+import litellm
+
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger, RAGPipelineConfig
 from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.rag.retrieval import FusionRetrieval
 from wandbot.rag.response_synthesis import ResponseSynthesizer, SimpleResponseSynthesizer
 from wandbot.retriever.base import SimpleRetrievalEngine, SimpleRetrievalEngineWithRerank
+from wandbot.rag.utils import LiteLLMTokenCostLogger
+
 
 logger = get_logger(__name__)
 
-
-def get_stats_dict_from_token_callback(token_callback):
-    return {
-        "total_tokens": token_callback.total_tokens,
-        "prompt_tokens": token_callback.prompt_tokens,
-        "completion_tokens": token_callback.completion_tokens,
-        "successful_requests": token_callback.successful_requests,
-    }
-
-
-def get_stats_dict_from_timer(timer):
-    return {
-        "start_time": timer.start,
-        "end_time": timer.stop,
-        "time_taken": timer.elapsed,
-    }
+litellm_token_and_cost_counter = LiteLLMTokenCostLogger()
+litellm.callbacks = [litellm_token_and_cost_counter]
 
 
 class RAGPipelineOutput(BaseModel):
@@ -41,6 +31,7 @@ class RAGPipelineOutput(BaseModel):
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int
+    completion_cost: float
     time_taken: float
     start_time: datetime.datetime
     end_time: datetime.datetime
@@ -97,24 +88,11 @@ class RAGPipeline:
             response = self.response_synthesizer.chain.invoke(retrieval_results)
 
         question = question if not self.config.query_enhancer_followed_by_rerank_fusion.enabled else enhanced_query["standalone_query"]
-        total_tokens = 0 # (
-        #     query_enhancer_cb.total_tokens
-        #     + response_cb.total_tokens
-        #     if self.config.query_enhancer_followed_by_rerank_fusion.enabled
-        #     else 0
-        # )
-        prompt_tokens = 0 # (
-        #     query_enhancer_cb.prompt_tokens
-        #     + response_cb.prompt_tokens
-        #     if self.config.query_enhancer_followed_by_rerank_fusion.enabled
-        #     else 0
-        # )
-        completion_tokens = 0 #(
-        #     query_enhancer_cb.completion_tokens
-        #     + response_cb.completion_tokens
-        #     if self.config.query_enhancer_followed_by_rerank_fusion.enabled
-        #     else 0
-        # )
+        usage_stats = litellm_token_and_cost_counter.get_totals()
+        total_tokens = usage_stats["total_tokens"]
+        prompt_tokens = usage_stats["prompt_tokens"]
+        completion_tokens = usage_stats["completion_tokens"]
+        completion_cost = usage_stats["cost"]
         time_taken = (
             query_enhancer_tb.elapsed
             + retrieval_tb.elapsed
@@ -150,6 +128,7 @@ class RAGPipeline:
             total_tokens=total_tokens,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            completion_cost=completion_cost,
             time_taken=time_taken,
             start_time=start_time,
             end_time=end_time,

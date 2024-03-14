@@ -5,8 +5,10 @@ from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatLiteLLM
 
-from wandbot.utils import clean_document_content
+from litellm import completion_cost
+from litellm.integrations.custom_logger import CustomLogger
 
+from wandbot.utils import clean_document_content
 
 class ChatModel:
     def __init__(self, temperature: float = 0.1, max_retries: int = 2):
@@ -150,3 +152,43 @@ def get_web_contexts(web_results):
         if web_results.get("web_context")
         else []
     )
+
+
+class LiteLLMTokenCostLogger(CustomLogger):
+    def __init__(self):
+        self.reset_totals()  # Initialize totals
+
+    def log_success_event(self, kwargs, response_obj, start_time, end_time): 
+        self.completion_tokens += response_obj.usage.completion_tokens
+        self.prompt_tokens += response_obj.usage.prompt_tokens
+        self.total_tokens += response_obj.usage.total_tokens
+        self.total_cost += completion_cost(response_obj)
+        # Optionally, print each event's details
+        print(f"On Success: {response_obj.usage}, Cost: {completion_cost(response_obj)}")
+
+    async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
+        # Assuming response_obj will have similar structure in async
+        self.completion_tokens += response_obj.usage.completion_tokens
+        self.prompt_tokens += response_obj.usage.prompt_tokens
+        self.total_tokens += response_obj.usage.total_tokens
+        self.total_cost += completion_cost(response_obj)
+        # Optionally, print each event's details
+        print(f"On Success: {response_obj.usage}, Cost: {completion_cost(response_obj)}")
+
+    def get_totals(self):
+        """Returns the current totals and then resets the counters."""
+        current_totals = {
+            "completion_tokens": self.completion_tokens,
+            "prompt_tokens": self.prompt_tokens,
+            "total_tokens": self.total_tokens,
+            "cost": self.total_cost
+        }
+        self.reset_totals()  # Reset totals after fetching
+        return current_totals
+
+    def reset_totals(self):
+        """Resets the total counts and costs to zero."""
+        self.completion_tokens = 0
+        self.prompt_tokens = 0
+        self.total_tokens = 0
+        self.total_cost = 0.0
