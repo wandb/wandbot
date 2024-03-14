@@ -1,4 +1,5 @@
 import json
+from pydantic import BaseModel
 
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
@@ -8,7 +9,9 @@ from langchain_community.chat_models import ChatLiteLLM
 from litellm import completion_cost
 from litellm.integrations.custom_logger import CustomLogger
 
-from wandbot.utils import clean_document_content
+from wandbot.utils import clean_document_content, get_logger
+
+logger = get_logger(__name__)
 
 class ChatModel:
     def __init__(self, temperature: float = 0.1, max_retries: int = 2):
@@ -154,41 +157,45 @@ def get_web_contexts(web_results):
     )
 
 
+class TotalsModel(BaseModel):
+    completion_tokens: int = 0
+    prompt_tokens: int = 0
+    total_tokens: int = 0
+    total_cost: float = 0.0
+
+
 class LiteLLMTokenCostLogger(CustomLogger):
     def __init__(self):
-        self.reset_totals()  # Initialize totals
+        # Use the Pydantic model for managing totals
+        self.totals = TotalsModel()
 
-    def log_success_event(self, kwargs, response_obj, start_time, end_time): 
-        self.completion_tokens += response_obj.usage.completion_tokens
-        self.prompt_tokens += response_obj.usage.prompt_tokens
-        self.total_tokens += response_obj.usage.total_tokens
-        self.total_cost += completion_cost(response_obj)
-        # Optionally, print each event's details
-        print(f"On Success: {response_obj.usage}, Cost: {completion_cost(response_obj)}")
+    def log_success_event(self, kwargs, response_obj, start_time, end_time):
+        # Update totals using the response object
+        self.totals.completion_tokens += response_obj.usage.completion_tokens
+        self.totals.prompt_tokens += response_obj.usage.prompt_tokens
+        self.totals.total_tokens += response_obj.usage.total_tokens
+        self.totals.total_cost += completion_cost(response_obj)
+        logger.info(
+            f"On Success: Completion Tokens: {response_obj.usage.completion_tokens}, "
+            f"Prompt Tokens: {response_obj.usage.prompt_tokens}, "
+            f"Total Tokens: {response_obj.usage.total_tokens}, "
+            f"Cost: {completion_cost(response_obj)}"
+        )
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
-        # Assuming response_obj will have similar structure in async
-        self.completion_tokens += response_obj.usage.completion_tokens
-        self.prompt_tokens += response_obj.usage.prompt_tokens
-        self.total_tokens += response_obj.usage.total_tokens
-        self.total_cost += completion_cost(response_obj)
-        # Optionally, print each event's details
-        print(f"On Success: {response_obj.usage}, Cost: {completion_cost(response_obj)}")
+        # Similar to the synchronous method, update totals for async events
+        self.totals.completion_tokens += response_obj.usage.completion_tokens
+        self.totals.prompt_tokens += response_obj.usage.prompt_tokens
+        self.totals.total_tokens += response_obj.usage.total_tokens
+        self.totals.total_cost += completion_cost(response_obj)
+        logger.info(
+            f"On Async Success: Completion Tokens: {response_obj.usage.completion_tokens}, "
+            f"Prompt Tokens: {response_obj.usage.prompt_tokens}, "
+            f"Total Tokens: {response_obj.usage.total_tokens}, "
+            f"Cost: {completion_cost(response_obj)}"
+        )
 
     def get_totals(self):
-        """Returns the current totals and then resets the counters."""
-        current_totals = {
-            "completion_tokens": self.completion_tokens,
-            "prompt_tokens": self.prompt_tokens,
-            "total_tokens": self.total_tokens,
-            "cost": self.total_cost
-        }
-        self.reset_totals()  # Reset totals after fetching
+        current_totals = self.totals
+        self.totals = TotalsModel()
         return current_totals
-
-    def reset_totals(self):
-        """Resets the total counts and costs to zero."""
-        self.completion_tokens = 0
-        self.prompt_tokens = 0
-        self.total_tokens = 0
-        self.total_cost = 0.0

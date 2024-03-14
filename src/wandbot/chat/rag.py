@@ -89,10 +89,6 @@ class RAGPipeline:
 
         question = question if not self.config.query_enhancer_followed_by_rerank_fusion.enabled else enhanced_query["standalone_query"]
         usage_stats = litellm_token_and_cost_counter.get_totals()
-        total_tokens = usage_stats["total_tokens"]
-        prompt_tokens = usage_stats["prompt_tokens"]
-        completion_tokens = usage_stats["completion_tokens"]
-        completion_cost = usage_stats["cost"]
         time_taken = (
             query_enhancer_tb.elapsed
             + retrieval_tb.elapsed
@@ -125,10 +121,10 @@ class RAGPipeline:
             source_documents=response["context_str"],
             system_prompt=response["response_prompt"],
             model=response["response_model"],
-            total_tokens=total_tokens,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            completion_cost=completion_cost,
+            total_tokens=usage_stats.total_tokens,
+            prompt_tokens=usage_stats.prompt_tokens,
+            completion_tokens=usage_stats.completion_tokens,
+            completion_cost=usage_stats.total_cost,
             time_taken=time_taken,
             start_time=start_time,
             end_time=end_time,
