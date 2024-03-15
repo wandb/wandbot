@@ -20,6 +20,7 @@ This module is meant to be run as a script and not imported as a module. When ru
 ZendeskWandBotResponseSystem object and runs it in an event loop.
 
 """
+
 import asyncio
 from typing import List
 
@@ -28,9 +29,8 @@ from zenpy.lib.api_objects import Comment, Ticket
 
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.zendesk.config import zendesk_app_config
-from wandbot.utils import get_logger
 from wandbot.apps.zendesk.extract_by_type import *
-
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 config = zendesk_app_config()
@@ -90,6 +90,7 @@ class ZendeskWandBotResponseSystem:
         api_client (AsyncAPIClient): The client for interacting with the WandBot API.
         semaphore (Semaphore): Use semaphore to control how many api calls to wandbot we make
     """
+
     def __init__(self) -> None:
         """Initializes the ZendeskWandBotResponseSystem with the necessary clients.
 
@@ -125,7 +126,6 @@ class ZendeskWandBotResponseSystem:
             minus=[f"tags:{tag}" for tag in exclude_tags],
         )
         return new_tickets
-
 
     async def generate_response(self, question: str) -> str:
         """Generates a response to a given question.

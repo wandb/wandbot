@@ -16,15 +16,16 @@ from urllib.parse import urljoin
 import aiohttp
 import requests
 
-from wandbot.api.schemas import (
+from wandbot.api.routers.chat import APIQueryRequest, APIQueryResponse
+from wandbot.api.routers.database import (
     APIFeedbackRequest,
     APIFeedbackResponse,
     APIGetChatThreadRequest,
     APIGetChatThreadResponse,
-    APIQueryRequest,
-    APIQueryResponse,
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
+)
+from wandbot.api.routers.retrieve import (
     APIRetrievalRequest,
     APIRetrievalResponse,
 )
@@ -53,11 +54,11 @@ class APIClient:
             url: The base URL for the API.
         """
         self.url = url
-        self.query_endpoint = urljoin(str(self.url), "query")
-        self.feedback_endpoint = urljoin(str(self.url), "feedback")
-        self.chat_thread_endpoint = urljoin(str(self.url), "chat_thread")
+        self.query_endpoint = urljoin(str(self.url), "chat/query")
+        self.feedback_endpoint = urljoin(str(self.url), "data/feedback")
+        self.chat_thread_endpoint = urljoin(str(self.url), "data/chat_thread")
         self.chat_question_answer_endpoint = urljoin(
-            str(self.url), "question_answer"
+            str(self.url), "data/question_answer"
         )
         self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
 

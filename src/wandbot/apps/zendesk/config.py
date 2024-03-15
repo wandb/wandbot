@@ -7,10 +7,10 @@ ZDGROUPID = "360016040851"
 class zendesk_app_config(BaseSettings):
     DISCBOTINTRO: str = (
         "Thank you for reaching out to W&B Technical Support!\n\n"
-    f"This is an automated reply from our support bot designed to assist you with your WandB-related queries.\n"
-    f"If you find the solution unsatisfactory or have additional questions, we encourage you to contact our support team at support@wandb.com, or continue replying in this thread\n\n"
+        f"This is an automated reply from our support bot designed to assist you with your WandB-related queries.\n"
+        f"If you find the solution unsatisfactory or have additional questions, we encourage you to contact our support team at support@wandb.com, or continue replying in this thread\n\n"
     )
-    
+
     ZENDESK_EMAIL: str = (Field(..., env="ZENDESK_EMAIL"),)
     ZENDESK_PASSWORD: str = (Field(..., env="ZENDESK_PASSWORD"),)
     ZENDESK_SUBDOMAIN: str = (Field(..., env="ZENDESK_SUBDOMAIN"),)

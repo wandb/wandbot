@@ -8,6 +8,7 @@ The bot uses the Slack Bolt framework for handling events and the langdetect lib
 It also communicates with an external API for processing queries and storing chat history and feedback.
 
 """
+
 import argparse
 import asyncio
 import logging

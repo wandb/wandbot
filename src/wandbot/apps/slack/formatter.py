@@ -10,7 +10,6 @@ class MrkdwnFormatter:
         self.markdown_link_pattern = re.compile(
             r"\[([^\[]+)\]\((.*?)\)", re.MULTILINE
         )
-        self.italic_pattern = re.compile(r"_([^_]+)_", re.MULTILINE)
         self.bold_pattern = re.compile(r"\*\*([^*]+)\*\*", re.MULTILINE)
         self.strike_pattern = re.compile(r"~~([^~]+)~~", re.MULTILINE)
         self.header_pattern = re.compile(r"^#+\s*(.*?)\n", re.MULTILINE)
@@ -20,10 +19,6 @@ class MrkdwnFormatter:
         text = match.group(1)
         url = match.group(2)
         return f"<{url}|{text}>"
-
-    @staticmethod
-    def replace_italic(match):
-        return f"*{match.group(1)}*"
 
     @staticmethod
     def replace_bold(match):
@@ -49,9 +44,6 @@ class MrkdwnFormatter:
                 else:
                     segment = self.markdown_link_pattern.sub(
                         self.replace_markdown_link, segment
-                    )
-                    segment = self.italic_pattern.sub(
-                        self.replace_italic, segment
                     )
                     segment = self.bold_pattern.sub(self.replace_bold, segment)
                     segment = self.strike_pattern.sub(

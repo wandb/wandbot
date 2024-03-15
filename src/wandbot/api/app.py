@@ -29,247 +29,82 @@ It uses logger from the utils module for logging purposes.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-from fastapi import FastAPI, Response, status
-
 import wandb
-from wandbot.api.schemas import (
-    APICreateChatThreadRequest,
-    APIFeedbackRequest,
-    APIFeedbackResponse,
-    APIGetChatThreadResponse,
-    APIQueryRequest,
-    APIQueryResponse,
-    APIQuestionAnswerRequest,
-    APIQuestionAnswerResponse,
-    APIRetrievalRequest,
-    APIRetrievalResponse,
-    APIRetrievalResult,
-)
-from wandbot.chat.chat import Chat
-from wandbot.chat.config import ChatConfig
-from wandbot.chat.schemas import ChatRequest
-from wandbot.database.client import DatabaseClient
-from wandbot.database.database import engine
-from wandbot.database.models import Base
+from fastapi import FastAPI
+from wandbot.api.routers import chat as chat_router
+from wandbot.api.routers import database as database_router
+from wandbot.api.routers import retrieve as retrieve_router
+from wandbot.ingestion.config import VectorStoreConfig
+from wandbot.retriever import VectorStore
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
-
-Base.metadata.create_all(bind=engine)
-chat: Chat | None = None
-app = FastAPI(name="wandbot", version="1.0.0")
-db_client: DatabaseClient | None = None
 last_backup = datetime.now().astimezone(timezone.utc)
 
 
-async def backup_db():
-    """Periodically backs up the database to a table.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handles the lifespan of the application.
 
-    This function runs periodically and retrieves all question-answer threads from the database since the last backup.
-    It then creates a pandas DataFrame from the retrieved threads and logs it to a table using Weights & Biases.
-    The last backup timestamp is updated after each backup.
-
-    Returns:
-        None
-    """
-    global last_backup
-    while True:
-        chat_threads = db_client.get_all_question_answers(last_backup)
-        if chat_threads is not None:
-            chat_table = pd.DataFrame(
-                [chat_thread for chat_thread in chat_threads]
-            )
-            last_backup = datetime.now().astimezone(timezone.utc)
-            logger.info(
-                f"Backing up database to Table at {last_backup}: Number of chat threads: {len(chat_table)}"
-            )
-            wandb.log(
-                {"question_answers_db": wandb.Table(dataframe=chat_table)}
-            )
-        await asyncio.sleep(600)
-
-
-@app.on_event("startup")
-def startup_event():
-    """Handles the startup event.
-
-    This function initializes the chat and database client objects and creates a task to backup the database.
+    This function is called by the Uvicorn server to handle the lifespan of the application.
+    It is used to perform any necessary startup and shutdown operations.
 
     Returns:
         None
     """
-    global chat, db_client
-    chat = Chat(ChatConfig())
-    db_client = DatabaseClient()
-    asyncio.create_task(backup_db())
-
-
-@app.post(
-    "/question_answer",
-    response_model=APIQuestionAnswerResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_question_answer(
-    request: APIQuestionAnswerRequest, response: Response
-) -> APIQuestionAnswerResponse | None:
-    """Creates a question answer.
-
-    Args:
-        request: The request object containing the question answer data.
-        response: The response object to update with the result.
-
-    Returns:
-        The created question answer or None if creation failed.
-    """
-    question_answer = db_client.create_question_answer(request)
-    if question_answer is None:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-    return question_answer
-
-
-@app.get(
-    "/chat_thread/{application}/{thread_id}",
-    response_model=APIGetChatThreadResponse | None,
-    status_code=status.HTTP_200_OK,
-)
-async def get_chat_thread(
-    application: str, thread_id: str, response: Response
-) -> APIGetChatThreadResponse:
-    """Retrieves a chat thread from the database.
-
-    If the chat thread does not exist, it creates a new chat thread.
-
-    Args:
-        application: The application name.
-        thread_id: The ID of the chat thread.
-        response: The HTTP response object.
-
-    Returns:
-        The retrieved or created chat thread.
-    """
-    chat_thread = db_client.get_chat_thread(
-        application=application,
-        thread_id=thread_id,
+    vector_store = VectorStore.from_config(VectorStoreConfig())
+    chat_router.chat = chat_router.Chat(vector_store=vector_store)
+    database_router.db_client = database_router.DatabaseClient()
+    retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+        vector_store=vector_store
     )
-    if chat_thread is None:
-        chat_thread = db_client.create_chat_thread(
-            APICreateChatThreadRequest(
-                application=application,
-                thread_id=thread_id,
+
+    async def backup_db():
+        """Periodically backs up the database to a table.
+
+        This function runs periodically and retrieves all question-answer threads from the database since the last backup.
+        It then creates a pandas DataFrame from the retrieved threads and logs it to a table using Weights & Biases.
+        The last backup timestamp is updated after each backup.
+
+        Returns:
+            None
+        """
+        global last_backup
+        while True:
+            chat_threads = database_router.db_client.get_all_question_answers(
+                last_backup
             )
-        )
-        response.status_code = status.HTTP_201_CREATED
-    if chat_thread is None:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-    return chat_thread
-
-
-@app.post(
-    "/query", response_model=APIQueryResponse, status_code=status.HTTP_200_OK
-)
-async def query(
-    request: APIQueryRequest,
-) -> APIQueryResponse:
-    """Executes a query using the chat function and returns the result as an APIQueryResponse.
-
-    Args:
-        request: The APIQueryRequest object containing the question and chat history.
-
-    Returns:
-        The APIQueryResponse object containing the result of the query.
-    """
-    result = chat(
-        ChatRequest(
-            question=request.question,
-            chat_history=request.chat_history,
-            language=request.language,
-            application=request.application,
-        ),
-    )
-    result = APIQueryResponse(**result.model_dump())
-
-    return result
-
-
-@app.post(
-    "/feedback",
-    response_model=APIFeedbackResponse | None,
-    status_code=status.HTTP_201_CREATED,
-)
-async def feedback(
-    request: APIFeedbackRequest, response: Response
-) -> APIFeedbackResponse:
-    """Handles the feedback request and logs the feedback data.
-
-    Args:
-        request: The feedback request object.
-        response: The response object.
-
-    Returns:
-        The feedback response object.
-    """
-    feedback_response = db_client.create_feedback(request)
-    if feedback_response is not None:
-        wandb.log(
-            {
-                "feedback": wandb.Table(
-                    columns=list(request.model_dump().keys()),
-                    data=[list(request.model_dump().values())],
+            if chat_threads is not None:
+                chat_table = pd.DataFrame(
+                    [chat_thread for chat_thread in chat_threads]
                 )
-            }
-        )
-    else:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-    return feedback_response
+                last_backup = datetime.now().astimezone(timezone.utc)
+                logger.info(
+                    f"Backing up database to Table at {last_backup}: Number of chat threads: {len(chat_table)}"
+                )
+                wandb.log(
+                    {"question_answers_db": wandb.Table(dataframe=chat_table)}
+                )
+            await asyncio.sleep(600)
 
-
-@app.post(
-    "/retrieve",
-    response_model=APIRetrievalResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
-    """Retrieves the top k results for a given query.
-
-    Args:
-        request: The APIRetrievalRequest object containing the query and other parameters.
-
-    Returns:
-        The APIRetrievalResponse object containing the query and top k results.
-    """
-    results = chat.retriever(
-        query=request.query,
-        language=request.language,
-        top_k=request.top_k,
-        include_tags=request.include_tags,
-        exclude_tags=request.exclude_tags,
-    )
-
-    return APIRetrievalResponse(
-        query=request.query,
-        top_k=[
-            APIRetrievalResult(
-                text=result["text"],
-                score=result["score"],
-                metadata=result["metadata"],
-            )
-            for result in results
-        ],
-    )
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """Finish the current run if wandb.run is not None.
-
-    Returns:
-        None
-    """
+    _ = asyncio.create_task(backup_db())
+    yield
     if wandb.run is not None:
         wandb.run.finish()
+
+
+app = FastAPI(
+    title="Wandbot", name="wandbot", version="1.3.0", lifespan=lifespan
+)
+
+
+app.include_router(chat_router.router)
+app.include_router(database_router.router)
+app.include_router(retrieve_router.router)
 
 
 if __name__ == "__main__":
