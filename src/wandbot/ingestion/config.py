@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -241,7 +240,7 @@ class FCReportsStoreConfig(DataStoreConfig):
 
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
-    embeddings_model: str = "text-embedding-3-small"
+    embeddings_model: str = "text-embedding-3-large"
     embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
