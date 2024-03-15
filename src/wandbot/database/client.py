@@ -15,18 +15,15 @@ Typical usage example:
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, List, Collection
+from typing import Any, Collection, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
 from wandbot.database.models import QuestionAnswer as QuestionAnswerModel
-from wandbot.database.models import (
-    YoutubeAssistantThread as YoutubeAssistantThreadModel,
-)
+from wandbot.database.models import YoutubeChatThread as YoutubeChatThreadModel
 from wandbot.database.schemas import ChatThreadCreate as ChatThreadCreateSchema
 from wandbot.database.schemas import Feedback as FeedbackSchema
 from wandbot.database.schemas import (
@@ -290,9 +287,9 @@ class DatabaseClient:
             ]
             return question_answers
 
-    def get_youtube_assistant_thread(
+    def get_youtube_chat_thread(
         self, thread_id: str
-    ) -> YoutubeAssistantThreadModel | None:
+    ) -> YoutubeChatThreadModel | None:
         """Gets a youtube chat thread from the database.
 
         Args:
@@ -301,16 +298,16 @@ class DatabaseClient:
         Returns:
             The youtube chat thread model if found, None otherwise.
         """
-        youtube_assistant_thread: YoutubeAssistantThreadModel | None = (
-            self.database.query(YoutubeAssistantThreadModel)
-            .filter(YoutubeAssistantThreadModel.thread_id == thread_id)
+        youtube_assistant_thread: YoutubeChatThreadModel | None = (
+            self.database.query(YoutubeChatThreadModel)
+            .filter(YoutubeChatThreadModel.thread_id == thread_id)
             .first()
         )
         return youtube_assistant_thread
 
-    def create_youtube_assistant_thread(
+    def create_youtube_chat_thread(
         self, youtube_assistant_thread: YoutubeAssistantThreadCreateSchema
-    ) -> YoutubeAssistantThreadModel:
+    ) -> YoutubeChatThreadModel:
         """Creates a youtube chat thread in the database.
 
         Args:
@@ -320,10 +317,8 @@ class DatabaseClient:
             The created youtube chat thread.
         """
         try:
-            youtube_assistant_thread: YoutubeAssistantThreadModel = (
-                YoutubeAssistantThreadModel(
-                    **youtube_assistant_thread.model_dump()
-                )
+            youtube_assistant_thread: YoutubeChatThreadModel = (
+                YoutubeChatThreadModel(**youtube_assistant_thread.model_dump())
             )
             youtube_assistant_thread.created_at = datetime.utcnow()
             youtube_assistant_thread.updated_at = datetime.utcnow()
@@ -336,9 +331,9 @@ class DatabaseClient:
             self.database.rollback()
         return youtube_assistant_thread
 
-    def update_youtube_assistant_thread_time(
+    def update_youtube_chat_thread_time(
         self, thread_id: str
-    ) -> YoutubeAssistantThreadModel:
+    ) -> YoutubeChatThreadModel:
         """Updates a youtube chat thread in the database.
 
         Args:
@@ -347,8 +342,8 @@ class DatabaseClient:
         Returns:
             The updated youtube chat thread.
         """
-        youtube_assistant_thread: YoutubeAssistantThreadModel = (
-            self.get_youtube_assistant_thread(thread_id=thread_id)
+        youtube_assistant_thread: YoutubeChatThreadModel = (
+            self.get_youtube_chat_thread(thread_id=thread_id)
         )
         try:
             youtube_assistant_thread.updated_at = datetime.utcnow()
@@ -361,20 +356,33 @@ class DatabaseClient:
             self.database.rollback()
         return youtube_assistant_thread
 
-    def delete_old_youtube_assistant_threads(
+    def get_old_youtube_chat_threads(
         self, time_delta: timedelta = timedelta(hours=24)
     ) -> Collection[YoutubeAssistantThreadCreateSchema]:
         """Deletes YoutubeAssistantThread records that have not been updated in the last 24 hours."""
         cutoff_time = datetime.now() - time_delta
-        old_threads = self.database.query(YoutubeAssistantThreadModel).filter(
-            YoutubeAssistantThreadModel.updated_at < cutoff_time
+        old_threads = self.database.query(YoutubeChatThreadModel).filter(
+            YoutubeChatThreadModel.updated_at < cutoff_time
         )
         threads = [
             YoutubeAssistantThreadCreateSchema.model_validate(thread)
             for thread in old_threads.all()
         ]
 
-        old_threads.delete(synchronize_session=False)
-        self.database.commit()
-
         return threads
+
+    def delete_youtube_chat_thread(self, thread_id: str) -> None:
+        """Deletes a youtube chat thread from the database.
+
+        Args:
+            thread_id: The ID of the youtube chat thread to delete.
+        """
+        youtube_assistant_thread: YoutubeChatThreadModel = (
+            self.get_youtube_chat_thread(thread_id=thread_id)
+        )
+        try:
+            self.database.delete(youtube_assistant_thread)
+            self.database.commit()
+        except Exception as e:
+            logger.error(f"Delete youtube chat thread failed with error: {e}")
+            self.database.rollback()

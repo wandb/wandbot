@@ -62,13 +62,11 @@ class FeedBack(Base):
     question_answer = relationship("QuestionAnswer", back_populates="feedback")
 
 
-class YoutubeAssistantThread(Base):
-    __tablename__ = "youtube_assistant_thread"
+class YoutubeChatThread(Base):
+    __tablename__ = "youtube_assistant"
 
     thread_id = Column(String, primary_key=True, index=True)
     video_id = Column(String)
-    assistant_file_id = Column(String)
-    assistant_id = Column(String)
-    assistant_thread_id = Column(String)
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
+    transcript = Column(String)
+    summary = Column(String)
+    key_points = Column(String)

@@ -80,14 +80,14 @@ class ChatThreadCreate(ChatThread):
     thread_id: str
 
 
-class YoutubeAssistantThreadBase(BaseModel):
+class YoutubeChatThreadBase(BaseModel):
     video_id: str
-    assistant_file_id: str
-    assistant_id: str
-    assistant_thread_id: str
+    transcript: str | None = None
+    summary: str | None = None
+    key_points: str | None = None
 
 
-class YoutubeAssistantThread(YoutubeAssistantThreadBase):
+class YoutubeAssistantThread(YoutubeChatThreadBase):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
