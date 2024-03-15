@@ -3,7 +3,6 @@ import json
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
-
 from wandbot.utils import clean_document_content
 
 
@@ -96,18 +95,6 @@ def get_web_contexts(web_results):
     output_documents = []
     if not web_results:
         return []
-    # web_answer = web_results["web_answer"]
-    # if web_answer:
-    # output_documents += [
-    #     Document(
-    #         page_content=web_answer,
-    #         metadata={
-    #             "source": "you.com",
-    #             "source_type": "web_answer",
-    #             "has_code": None,
-    #         },
-    #     )
-    # ]
     return (
         output_documents
         + [
