@@ -31,10 +31,6 @@ from wandbot.apps.slack.handlers.docsbot import (
     create_docsbot_handler,
     create_reaction_added_handler,
 )
-from wandbot.apps.slack.handlers.youtube_chat import (
-    create_youtube_chat_init_handler,
-    create_youtube_chat_input_handler,
-)
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -61,6 +57,7 @@ else:
 app = AsyncApp(token=config.SLACK_BOT_TOKEN)
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 slack_client = app.client
+
 
 def get_init_block(user: str) -> List[Dict[str, Any]]:
     initial_block = [
@@ -117,21 +114,9 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
                 "action_id": "content_navigator",
             },
         },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Chat with a Youtube Video*\n Chat with the YouTube link provided",
-            },
-            "accessory": {
-                "type": "button",
-                "text": {"type": "plain_text", "text": "YT Assistant"},
-                "value": "yt_assistant",
-                "action_id": "yt_assistant",
-            },
-        },
     ]
     return initial_block
+
 
 # --------------------------------------
 # Main Wandbot Mention Handler
@@ -192,17 +177,6 @@ app.action("technical_signups")(
 
 
 # --------------------------------------
-# Handlers for the YouTube Chat
-# --------------------------------------
-
-app.action("yt_assistant")(
-    create_youtube_chat_init_handler(slack_client=slack_client)
-)
-
-app.action("chat_youtube")(create_youtube_chat_input_handler())
-
-
-# --------------------------------------
 # Handlers for the Content Navigator
 # --------------------------------------
 
@@ -211,6 +185,7 @@ app.action("content_navigator")(
         slack_client=slack_client, api_client=api_client
     )
 )
+
 
 async def main():
     handler = AsyncSocketModeHandler(app, config.SLACK_APP_TOKEN)

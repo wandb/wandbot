@@ -78,18 +78,3 @@ class ChatThread(ChatThreadBase):
 
 class ChatThreadCreate(ChatThread):
     thread_id: str
-
-
-class YoutubeChatThreadBase(BaseModel):
-    video_id: str
-    transcript: str | None = None
-    summary: str | None = None
-    key_points: str | None = None
-
-
-class YoutubeAssistantThread(YoutubeChatThreadBase):
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
-
-
-class YoutubeAssistantThreadCreate(YoutubeAssistantThread):
-    thread_id: str

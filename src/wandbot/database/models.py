@@ -60,13 +60,3 @@ class FeedBack(Base):
     )
     rating = Column(Integer)
     question_answer = relationship("QuestionAnswer", back_populates="feedback")
-
-
-class YoutubeChatThread(Base):
-    __tablename__ = "youtube_assistant"
-
-    thread_id = Column(String, primary_key=True, index=True)
-    video_id = Column(String)
-    transcript = Column(String)
-    summary = Column(String)
-    key_points = Column(String)
