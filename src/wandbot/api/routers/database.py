@@ -2,7 +2,6 @@ import wandb
 from fastapi import APIRouter
 from starlette import status
 from starlette.responses import Response
-
 from wandbot.database.client import DatabaseClient
 from wandbot.database.database import engine
 from wandbot.database.models import Base
@@ -13,8 +12,6 @@ from wandbot.database.schemas import (
     FeedbackCreate,
     QuestionAnswer,
     QuestionAnswerCreate,
-    YoutubeAssistantThreadCreate,
-    YoutubeAssistantThread,
 )
 from wandbot.utils import get_logger
 
@@ -148,63 +145,3 @@ def feedback(
     else:
         response.status_code = status.HTTP_400_BAD_REQUEST
     return feedback_response
-
-
-class APIYouTubeAssistantThreadRequest(YoutubeAssistantThreadCreate):
-    pass
-
-
-class APIYouTubeAssistantThreadResponse(YoutubeAssistantThread):
-    pass
-
-
-@router.post(
-    "/youtube_assistant_thread",
-    response_model=APIYouTubeAssistantThreadResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_youtube_assistant_thread(
-    request: APIYouTubeAssistantThreadRequest, response: Response
-) -> APIYouTubeAssistantThreadResponse:
-    """Creates a YouTube assistant thread.
-
-    Args:
-        request: The request object containing the YouTube assistant thread data.
-        response: The response object to update with the result.
-
-    Returns:
-        The created YouTube assistant thread.
-
-    """
-    youtube_assistant_thread = db_client.create_youtube_assistant_thread(
-        request
-    )
-    if youtube_assistant_thread is None:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-
-    return youtube_assistant_thread
-
-
-@router.get(
-    "/youtube_assistant_thread/{thread_id}",
-    response_model=APIYouTubeAssistantThreadResponse | None,
-    status_code=status.HTTP_200_OK,
-)
-def get_youtube_assistant_thread(
-    thread_id: str, response: Response
-) -> APIYouTubeAssistantThreadResponse:
-    """Retrieves a YouTube assistant thread from the database.
-
-    Args:
-        thread_id: The ID of the YouTube assistant thread.
-        response: The HTTP response object.
-
-    Returns:
-        The retrieved YouTube assistant thread.
-    """
-    youtube_assistant_thread = db_client.get_youtube_assistant_thread(
-        thread_id=thread_id
-    )
-    if youtube_assistant_thread is None:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-    return youtube_assistant_thread
