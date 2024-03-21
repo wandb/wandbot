@@ -47,6 +47,8 @@ simsimd = "3.7.7"
 
 [tool.poetry.dev-dependencies]
 #fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
+llama_index = "^0.10.20"
+ragas = "^0.1.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

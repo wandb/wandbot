@@ -31,6 +31,7 @@ class ChatModel:
             model_name=value,
             temperature=self.temperature,
             max_retries=self.max_retries,
+            max_tokens=4096,
         )
         setattr(obj, self.private_name, model)
 
