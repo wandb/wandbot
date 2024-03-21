@@ -298,8 +298,40 @@ class QueryEnhancer:
         return self._chain
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        # query_enhancer_chain = create_structured_output_runnable(
+        #     EnhancedQuery, model, self.prompt
+        # )
+
+        # input_chain = RunnableParallel(
+        #     query=RunnablePassthrough(),
+        #     chat_history=(
+        #         RunnableLambda(lambda x: convert_to_messages(x["chat_history"]))
+        #         | RunnableLambda(
+        #             lambda x: get_buffer_string(x, "user", "assistant")
+        #         )
+        #     ),
+        # )
+
+        # full_query_enhancer_chain = input_chain | query_enhancer_chain
+
+        # intermediate_chain = RunnableParallel(
+        #     query=itemgetter("query"),
+        #     chat_history=itemgetter("chat_history"),
+        #     enhanced_query=full_query_enhancer_chain,
+        # )
+        # chain = intermediate_chain | RunnableLambda(
+        #     lambda x: x["enhanced_query"].parse_output(
+        #         x["query"], convert_to_messages(x["chat_history"]), self.config
+        #     )
+        # )
+
+        from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
+
+        parser = PydanticOutputParser(pydantic_object=EnhancedQuery)
+        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=model)
+
         query_enhancer_chain = create_structured_output_runnable(
-            EnhancedQuery, model, self.prompt
+            EnhancedQuery, model, self.prompt, output_parser=fixing_parser
         )
 
         input_chain = RunnableParallel(

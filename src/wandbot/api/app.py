@@ -29,10 +29,7 @@ It uses logger from the utils module for logging purposes.
 """
 
 import os
-if os.environ.get("CONFIG_PATH") is None:
-    os.environ["CONFIG_PATH"] = "configs/openai_config.yaml"
-else:
-    print(os.environ.get("CONFIG_PATH"))
+os.environ["CONFIG_PATH"] = "config.yaml"
 
 import asyncio
 from contextlib import asynccontextmanager

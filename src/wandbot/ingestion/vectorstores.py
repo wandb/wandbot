@@ -91,8 +91,6 @@ def load(
     for batch_idx in trange(0, len(transformed_documents), vectorstore_config.batch_size):
         batch = transformed_documents[batch_idx : batch_idx + vectorstore_config.batch_size]
         chroma.add_documents(batch)
-        # TODO: remove break
-        break
     chroma.persist()
 
     result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")
