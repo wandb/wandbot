@@ -9,7 +9,7 @@ import litellm
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger, RAGPipelineConfig
 from wandbot.rag.query_handler import QueryEnhancer
-from wandbot.rag.retrieval import FusionRetrieval
+from wandbot.rag.retrieval import FusionRetrieval, SimpleRetrievalWithoutFusion
 from wandbot.rag.response_synthesis import ResponseSynthesizer, SimpleResponseSynthesizer
 from wandbot.retriever.base import SimpleRetrievalEngine, SimpleRetrievalEngineWithRerank
 from wandbot.rag.utils import LiteLLMTokenCostLogger
@@ -48,11 +48,16 @@ class RAGPipeline:
         self.vector_store = vector_store
         self.config = config
 
-        if config.query_enhancer_followed_by_rerank_fusion.enabled:
+        if config.query_enhancer.enabled:
             self.query_enhancer = QueryEnhancer(config=config)
-            self.retrieval = FusionRetrieval(
-                vector_store=vector_store, top_k=top_k, search_type=search_type
-            )
+            if config.rerank_fusion.enabled:
+                self.retrieval = FusionRetrieval(
+                    vector_store=vector_store, top_k=top_k, search_type=search_type
+                )
+            else:
+                self.retrieval = SimpleRetrievalWithoutFusion(
+                    vector_store=vector_store, top_k=top_k, search_type=search_type
+                )
             self.response_synthesizer = ResponseSynthesizer(config=config)
         else:
             if config.retrieval_re_ranker.enabled:

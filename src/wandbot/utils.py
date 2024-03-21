@@ -323,7 +323,8 @@ class RAGPipelineConfig(BaseModel):
     embeddings: EmbeddingsConfig
     retrieval_re_ranker: FeatureToggle
     use_you_search_api: FeatureToggle
-    query_enhancer_followed_by_rerank_fusion: FeatureToggle
+    query_enhancer: FeatureToggle
+    rerank_fusion: FeatureToggle
     chunk_size: int
     top_k: int
     project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
