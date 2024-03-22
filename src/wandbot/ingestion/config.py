@@ -275,7 +275,6 @@ class VectorStoreConfig(BaseSettings):
 class OpenAIEmbeddingConfig(VectorStoreConfig):
     embeddings_model: str = "text-embedding-3-small"
     persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/openai/{embeddings_model}")
-    embedding_dim: int = 512
 
 
 class CohereEmbeddingConfig(VectorStoreConfig):

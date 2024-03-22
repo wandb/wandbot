@@ -329,7 +329,7 @@ class RAGPipelineConfig(BaseModel):
     top_k: int
     project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
     entity: str | None = Field("wandbot", env="WANDB_ENTITY")
-
+ 
 
 def load_config(config_path: str) -> RAGPipelineConfig:
     """Load and return the YAML configuration as a Pydantic model."""
@@ -338,4 +338,8 @@ def load_config(config_path: str) -> RAGPipelineConfig:
 
     with open(config_path, 'r') as file:
         raw_config = yaml.safe_load(file)
+    
+    embeddings_config = raw_config["embeddings"]["config"]
+    unique_identifier = '-'.join(f"{key}_{value}" for key, value in embeddings_config.items())
+    raw_config["embeddings"]["config"]["persist_dir"] = pathlib.Path(f"data/cache/vectorstore/openai/{unique_identifier}")
     return RAGPipelineConfig(**raw_config)

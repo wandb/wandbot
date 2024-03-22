@@ -76,7 +76,7 @@ class RAGPipeline:
         if chat_history is None:
             chat_history = []
 
-        if self.config.query_enhancer_followed_by_rerank_fusion.enabled:
+        if self.config.query_enhancer.enabled:
             with Timer() as query_enhancer_tb:
                 enhanced_query = self.query_enhancer.chain.invoke(
                     {"query": question, "chat_history": chat_history}
@@ -92,18 +92,18 @@ class RAGPipeline:
         with Timer() as response_tb:
             response = self.response_synthesizer.chain.invoke(retrieval_results)
 
-        question = question if not self.config.query_enhancer_followed_by_rerank_fusion.enabled else enhanced_query["standalone_query"]
+        question = question if not self.config.query_enhancer.enabled else enhanced_query["standalone_query"]
         usage_stats = litellm_token_and_cost_counter.get_totals()
         time_taken = (
             query_enhancer_tb.elapsed
             + retrieval_tb.elapsed
             + response_tb.elapsed
-            if self.config.query_enhancer_followed_by_rerank_fusion.enabled
+            if self.config.query_enhancer.enabled
             else retrieval_tb.elapsed + response_tb.elapsed
         )
         start_time = (
             query_enhancer_tb.start
-            if self.config.query_enhancer_followed_by_rerank_fusion.enabled
+            if self.config.query_enhancer.enabled
             else retrieval_tb.start
         )
         end_time = response_tb.stop

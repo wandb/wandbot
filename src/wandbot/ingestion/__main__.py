@@ -10,6 +10,7 @@ logger = get_logger(__name__)
 
 def main(config_path: str) -> None:
     config = load_config(config_path)
+    logger.info(config)
 
     project = os.environ.get("WANDB_PROJECT", "wandbot-dev")
     entity = os.environ.get("WANDB_ENTITY", "wandbot")

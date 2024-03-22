@@ -1,16 +1,15 @@
 llm:
-  model: "gpt-4-0125-preview" # 1106 1.1
+  model: "gpt-4-1106-preview" # 1106 1.1
   temperature: 0.1
   max_retries: 2
 fallback_llm:
-  model: "gpt-4-0125-preview"
+  model: "gpt-4-1106-preview"
   temperature: 0.1
   max_retries: 6
 embeddings:
   type: "OpenAIEmbedding"
   config:
-    embeddings_model: "text-embedding-3-small" # text-embedding-ada-002
-    embedding_dim: 512
+    embeddings_model: "text-embedding-ada-002" # text-embedding-ada-002
 retrieval_re_ranker:
   enabled: True
 use_you_search_api:
@@ -18,6 +17,6 @@ use_you_search_api:
 query_enhancer:
   enabled: True
 rerank_fusion:
-  enabled: True
+  enabled: False
 chunk_size: 512
 top_k: 5
