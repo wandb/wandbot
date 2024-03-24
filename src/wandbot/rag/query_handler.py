@@ -15,7 +15,6 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
-
 from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger, RAGPipelineConfig
 
@@ -144,7 +143,7 @@ class EnhancedQuery(BaseModel):
     intents: List[Intent] = Field(
         ...,
         description=f"A list of one or more intents associated with the query. Here are the possible intents that "
-        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS, indent=2)}",
+        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}",
         min_items=1,
         max_items=5,
     )

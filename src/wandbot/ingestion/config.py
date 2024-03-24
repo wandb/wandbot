@@ -24,7 +24,6 @@ from pydantic import (
     field_validator
 )
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
