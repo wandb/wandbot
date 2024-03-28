@@ -83,7 +83,7 @@ def get_init_block(user: str) -> List[Dict[str, Any]]:
             },
             "accessory": {
                 "type": "button",
-                "text": {"type": "plain_text", "text": "Docs Bot"},
+                "text": {"type": "plain_text", "text": "Support Bot"},
                 "value": "docsbot",
                 "action_id": "docsbot",
             },

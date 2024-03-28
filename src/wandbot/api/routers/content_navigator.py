@@ -48,4 +48,3 @@ the moment, please try again later."
         rejected_slack_response=rejected_slack_response,
         response_items_count=response_items_count,
     )
-
