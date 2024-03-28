@@ -1,8 +1,9 @@
-import re
 import logging
+import re
 from typing import Any, Dict, List
 
 from slack_sdk.web.async_client import AsyncWebClient
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.utils import get_initial_message_from_thread
 
@@ -131,8 +132,11 @@ async def handle_adcopy_action(
     query = re.sub(r"\<@\w+\>", "", query).strip()
     logger.info(f"Initial message: {initial_message}")
 
-    await say(f"Working on generating ads for '{persona}' focussed on '{action}' \
-for the query: '{query}'...", thread_ts=thread_ts)
+    await say(
+        f"Working on generating ads for '{persona}' focussed on '{action}' \
+for the query: '{query}'...",
+        thread_ts=thread_ts,
+    )
 
     api_response = await api_client.generate_ads(
         query=query, action=action, persona=persona

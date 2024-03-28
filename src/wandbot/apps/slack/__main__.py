@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
+
 from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.slack.handlers.ad_copy import (

@@ -17,6 +17,7 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
+
 from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger
 

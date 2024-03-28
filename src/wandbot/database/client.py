@@ -18,6 +18,7 @@ from typing import Any, List
 
 from sqlalchemy.future import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import ChatThread as ChatThreadModel
 from wandbot.database.models import FeedBack as FeedBackModel
