@@ -1,4 +1,5 @@
 from typing import List
+from itertools import chain
 
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
@@ -50,6 +51,51 @@ def rerank_results(
     query = "\n".join(queries)
     ranked_results = reranker.compress_documents(documents=context, query=query)
     return ranked_results
+
+
+class SimpleRetrievalWithoutFusion:
+    def __init__(
+        self,
+        vector_store: VectorStore,
+        top_k: int = 5,
+        search_type: str = "mmr",
+    ):
+        self.vectorstore = vector_store
+        self.top_k = top_k
+        self.search_type = search_type
+
+        self.retriever = self.vectorstore.as_parent_retriever(
+            search_type=self.search_type, search_kwargs={"k": self.top_k}
+        )
+
+        self._chain = None
+
+    @property
+    def chain(self) -> Runnable:
+        if self._chain is None:
+            self._chain = (
+                RunnablePassthrough().assign(
+                    docs_context=lambda x: self.retriever.batch(
+                        x["all_queries"]
+                    ),
+                    web_context=lambda x: run_web_search(
+                        x["standalone_query"], x["avoid_query"]
+                    ),
+                )
+                | RunnablePassthrough().assign(
+                    full_context=lambda x: x["docs_context"]
+                    + [x["web_context"]]
+                )
+                | RunnablePassthrough().assign(
+                    context=lambda x: rerank_results(
+                        [x["standalone_query"]],
+                        list(chain.from_iterable(x["full_context"])),
+                        self.top_k,
+                        x["language"],
+                    )
+                )
+            )
+        return self._chain
 
 
 class FusionRetrieval:

@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Optional, Sequence
 
-from llama_index.evaluation import CorrectnessEvaluator, EvaluationResult
+from llama_index.legacy.evaluation import CorrectnessEvaluator, EvaluationResult
 
 from wandbot.evaluation.eval.utils import (
     make_eval_template,
@@ -96,7 +96,7 @@ class WandbRelevancyEvaluator(CorrectnessEvaluator):
             reference_answer=reference,
         )
 
-        passing, reasoning, score = safe_parse_eval_response(
+        passing, reasoning, score = await safe_parse_eval_response(
             eval_response, "relevant"
         )
 

@@ -2,7 +2,7 @@ import asyncio
 from typing import Any, Optional, Sequence
 
 import regex as re
-from llama_index.evaluation import CorrectnessEvaluator, EvaluationResult
+from llama_index.legacy.evaluation import CorrectnessEvaluator, EvaluationResult
 
 from wandbot.evaluation.eval.utils import (
     make_eval_template,
@@ -98,19 +98,20 @@ class WandbCorrectnessEvaluator(CorrectnessEvaluator):
         if query is None or response is None or reference is None:
             print(query, response, reference, flush=True)
             raise ValueError("query, response, and reference must be provided")
-
+        
+        context_str = re.sub(
+            "\n+", "\n", "\n---\n".join(contexts) if contexts else ""
+        )
         eval_response = await self._service_context.llm.apredict(
             prompt=self._eval_template,
             query=query,
             generated_answer=response,
             reference_answer=reference,
-            context_str=re.sub(
-                "\n+", "\n", "\n---\n".join(contexts) if contexts else ""
-            ),
+            context_str=context_str,
             reference_notes=kwargs.get("reference_notes", ""),
         )
 
-        passing, reasoning, score = safe_parse_eval_response(
+        passing, reasoning, score = await safe_parse_eval_response(
             eval_response, "correct"
         )
 

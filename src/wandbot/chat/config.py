@@ -27,5 +27,3 @@ class ChatConfig(BaseSettings):
         env="WANDB_INDEX_ARTIFACT",
         validation_alias="wandb_index_artifact",
     )
-    wandb_project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
-    wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")

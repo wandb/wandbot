@@ -28,6 +28,9 @@ The backup data is transformed into a Pandas DataFrame and saved as a wandb.Tabl
 It uses logger from the utils module for logging purposes.
 """
 
+import os
+os.environ["CONFIG_PATH"] = "config.yaml"
+
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -38,12 +41,20 @@ from fastapi import FastAPI
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
-from wandbot.ingestion.config import VectorStoreConfig
+from wandbot.ingestion.utils import get_embedding_config
 from wandbot.retriever import VectorStore
-from wandbot.utils import get_logger
+from wandbot.utils import get_logger, load_config
 
 logger = get_logger(__name__)
 last_backup = datetime.now().astimezone(timezone.utc)
+
+config = load_config(os.environ["CONFIG_PATH"])
+logger.info(
+    f"Loaded configuration from {os.environ['CONFIG_PATH']}: {config}"
+)
+vectorstore_config = get_embedding_config(
+    config.embeddings.type, config.embeddings.config
+)
 
 
 @asynccontextmanager
@@ -56,12 +67,18 @@ async def lifespan(app: FastAPI):
     Returns:
         None
     """
-    vector_store = VectorStore.from_config(VectorStoreConfig())
-    chat_router.chat = chat_router.Chat(vector_store=vector_store)
+    vector_store = VectorStore.from_config(vectorstore_config)
+    chat_router.chat = chat_router.Chat(vector_store=vector_store, config=config)
     database_router.db_client = database_router.DatabaseClient()
-    retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-        vector_store=vector_store
-    )
+    if not config.retrieval_re_ranker.enabled:
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            vector_store=vector_store
+        )
+    else:
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngineWithRerank(
+            vector_store=vector_store
+        )
+
 
     async def backup_db():
         """Periodically backs up the database to a table.

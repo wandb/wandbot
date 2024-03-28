@@ -1,7 +1,7 @@
-from llama_index import ChatPromptTemplate
-from llama_index.llms import ChatMessage, MessageRole
-from ragas.llms import OpenAI
-from ragas.utils import json_loader
+from llama_index.core.prompts import ChatPromptTemplate
+from llama_index.core.llms import ChatMessage, MessageRole
+from langchain_openai import ChatOpenAI
+from ragas.llms.json_load import json_loader
 
 
 def make_eval_template(system_template, user_template):
@@ -13,13 +13,12 @@ def make_eval_template(system_template, user_template):
     )
 
 
-def safe_parse_eval_response(eval_response, passing_decision):
+async def safe_parse_eval_response(eval_response, passing_decision):
     try:
-        eval_response_dict = json_loader.safe_load(eval_response, llm=OpenAI())
+        eval_response_dict = await json_loader.safe_load(eval_response, llm=ChatOpenAI())
         score = eval_response_dict.get("score")
         reasoning = eval_response_dict.get("reason")
         decision = eval_response_dict.get("decision") == passing_decision
-
     except Exception as e:
         print(e)
         print(eval_response)

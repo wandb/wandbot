@@ -11,12 +11,18 @@ Typical usage example:
   docodile_english_store_config = DocodileEnglishStoreConfig()
 """
 
+import os
 import datetime
 import pathlib
-from typing import List, Optional
+from typing import List, Optional, Dict, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+    field_validator
+)
 from pydantic_settings import BaseSettings
 from wandbot.utils import get_logger
 
@@ -240,8 +246,55 @@ class FCReportsStoreConfig(DataStoreConfig):
 
 class VectorStoreConfig(BaseSettings):
     name: str = "vectorstore"
-    embeddings_model: str = "text-embedding-3-large"
-    embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
     artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
+    # Optional fields for flexibility
+    embedding_dim: int | None = None
+    input_type: str | None = None
+
+    @field_validator('artifact_url')
+    def set_artifact_url(cls, v: str) -> str:
+        wandb_project = os.environ.get("WANDB_PROJECT", "wandbot-dev")
+        wandb_entity = os.environ.get("WANDB_ENTITY", "wandbot")
+        return f"{wandb_entity}/{wandb_project}/chroma_index:latest"
+    
+    def get_lite_llm_embeddings_params(self) -> Dict[str, Union[str, Optional[int]]]:
+        """
+        Converts the configuration into a dictionary of parameters
+        suitable for initializing LiteLLMEmbeddings.
+        """
+        return {
+            "model": self.embeddings_model,
+            "dimensions": self.embedding_dim,
+            "input_type": self.input_type,
+        }
+    
+
+class OpenAIEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "text-embedding-3-small"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/openai/{embeddings_model}")
+
+
+class CohereEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "embed-english-v3.0"
+    input_type: str = "search_document"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/cohere/{embeddings_model}")
+    batch_size: int = 96
+
+
+class VoyageEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "voyage/voyage-lite-01-instruct"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/{embeddings_model}")
+    batch_size: int = 96
+
+
+class HuggingFaceEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "huggingface/microsoft/codebert-base"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/hf/{embeddings_model.split('/')[-1]}")
+
+
+class MistralEmbeddingConfig(VectorStoreConfig):
+    embeddings_model: str = "mistral/mistral-embed"
+    persist_dir: pathlib.Path = pathlib.Path(f"data/cache/vectorstore/{embeddings_model}")
+    batch_size: int = 32

@@ -27,18 +27,19 @@ import hashlib
 import json
 import logging
 import os
+import yaml
 import pathlib
 import re
 import sqlite3
 import string
-from typing import Any, Coroutine, List, Tuple
 
 import fasttext
 import nest_asyncio
 import tiktoken
 from langchain_core.documents import Document
-from pydantic import Field
+from pydantic import Field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Any, Coroutine, List, Tuple, Optional
 
 import wandb
 
@@ -54,7 +55,7 @@ def get_logger(name: str) -> logging.Logger:
     """
     logging.basicConfig(
         format="%(asctime)s : %(levelname)s : %(message)s",
-        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "INFO")),
+        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "CRITICAL")),
     )
     logger = logging.getLogger(name)
     return logger
@@ -299,3 +300,46 @@ def filter_smaller_documents(
     return [
         document for document in documents if filter_small_document(document)
     ]
+
+
+class LLMConfig(BaseModel):
+    model: str
+    temperature: float
+    max_retries: int
+
+
+class FeatureToggle(BaseModel):
+    enabled: bool
+
+
+class EmbeddingsConfig(BaseModel):
+    type: str
+    config: dict
+
+
+class RAGPipelineConfig(BaseModel):
+    llm: LLMConfig
+    fallback_llm: LLMConfig
+    embeddings: EmbeddingsConfig
+    retrieval_re_ranker: FeatureToggle
+    use_you_search_api: FeatureToggle
+    query_enhancer: FeatureToggle
+    rerank_fusion: FeatureToggle
+    chunk_size: int
+    top_k: int
+    project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
+    entity: str | None = Field("wandbot", env="WANDB_ENTITY")
+ 
+
+def load_config(config_path: str) -> RAGPipelineConfig:
+    """Load and return the YAML configuration as a Pydantic model."""
+    config_path = pathlib.Path(__file__).parent / config_path
+    logger.info(f"Loading configuration from {config_path}")
+
+    with open(config_path, 'r') as file:
+        raw_config = yaml.safe_load(file)
+    
+    embeddings_config = raw_config["embeddings"]["config"]
+    unique_identifier = '-'.join(f"{key}_{value}" for key, value in embeddings_config.items())
+    raw_config["embeddings"]["config"]["persist_dir"] = pathlib.Path(f"data/cache/vectorstore/openai/{unique_identifier}")
+    return RAGPipelineConfig(**raw_config)
