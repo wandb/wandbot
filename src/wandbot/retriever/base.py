@@ -9,9 +9,9 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
+from wandbot.utils import get_logger
 
-from chromadb.config import Settings as ChromaSettings
-
+logger = get_logger(__name__)
 
 
 class VectorStore:
@@ -34,7 +34,6 @@ class VectorStore:
             collection_name=collection_name,
             embedding_function=self.embeddings_model,  # type: ignore
             persist_directory=persist_dir,
-            client_settings=ChromaSettings(anonymized_telemetry=False)
         )
 
     @classmethod
@@ -43,7 +42,7 @@ class VectorStore:
             return cls(
                 embeddings_model=config.embeddings_model,
                 collection_name=config.name,
-                persist_dir=str(config.persist_dir),
+                persist_dir=str(config.persist_dir.resolve()),
                 config=config,
             )
         if wandb.run is None:

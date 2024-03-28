@@ -21,7 +21,6 @@ from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
-
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import get_logger
 
@@ -32,7 +31,7 @@ def load(
     project: str,
     entity: str,
     source_artifact_path: str,
-    result_artifact_name: str = "wandbot_index",
+    result_artifact_name: str = "chroma_index",
 ) -> str:
     """Load the vector store.
 
@@ -86,7 +85,9 @@ def load(
         chroma.add_documents(batch)
     chroma.persist()
 
-    result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")
+    result_artifact = wandb.Artifact(
+        name=result_artifact_name, type="vectorstore"
+    )
 
     result_artifact.add_dir(
         local_path=str(config.persist_dir),

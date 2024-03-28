@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
 from langchain.chains.openai_functions import create_structured_output_runnable
+from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
+from langchain.schema import BaseMessage
 from langchain_core.messages import convert_to_messages, get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
@@ -15,7 +17,6 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
-
 from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger
 
@@ -255,6 +256,18 @@ ENHANCER_PROMPT_MESSAGES = [
 ]
 
 
+def exception_to_messages(inputs: dict) -> dict:
+    exception = inputs.pop("exception")
+    messages = [
+        BaseMessage(content=str(exception)),
+        BaseMessage(
+            content="The previous output raised an error. Please try again with corrected output."
+        ),
+    ]
+    inputs["messages"] = messages
+    return inputs
+
+
 class QueryEnhancer:
     model: ChatModel = ChatModel()
     fallback_model: ChatModel = ChatModel(max_retries=6)
@@ -279,8 +292,11 @@ class QueryEnhancer:
         return self._chain
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        parser = PydanticOutputParser(pydantic_object=EnhancedQuery)
+        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=model)
+
         query_enhancer_chain = create_structured_output_runnable(
-            EnhancedQuery, model, self.prompt
+            EnhancedQuery, model, self.prompt, output_parser=fixing_parser
         )
 
         input_chain = RunnableParallel(
