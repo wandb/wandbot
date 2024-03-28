@@ -850,7 +850,7 @@ def load(
         WeaveCodeStoreConfig(),
         WeaveExamplesStoreConfig(),
         WandbEduCodeStoreConfig(),
-        # FCReportsStoreConfig(),
+        FCReportsStoreConfig(),
     ]
 
     pool = Pool(cpu_count() - 1)
