@@ -53,7 +53,7 @@ async def get_answer(question: str, application: str = "api-eval-bharat") -> str
         "application": application,
         "language": "en",
     }
-    async with httpx.AsyncClient(timeout=150.0) as client:
+    async with httpx.AsyncClient(timeout=200.0) as client:
         response = await client.post(url, data=json.dumps(payload))
         response_json = response.json()
     return json.dumps(response_json)
@@ -150,6 +150,23 @@ async def evaluate_row(idx: Hashable, row_str: str) -> str:
     return eval_result
 
 
+async def process_chunk(chunk, outfile):
+    """
+    Process a chunk of the dataframe asynchronously and write results to the file.
+    """
+    for idx, row in chunk.iterrows():
+        row_str = row.to_json()
+        response = await get_eval_record(row_str, application="test-baseline-ayush")
+        logger.info(f"Generated response for idx: {idx}")
+        eval_row = await evaluate_row(idx, response)
+        logger.info(f"Evaluated response for idx: {idx}")
+        try:
+            json.loads(eval_row)
+            await outfile.write(eval_row + "\n")
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse response for idx: {idx}")
+
+
 async def main():
     eval_artifact = wandb.Api().artifact("wandbot/wandbot-eval/autoeval_dataset:v3")
     eval_artifact_dir = eval_artifact.download(root="data/eval")
@@ -163,21 +180,15 @@ async def main():
         (df["is_wandb_query"] == "YES") & (df["correctness"] == "correct")
     ]
 
+    chunk_size = 7
+    chunks = [correct_df.iloc[i:i + chunk_size] for i in range(0, correct_df.shape[0], chunk_size)]
+    logger.info("Number of chunks: %s", len(chunks))
+
     async with aiofiles.open(
-        "data/eval/baselinev1_1_async.jsonl", "w+"
+        "data/eval/baselinev1_1_async_parallel.jsonl", "w+"
     ) as outfile:
-        for idx, row in tqdm(correct_df.iterrows(), total=len(correct_df)):
-            row_str = row.to_json()
-            response = await get_eval_record(row_str, application="test-baseline-ayush")
-            logger.info("Generated response for idx: %s", idx)
-            eval_row = await evaluate_row(idx, response)
-            logger.info("Evaluated response for idx: %s", idx)
-            try:
-                json.loads(eval_row)
-                await outfile.write(eval_row + "\n")
-            except json.JSONDecodeError:
-                logger.error("Failed to parse response for idx: %s", idx)
-                continue
+        tasks = [process_chunk(chunk, outfile) for chunk in tqdm(chunks)]
+        await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     asyncio.run(main())
