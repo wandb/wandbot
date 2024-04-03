@@ -21,7 +21,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ChatConfig(BaseSettings):
     chat_model_name: str = "gpt-4-1106-preview"
     max_retries: int = 2
-    fallback_model_name: str = "gpt-3.5-turbo-1106"
+    fallback_model_name: str = "gpt-4-1106-preview"
     max_fallback_retries: int = 6
     chat_temperature: float = 0.1
     chat_prompt: pathlib.Path = pathlib.Path("data/prompts/chat_prompt.json")

@@ -239,17 +239,17 @@ class Chat:
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        self.chat_table = StreamTable(
-            table_name="chat_logs",
-            project_name=self.config.wandb_project,
-            entity_name=self.config.wandb_entity,
-            # f"{self.config.wandb_entity}/{self.config.wandb_project}/chat_logs"
-        )
+        # self.chat_table = StreamTable(
+        #     table_name="chat_logs",
+        #     project_name=self.config.wandb_project,
+        #     entity_name=self.config.wandb_entity,
+        #     # f"{self.config.wandb_entity}/{self.config.wandb_project}/chat_logs"
+        # )
 
-        self.wandb_callback = WandbCallbackHandler()
+        # self.wandb_callback = WandbCallbackHandler()
         self.token_counter = TokenCountingHandler()
         self.callback_manager = CallbackManager(
-            [self.wandb_callback, self.token_counter]
+            [self.token_counter]
         )
         self.default_service_context = load_service_context(
             llm=self.config.chat_model_name,
@@ -477,7 +477,7 @@ class Chat:
                 self.qa_prompt.message_templates, result
             )
             result["system_prompt"] = system_template
-            self.chat_table.log(result)
+            # self.chat_table.log(result)
             return ChatResponse(**result)
         except Exception as e:
             with Timer() as timer:
