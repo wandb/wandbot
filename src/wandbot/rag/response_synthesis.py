@@ -1,10 +1,19 @@
+import json
 from operator import itemgetter
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 from langchain_openai import ChatOpenAI
-from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
+
+from wandbot.rag.utils import (
+    ChatModel,
+    combine_documents,
+    create_query_str,
+    combine_simple_documents,
+    create_simple_query_str
+)
+from wandbot.utils import RAGPipelineConfig
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """You are Wandbot - a support expert in Weights & Biases, wandb and weave. 
 Your goal to help users with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
@@ -82,19 +91,99 @@ The correct answer to the user's query
  - [^2]: [source](source_url)
  - [^3]: [source](source_url)
  ...
-
- <!--start-context-information-->
- 
- {context_str}
- 
- <!--end-context-information-->
 """
+
+RESPONSE_SYNTHESIS_HUMAN_PROMPT = """
+<!--start-context-information-->
+
+{context_str}
+
+<!--end-context-information-->
+<!--start-question-->
+
+**Question**: {query_str}
+
+<!--end-question-->
+<!--final-answer-in-markdown-->
+"""
+
+template = json.load(open("data/prompts/chat_prompt_v1_1.json"))
+
+example_1_human = template["messages"][1]["human"]
+example_1_assistant = template["messages"][2]["assistant"]
+example_2_human = template["messages"][3]["human"]
+example_2_assistant = template["messages"][4]["assistant"]
 
 
 RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     ("system", RESPONSE_SYNTHESIS_SYSTEM_PROMPT),
-    ("human", "{query_str}"),
+    ("human", example_1_human),
+    ("assistant", example_1_assistant),
+    ("human", example_2_human),
+    ("assistant", example_2_assistant),
+    ("human", RESPONSE_SYNTHESIS_HUMAN_PROMPT),
 ]
+
+
+class SimpleResponseSynthesizer:
+    model: ChatModel = ChatModel()
+    fallback_model: ChatModel = ChatModel(max_retries=6)
+
+    def __init__(
+        self,
+        config: RAGPipelineConfig | None = None,
+        model: str = "gpt-4-0125-preview",
+        fallback_model: str = "gpt-3.5-turbo-1106",
+    ):
+        self.model = model if not config else config.llm.model   # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model # type: ignore
+
+        if config:
+            self.model.temperature = config.llm.temperature
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = config.fallback_llm.temperature
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
+        self.prompt = ChatPromptTemplate.from_messages(
+            RESPONSE_SYNTHESIS_PROMPT_MESSAGES
+        )
+        self._chain = None
+
+    @property
+    def chain(self) -> Runnable:
+        if self._chain is None:
+            base_chain = self._load_chain(self.model)
+            fallback_chain = self._load_chain(self.fallback_model)
+            self._chain = base_chain.with_fallbacks([fallback_chain])
+        return self._chain
+
+    def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        response_synthesis_chain = (
+            RunnableLambda(
+                lambda x: {
+                    "query_str": create_simple_query_str(x),
+                    "context_str": combine_simple_documents(x.context),
+                }
+            )
+            | RunnableParallel(
+                query_str=itemgetter("query_str"),
+                context_str=itemgetter("context_str"),
+                response_prompt=self.prompt,
+            )
+            | RunnableParallel(
+                query_str=itemgetter("query_str"),
+                context_str=itemgetter("context_str"),
+                response_prompt=RunnableLambda(
+                    lambda x: x["response_prompt"].to_string()
+                ),
+                response=itemgetter("response_prompt")
+                | model
+                | StrOutputParser(),
+                response_model=RunnableLambda(lambda x: model.model_name),
+            )
+        )
+
+        return response_synthesis_chain
 
 
 class ResponseSynthesizer:
@@ -103,11 +192,19 @@ class ResponseSynthesizer:
 
     def __init__(
         self,
+        config: RAGPipelineConfig | None = None,
         model: str = "gpt-4-0125-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = model if not config else config.llm.model   # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model # type: ignore
+
+        if config:
+            self.model.temperature = config.llm.temperature
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = config.fallback_llm.temperature
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
         self.prompt = ChatPromptTemplate.from_messages(
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )

@@ -1,0 +1,20 @@
+llm:
+  model: "gpt-4-1106-preview"
+  temperature: 0.1
+  max_retries: 2
+fallback_llm:
+  model: "gpt-3.5-turbo-1106"
+  temperature: 0.1
+  max_retries: 6
+embeddings:
+  type: "VoyageEmbedding"
+  config:
+    embeddings_model: "voyage/voyage-lite-01-instruct"
+retrieval_re_ranker:
+  enabled: False
+use_you_search_api:
+  enabled: False
+query_enhancer_followed_by_rerank_fusion:
+  enabled: True
+chunk_size: 512
+top_k: 5

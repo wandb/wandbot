@@ -63,6 +63,14 @@ WANDBOT_API_URL="http://localhost:8000"
 WANDB_TRACING_ENABLED="true"
 WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY="wandbot"
+WANDB_REPORT_API_ENABLE_V2="true"
+WANDB_REPORT_API_DISABLE_MESSAGE="true"
+```
+
+The best practive would be to create a `.env` file in the root of this repo and execute this command in your terminal:
+
+```
+set -o allexport; source .env; set +o allexport
 ```
 
 Once these environment variables are set, you can start the Q&A bot application using the following commands:

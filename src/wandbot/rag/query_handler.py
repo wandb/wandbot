@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
 from langchain.chains.openai_functions import create_structured_output_runnable
+from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain_core.messages import convert_to_messages, get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
@@ -16,7 +17,7 @@ from langchain_core.runnables import (
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
 from wandbot.rag.utils import ChatModel
-from wandbot.utils import get_logger
+from wandbot.utils import RAGPipelineConfig, get_logger, load_config
 
 logger = get_logger(__name__)
 
@@ -108,18 +109,19 @@ class Keyword(BaseModel):
 
     keyword: str = Field(
         ...,
-        description="A search phrase to get the most relevant information related to Weights & Biases from the web "
-        " This will be used to gather information required to answer the query",
+        description="A Keyword that can be used to retrieve for relevant articles required to answer the query",
     )
 
 
 class SubQuery(BaseModel):
-    """A sub query that will help gather information required to answer the query"""
+    """A list of sub-questions that break the complex user query into smaller parts"""
 
     query: str = Field(
         ...,
-        description="The sub query that needs to be answered to answer the query. This will be used to define the "
-        "steps required to answer the query",
+        description="An Informative sub-query from the given user query. "
+        "The sub question should be specific and relevant to the user question. "
+        "The sub question should help in answering the user question. "
+        "The sub question will be used to gather information required to answer the query.",
     )
 
 
@@ -143,25 +145,25 @@ class EnhancedQuery(BaseModel):
     intents: List[Intent] = Field(
         ...,
         description=f"A list of one or more intents associated with the query. Here are the possible intents that "
-        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}",
+        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS, indent=2)}",
         min_items=1,
         max_items=5,
     )
     keywords: List[Keyword] = Field(
         ...,
-        description="A list of diverse search terms associated with the query.",
+        description="A list of keywords associated with the query.",
         min_items=1,
         max_items=5,
     )
     sub_queries: List[SubQuery] = Field(
         ...,
-        description="A list of sub queries that break the query into smaller parts",
+        description="A list of informative sub-queries that resolve the user query",
         min_items=1,
         max_items=5,
     )
     vector_search_queries: List[VectorSearchQuery] = Field(
         ...,
-        description="A list of diverse queries to search for similar documents in the vector space",
+        description="A list of diverse queries to search for similar documents in a vector space",
         min_items=1,
         max_items=5,
     )
@@ -191,7 +193,10 @@ class EnhancedQuery(BaseModel):
         )
 
     def parse_output(
-        self, query: str, chat_history: Optional[List[Tuple[str, str]]] = None
+        self,
+        query: str,
+        chat_history: Optional[List[Tuple[str, str]]] = None,
+        config: RAGPipelineConfig | None = None,
     ) -> Dict[str, Any]:
         """Parse the output of the model"""
         question = clean_question(query)
@@ -201,22 +206,32 @@ class EnhancedQuery(BaseModel):
         else:
             standalone_query = self.standalone_query
 
-        if self.avoid_query:
+        use_search_api = (
+            True if config is None else config.use_you_search_api.enabled
+        )
+
+        if use_search_api:
+            if self.avoid_query:
+                keywords = []
+                sub_queries = []
+                vector_search_queries = []
+            else:
+                keywords = [keyword.keyword for keyword in self.keywords]
+                sub_queries = [
+                    sub_query.query for sub_query in self.sub_queries
+                ]
+                vector_search_queries = [
+                    vector_search_query.query
+                    for vector_search_query in self.vector_search_queries
+                ]
+        else:
             keywords = []
             sub_queries = []
             vector_search_queries = []
-        else:
-            keywords = [keyword.keyword for keyword in self.keywords]
-            sub_queries = [sub_query.query for sub_query in self.sub_queries]
-            vector_search_queries = [
-                vector_search_query.query
-                for vector_search_query in self.vector_search_queries
-            ]
         intents_descriptions = ""
         for intent in self.intents:
             intents_descriptions += (
                 f"{intent.label.value.replace('_', ' ').title()}:"
-                f"\n\t{intent.reasoning}"
                 f"\n\t{QUERY_INTENTS[intent.label.value]}\n\n"
             )
 
@@ -233,7 +248,7 @@ class EnhancedQuery(BaseModel):
             "sub_queries": sub_queries,
             "vector_search_queries": vector_search_queries,
             "language": self.language,
-            "avoid_query": self.avoid_query,
+            "avoid_query": self.avoid_query if use_search_api else True,
             "chat_history": chat_history,
             "all_queries": all_queries,
         }
@@ -260,11 +275,20 @@ class QueryEnhancer:
 
     def __init__(
         self,
-        model: str = "gpt-4-0125-preview",
+        config: RAGPipelineConfig | None = None,
+        model: str = "gpt-4-1106-preview",
         fallback_model: str = "gpt-3.5-turbo-1106",
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = model if not config else config.llm.model  # type: ignore
+        self.fallback_model = fallback_model if not config else config.fallback_llm.model  # type: ignore
+
+        if config:
+            self.model.temperature = 0.0
+            self.model.max_retries = config.llm.max_retries
+            self.fallback_model.temperature = 0.0
+            self.fallback_model.max_retries = config.fallback_llm.max_retries
+
+        self.config = config
         self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
         self._chain = None
 
@@ -278,8 +302,11 @@ class QueryEnhancer:
         return self._chain
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
+        parser = PydanticOutputParser(pydantic_object=EnhancedQuery)
+        fixing_parser = OutputFixingParser.from_llm(parser=parser, llm=model)
+
         query_enhancer_chain = create_structured_output_runnable(
-            EnhancedQuery, model, self.prompt
+            EnhancedQuery, model, self.prompt, output_parser=fixing_parser
         )
 
         input_chain = RunnableParallel(
@@ -301,7 +328,7 @@ class QueryEnhancer:
         )
         chain = intermediate_chain | RunnableLambda(
             lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"])
+                x["query"], convert_to_messages(x["chat_history"]), self.config
             )
         )
 
