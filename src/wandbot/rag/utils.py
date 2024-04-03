@@ -50,12 +50,12 @@ Language: {language}
 Intents: 
 
 {intents}
-
-Sub-queries to consider answering: 
-
-{sub_queries}
 """
 )
+
+# Sub-queries to consider answering: 
+
+# {sub_queries}
 
 
 def create_query_str(enhanced_query, document_prompt=DEFAULT_QUESTION_PROMPT):
@@ -63,8 +63,8 @@ def create_query_str(enhanced_query, document_prompt=DEFAULT_QUESTION_PROMPT):
     metadata = {
         "language": enhanced_query["language"],
         "intents": enhanced_query["intents"],
-        "sub_queries": "\t"
-        + "\n\t".join(enhanced_query["sub_queries"]).strip(),
+        # "sub_queries": "\t"
+        # + "\n\t".join(enhanced_query["sub_queries"]).strip(),
     }
     doc = Document(page_content=page_content, metadata=metadata)
     doc = clean_document_content(doc)

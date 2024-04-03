@@ -1,3 +1,4 @@
+import json
 from operator import itemgetter
 
 from langchain_core.output_parsers import StrOutputParser
@@ -90,18 +91,37 @@ The correct answer to the user's query
  - [^2]: [source](source_url)
  - [^3]: [source](source_url)
  ...
-
- <!--start-context-information-->
- 
- {context_str}
- 
- <!--end-context-information-->
 """
+
+RESPONSE_SYNTHESIS_HUMAN_PROMPT = """
+<!--start-context-information-->
+
+{context_str}
+
+<!--end-context-information-->
+<!--start-question-->
+
+**Question**: {query_str}
+
+<!--end-question-->
+<!--final-answer-in-markdown-->
+"""
+
+template = json.load(open("data/prompts/chat_prompt_v1_1.json"))
+
+example_1_human = template["messages"][1]["human"]
+example_1_assistant = template["messages"][2]["assistant"]
+example_2_human = template["messages"][3]["human"]
+example_2_assistant = template["messages"][4]["assistant"]
 
 
 RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     ("system", RESPONSE_SYNTHESIS_SYSTEM_PROMPT),
-    ("human", "{query_str}"),
+    ("human", example_1_human),
+    ("assistant", example_1_assistant),
+    ("human", example_2_human),
+    ("assistant", example_2_assistant),
+    ("human", RESPONSE_SYNTHESIS_HUMAN_PROMPT),
 ]
 
 
