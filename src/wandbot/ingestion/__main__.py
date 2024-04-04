@@ -12,7 +12,7 @@ def main():
     entity = os.environ.get("WANDB_ENTITY", "wandbot")
 
     # raw_artifact = prepare_data.load(project, entity)
-    raw_artifact = "wandbot/wandbot-dev/raw_dataset:v55"
+    raw_artifact = "wandbot/wandbot_public/raw_dataset:v23"
     vectorstore_artifact = vectorstores.load(project, entity, raw_artifact)
     # TODO: include ingestion report
     create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)

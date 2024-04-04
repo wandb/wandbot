@@ -119,7 +119,7 @@ def convert_lc_to_llama(document: LcDocument) -> LlamaDocument:
     return llama_document
 
 
-def load(documents: List[LcDocument], chunk_size: int = 384) -> List[Any]:
+def load(documents: List[LcDocument], chunk_size: int = 512) -> List[Any]:
     """Loads documents and returns a list of nodes.
 
     Args:
@@ -159,7 +159,7 @@ def load(documents: List[LcDocument], chunk_size: int = 384) -> List[Any]:
     nodes = node_parser.get_nodes_from_documents(nodes)
 
     def filter_smaller_nodes(
-        text_nodes: List[TextNode], min_size: int = 5
+        text_nodes: List[TextNode], min_size: int = 10
     ) -> List[TextNode]:
         """Filters out nodes that are smaller than the chunk size.
 
