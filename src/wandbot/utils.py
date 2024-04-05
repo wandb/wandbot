@@ -98,7 +98,10 @@ def load_embeddings(
     Returns:
         A cached embedder instance.
     """
-    embeddings = OpenAIEmbedding(model=model_name, dimensions=dimensions)
+    if model_name == "text-embedding-ada-002":
+        embeddings = OpenAIEmbedding(model=model_name)
+    else:
+        embeddings = OpenAIEmbedding(model=model_name, dimensions=dimensions)
     return embeddings
 
 
