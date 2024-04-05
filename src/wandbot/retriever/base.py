@@ -5,7 +5,7 @@ from llama_index import (
     QueryBundle,
     ServiceContext,
     StorageContext,
-    load_indices_from_storage,
+    load_index_from_storage,
 )
 from llama_index.callbacks import CallbackManager
 from llama_index.postprocessor import BaseNodePostprocessor, CohereRerank
@@ -96,28 +96,21 @@ class Retriever:
             )
         )
 
-        (
-            self.storage_context,
-            index_ids,
-        ) = self.load_storage_context_from_artifact(
+        self.storage_context = self.load_storage_context_from_artifact(
             artifact_url=self.config.index_artifact
         )
 
-        self.indices = load_indices_from_storage(
+        self.index = load_index_from_storage(
             self.storage_context,
             service_context=self.service_context,
-            index_ids=index_ids,
         )
-        retriever_list = []
-        for index in self.indices:
-            retriever = HybridRetriever(
-                index=index,
-                similarity_top_k=self.config.similarity_top_k,
-                storage_context=self.storage_context,
-            )
-            retriever_list.append(retriever)
+        retriever = HybridRetriever(
+            index=self.index,
+            similarity_top_k=self.config.similarity_top_k,
+            storage_context=self.storage_context,
+        )
         self._retriever = FusionRetriever(
-            retriever_list,
+            [retriever],
             similarity_top_k=self.config.similarity_top_k,
             num_queries=1,
             use_async=False,
@@ -143,7 +136,7 @@ class Retriever:
             embed_dimensions=self.config.embeddings_size,
             persist_dir=artifact_dir,
         )
-        return storage_context, artifact.metadata["index_ids"]
+        return storage_context
 
     def load_query_engine(
         self,

@@ -195,7 +195,6 @@ def load_index(
     nodes: List[TextNode],
     service_context: ServiceContext,
     storage_context: StorageContext,
-    index_id: str,
     persist_dir: str,
 ) -> VectorStoreIndex:
     """Loads an index from storage or creates a new one if not found.
@@ -216,7 +215,6 @@ def load_index(
         storage_context=storage_context,
         show_progress=True,
     )
-    index.set_index_id(index_id)
     index.storage_context.persist(persist_dir=persist_dir)
     return index
 

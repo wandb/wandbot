@@ -74,7 +74,7 @@ def load(
         pathlib.Path(artifact_dir).rglob("documents.jsonl")
     )
 
-    transformed_documents: Dict[str, List[TextNode]] = {}
+    transformed_documents: List[LcDocument] = []
     for document_file in document_files:
         documents: List[LcDocument] = []
         with document_file.open() as f:
@@ -85,19 +85,14 @@ def load(
         preprocessed_documents = preprocess_data.load(documents)
         unique_objects = {obj.hash: obj for obj in preprocessed_documents}
         preprocessed_documents = list(unique_objects.values())
-        transformed_documents[
-            document_file.parent.name
-        ] = preprocessed_documents
+        transformed_documents.extend(preprocessed_documents)
 
-    for store_name, doc_list in transformed_documents.items():
-        logger.info(f"Number of documents: {len(doc_list)}")
-        _ = load_index(
-            doc_list,
-            service_context,
-            storage_context,
-            index_id=store_name,
-            persist_dir=str(config.persist_dir),
-        )
+    index = load_index(
+        transformed_documents,
+        service_context,
+        storage_context,
+        persist_dir=str(config.persist_dir),
+    )
     artifact = wandb.Artifact(
         name="wandbot_index",
         type="storage_context",
