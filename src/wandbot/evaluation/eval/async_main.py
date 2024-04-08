@@ -47,7 +47,7 @@ relevancy_evaluator = WandbRelevancyEvaluator(
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 async def get_answer(question: str, application: str = "api-eval-bharat") -> str:
-    url = "http://0.0.0.0:8000/query"
+    url = "http://0.0.0.0:8000/chat/query"
     payload = {
         "question": question,
         "chat_history": [],

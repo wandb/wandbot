@@ -220,7 +220,7 @@ class Retriever:
             else CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0"),
         ]
         query_engine = WandbRetrieverQueryEngine.from_args(
-            retriever=retriever,
+            retriever=self._retriever,
             node_postprocessors=node_postprocessors,
             response_mode=ResponseMode.NO_TEXT,
             service_context=self.service_context,

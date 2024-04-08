@@ -274,6 +274,8 @@ class Chat:
             service_context=self.fallback_service_context,
             callback_manager=self.callback_manager,
         )
+        logger.info("Retriever initialized: %s", self.retriever)
+
 
     def _load_chat_engine(
         self,
@@ -301,6 +303,8 @@ class Chat:
             top_k=top_k,
             is_avoid_query=True if "avoid" in query_intent.lower() else False,
         )
+        logger.info("Query engine: %s", query_engine)
+        logger.info("Query engine retriever: %s", query_engine.retriever)
 
         self.qa_prompt = load_chat_prompt(
             f_name=self.config.chat_prompt,
