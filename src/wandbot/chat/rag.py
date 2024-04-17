@@ -45,15 +45,12 @@ class Pipeline:
             enhanced_query = self.query_enhancer.chain.invoke(
                 {"query": question, "chat_history": chat_history}
             )
-        logger.debug(f"Enhanced query: {enhanced_query}")
         with get_openai_callback() as retrieval_cb, Timer() as retrieval_tb:
             retrieval_results = self.retrieval.chain.invoke(enhanced_query)
-        logger.debug(f"Retrieval results: {retrieval_results}")
         with get_openai_callback() as response_cb, Timer() as response_tb:
             response = self.response_synthesizer.chain.invoke(
                 {"query": enhanced_query, "context": retrieval_results}
             )
-        logger.debug(f"Response: {response}")
 
         contexts = {
             "context": [
