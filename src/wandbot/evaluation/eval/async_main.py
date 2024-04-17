@@ -50,7 +50,6 @@ async def get_answer(question: str, application: str = "api-eval-bharat") -> str
     url = "http://0.0.0.0:8000/chat/query"
     payload = {
         "question": question,
-        "chat_history": [],
         "application": application,
         "language": "en",
     }
@@ -77,10 +76,11 @@ async def get_eval_record(row_str: str, application: str = "api-eval-bharat") ->
     response = json.loads(response)
     response["ground_truths"] = row["answer"]
     response["reference_notes"] = row["notes"]
-    response["contexts"] = [
-        "\nSource: " + source["source"] + " \n " + source["text"]
-        for source in json.loads(response["source_documents"])
-    ]
+    # response["contexts"] = [
+    #     "\nSource: " + source["source"] + " \n " + source["text"]
+    #     for source in json.loads(response["source_documents"])
+    # ]
+    response["contexts"] = response["source_documents"]
     response = json.dumps(response)
     return response
 
