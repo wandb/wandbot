@@ -9,6 +9,7 @@ from wandbot.query_handler.query_enhancer import load_query_enhancement_chain
 from wandbot.retriever.base import (
     load_retriever_with_options,
     load_vector_store_from_config,
+    load_vector_store_from_artifact,
 )
 from wandbot.retriever.fusion import load_fusion_retriever_chain
 
@@ -29,10 +30,14 @@ def load_rag_chain(
         model, lang_detect_path
     ).with_fallbacks([fallback_query_enhancer_chain])
 
-    vectorstore_config = VectorStoreConfig(persist_dir=vector_store_path)
-    vectorstore = load_vector_store_from_config(vectorstore_config)
+    # vectorstore_config = VectorStoreConfig(persist_dir=vector_store_path)
+    vectorstore = load_vector_store_from_artifact(vector_store_path)
     base_retriever = load_retriever_with_options(
-        vectorstore, search_type=search_type, search_kwargs={"top_k": top_k * 4}
+        vectorstore,
+        search_type=search_type,
+        search_kwargs={
+            "top_k": top_k * 4,
+        }
     )
     parent_retriever = base_retriever | RunnableLambda(
         lambda docs: [

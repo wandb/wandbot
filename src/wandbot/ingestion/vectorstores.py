@@ -66,8 +66,6 @@ def load(
     vectorstore_dir = config.persist_dir
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
 
-    storage_context = load_storage_context(persist_dir=str(config.persist_dir))
-
     document_files: List[pathlib.Path] = list(
         pathlib.Path(artifact_dir).rglob("documents.jsonl")
     )

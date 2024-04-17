@@ -11,14 +11,17 @@ def main():
     project = os.environ.get("WANDB_PROJECT", "wandbot-dev")
     entity = os.environ.get("WANDB_ENTITY", "wandbot")
 
-    raw_artifact = prepare_data.load(project, entity)
+    # raw_artifact = prepare_data.load(project, entity)
+    raw_artifact = "wandbot/wandbot-dev/raw_dataset:v39"
 
-    preprocessed_artifact = preprocess_data.load(project, entity, raw_artifact)
+    # preprocessed_artifact = preprocess_data.load(project, entity, raw_artifact)
+    preprocessed_artifact = "wandbot/wandbot-dev/transformed_data:v5"
+
     vectorstore_artifact = vectorstores.load(
         project, entity, preprocessed_artifact
     )
 
-    create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
+    # create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
     print(vectorstore_artifact)
 
 
