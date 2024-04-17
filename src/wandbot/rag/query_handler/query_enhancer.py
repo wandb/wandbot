@@ -28,8 +28,8 @@ def clean_question(question: str) -> str:
 class QueryEnhancer:
     def __init__(
         self,
-        model: str = "gpt-4-0125-preview",
-        fallback_model="gpt-3.5-turbo-1106",
+        model: str = "gpt-4-1106-preview",
+        fallback_model="gpt-4-1106-preview",
     ):
         self.question_condenser = CondenseQuestion(
             model=model, fallback_model=fallback_model

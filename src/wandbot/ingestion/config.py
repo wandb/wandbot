@@ -244,4 +244,8 @@ class VectorStoreConfig(BaseSettings):
     embedding_dim: int = 512
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     batch_size: int = 256
-    artifact_url: str = "wandbot/wandbot-dev/chroma_index:latest"
+    artifact_url: str = Field(
+        "wandbot/wandbot-dev/chroma_index:latest",
+        env="WANDB_INDEX_ARTIFACT",
+        validation_alias="wandb_index_artifact",
+    )

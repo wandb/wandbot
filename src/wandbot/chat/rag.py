@@ -27,7 +27,7 @@ class Pipeline:
     def __init__(
         self,
         vector_store_config: VectorStoreConfig,
-        top_k: int = 5,
+        top_k: int = 15,
         search_type: str = "mmr",
     ):
         self.query_enhancer = QueryEnhancer()
