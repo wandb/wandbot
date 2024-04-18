@@ -33,7 +33,6 @@ from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import Timer, get_logger
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -101,7 +100,6 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            self.chat_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
