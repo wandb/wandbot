@@ -2,4 +2,3 @@
 (python -m wandbot.apps.slack -l en) & \
 (python -m wandbot.apps.slack -l ja) & \
 (python -m wandbot.apps.discord) & \
-(python -m wandbot.apps.zendesk)
