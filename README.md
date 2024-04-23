@@ -4,10 +4,33 @@ Wandbot is a question-answering bot designed specifically for Weights & Biases [
 Leveraging the power of [llama-index](https://gpt-index.readthedocs.io/en/stable/) and OpenAI's [gpt-4](https://openai.com/research/gpt-4), it provides precise and context-aware responses
 using a combination of [FAISS](https://github.com/facebookresearch/faiss) for RAG and OpenAI's [gpt-4](https://openai.com/research/gpt-4) for generating responses.
 
+## What's New
+
+### wandbot v1.3.0
+
+This release introduces a number of exciting updates and improvements:
+
+- **Parallel LLM Calls**: Replaced the llama-index with the LECL, enabling parallel LLM calls for increased efficiency.
+- **ChromaDB Integration**: Transitioned from FAISS to ChromaDB to leverage metadata filtering and speed.
+- **Query Enhancer Optimization**: Improved the query enhancer to operate with a single LLM call.
+- **Modular RAG Pipeline**: Split the RAG pipeline into three distinct modules: query enhancement, retrieval, and response synthesis, for improved clarity and maintenance.
+- **Parent Document Retrieval**: Introduced parent document retrieval functionality within the retrieval module to enhance contextuality.
+- **Sub-query Answering**: Added sub-query answering capabilities in the response synthesis module to handle complex queries more effectively.
+- **API Restructuring**: Redesigned the API into separate routers for retrieval, database, and chat operations.
+
+These updates are part of our ongoing commitment to improve performance and usability.
+
+## Evaluation
+
+| wandbot version  | Comment  | response accuracy |
+|---|---|---|
+| 1.0.0 | our baseline wandbot |  53.78 % |
+| 1.1.0 | improvement over baseline; in production for the longest | 72.45 %  | 
+| 1.3.0 | our new enhanced wandbot | 81.63 % |
 
 ## Features
 
-- Wandbot employs Retrieval Augmented Generation with a [FAISS](https://github.com/facebookresearch/faiss) backend, ensuring efficient and accurate responses to user queries by retrieving relevant documents.
+- Wandbot employs Retrieval Augmented Generation with a ChromaDB backend, ensuring efficient and accurate responses to user queries by retrieving relevant documents.
 - It features periodic data ingestion and report generation, contributing to the bot's continuous improvement. You can view the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist).
 - The bot is integrated with Discord and Slack, facilitating seamless integration with these popular collaboration platforms.
 - Performance monitoring and continuous improvement are made possible through logging and analysis with Weights & Biases Tables. Visit the workspace for more details [here](https://wandb.ai/wandbot/wandbot_public).
@@ -77,37 +100,6 @@ Once these environment variables are set, you can start the Q&A bot application 
 For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
-
-## Evaluation
-
-We evaluated the performance of the Q&A bot manually and using auto eval strategies. The following W&B reports document the steps taken to evaluate the Q&A bot:
-
-- [How to evaluate an LLM Part 1: Building an Evaluation Dataset for our LLM System](http://wandb.me/wandbot-eval-part1): The report dives into the steps taken to build a gold-standard evaluation set.
-- [How to evaluate an LLM Part 2: Manual Evaluation of our LLM System](http://wandb.me/wandbot-eval-part2): The report talks about the thought process and steps taken to perform manual evaluation.
-- [How to evaluate an LLM Part 3: Auto-Evaluation; LLMs evaluating LLMs](http://wandb.me/wandbot-eval-part3): Various LLM auto-eval startegies are documented in this report.
-
-### Evaluation Results
-
-**Manual Evaluation**
-
-We manually evaluated the Q&A bot's responses to establish a basline score.
-
-| Evaluation Metric  | Comment  | Score |
-|---|---|---|
-| Accurary | measure the correctness of Q&A bot responses |  66.67 % |
-| URL Hallucination | measure the validity and relevancy of the links | 10.61 %  | 
-| Query Relevancy | measure if the query is relevant to W&B | 88.64 % |
-
-**Auto Evaluation (LLM evaluate LLM)**
-
-We employed a few auto evaluation strategies to speed up the iteration process of the bot's development
-
-| Evaluation Metric  | Comment  | Score |
-|---|---|---|
-| Faithfulness Accuracy | measures if the response from a RAG pipeline matches any retrieved chunk | 53.78 % |
-| Relevancy Accuracy | measures is the generated response is in-line with the context | 61.36 % |
-| Hit Rate | measures if the correct chunk is present in the retrieved chunks | 0.79 |
-| Mean Reciprocal Ranking (MRR) | measures the quality of the retriever | 0.74 |
 
 ## Overview of the Implementation
 
