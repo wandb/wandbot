@@ -20,29 +20,25 @@ Typical usage example:
     storage_context = load_storage_context(768, "/path/to/persist")
     index = load_index(nodes, service_context, storage_context, "/path/to/persist")
 """
+
+import asyncio
 import datetime
 import hashlib
 import json
 import logging
 import os
 import pathlib
+import re
 import sqlite3
-from typing import Any, List, Optional
+import string
+from typing import Any, Coroutine, List, Tuple
 
-import faiss
 import fasttext
-from llama_index import (
-    ServiceContext,
-    StorageContext,
-    VectorStoreIndex,
-    load_index_from_storage,
-)
-from llama_index.embeddings import OpenAIEmbedding
-from llama_index.llms import LiteLLM
-from llama_index.llms.llm import LLM
-from llama_index.schema import NodeWithScore, TextNode
-from llama_index.vector_stores import FaissVectorStore
-from pydantic_settings import BaseSettings
+import nest_asyncio
+import tiktoken
+from langchain_core.documents import Document
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import wandb
 
@@ -62,6 +58,18 @@ def get_logger(name: str) -> logging.Logger:
     )
     logger = logging.getLogger(name)
     return logger
+
+
+logger = get_logger(__name__)
+
+
+def strip_punctuation(text):
+    # Create a translation table mapping every punctuation character to None
+    translator = str.maketrans("", "", string.punctuation)
+
+    # Use the table to strip punctuation from the text
+    no_punct = text.translate(translator)
+    return no_punct
 
 
 class Timer:
@@ -84,138 +92,6 @@ class Timer:
     def elapsed(self) -> float:
         """Calculates the elapsed time in seconds."""
         return (self.stop - self.start).total_seconds()
-
-
-def load_embeddings(cache_dir: str) -> OpenAIEmbedding:
-    """Loads embeddings from cache or creates new ones if not found.
-
-    Args:
-        cache_dir: The directory where the embeddings cache is stored.
-
-    Returns:
-        A cached embedder instance.
-    """
-    # underlying_embeddings = OpenAIEmbeddings()
-    #
-    # embeddings_cache_fs = LocalFileStore(cache_dir)
-    # cached_embedder = CacheBackedEmbeddings.from_bytes_store(
-    #     underlying_embeddings,
-    #     embeddings_cache_fs,
-    #     namespace=underlying_embeddings.model + "/",
-    # )
-    #
-    # return cast(LCEmbeddings, cached_embedder)
-    embeddings = OpenAIEmbedding()
-    return embeddings
-
-
-def load_llm(
-    model_name: str,
-    temperature: float,
-    max_retries: int,
-) -> LLM:
-    """Loads a language model with the specified parameters.
-
-    Args:
-        model_name: The name of the model to load.
-        temperature: The temperature parameter for the model.
-        max_retries: The maximum number of retries for loading the model.
-
-    Returns:
-        An instance of the loaded language model.
-    """
-    import litellm
-    from litellm.caching import Cache
-
-    litellm.cache = Cache()
-
-    llm = LiteLLM(
-        model=model_name,
-        temperature=temperature,
-        max_retries=max_retries,
-        caching=True,
-    )
-
-    return llm
-
-
-def load_service_context(
-    embeddings_cache: str,
-    llm: str = "gpt-3.5-turbo-16k-0613",
-    temperature: float = 0.1,
-    max_retries: int = 2,
-    callback_manager: Optional[Any] = None,
-) -> ServiceContext:
-    """Loads a service context with the specified parameters.
-
-    Args:
-        llm: The language model to load.
-        temperature: The temperature parameter for the model.
-        embeddings_cache: The directory where the embeddings cache is stored.
-        max_retries: The maximum number of retries for loading the model.
-        callback_manager: The callback manager for the service context (optional).
-
-    Returns:
-        A service context instance with the specified parameters.
-    """
-
-    embed_model = load_embeddings(embeddings_cache)
-    llm = load_llm(
-        model_name=llm,
-        temperature=temperature,
-        max_retries=max_retries,
-    )
-
-    return ServiceContext.from_defaults(
-        llm=llm, embed_model=embed_model, callback_manager=callback_manager
-    )
-
-
-def load_storage_context(embed_dimensions: int) -> StorageContext:
-    """Loads a storage context with the specified parameters.
-
-    Args:
-        embed_dimensions: The dimensions of the embeddings.
-
-    Returns:
-        A storage context instance with the specified parameters.
-    """
-
-    faiss_index = faiss.IndexFlatL2(embed_dimensions)
-    storage_context = StorageContext.from_defaults(
-        vector_store=FaissVectorStore(faiss_index),
-    )
-    return storage_context
-
-
-def load_index(
-    nodes: Any,
-    service_context: ServiceContext,
-    storage_context: StorageContext,
-    persist_dir: str,
-) -> VectorStoreIndex:
-    """Loads an index from storage or creates a new one if not found.
-
-    Args:
-        nodes: The nodes to include in the index.
-        service_context: The service context for the index.
-        storage_context: The storage context for the index.
-        persist_dir: The directory where the index is persisted.
-
-    Returns:
-        An index instance with the specified parameters.
-    """
-    try:
-        index = load_index_from_storage(storage_context)
-    except Exception:
-        index = VectorStoreIndex(
-            nodes=nodes,
-            service_context=service_context,
-            storage_context=storage_context,
-            show_progress=True,
-        )
-        index.storage_context.persist(persist_dir=persist_dir)
-    return index
 
 
 def cachew(cache_path: str = "./cache.db", logger=None):
@@ -265,32 +141,25 @@ def cachew(cache_path: str = "./cache.db", logger=None):
     return memoize
 
 
-def create_no_result_dummy_node() -> NodeWithScore:
-    """
-    Creates a dummy node to be used when no results found.
-    This can be used instead of returning results that are not relevant
-    or have already been filtered out.
-    """
-    dummy_text = "No results found"
-    dummy_metadata = {
-        "source": "no-result",
-        "language": "en",
-        "description": "This is a dummy node when there are no results",
-        "title": "No Result Node",
-        "tags": ["no-result"],
-    }
-    dummy_text_node = TextNode(text=dummy_text, metadata=dummy_metadata)
-    return NodeWithScore(node=dummy_text_node, score=0.0)
-
-
 class FasttextModelConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
     fasttext_file_path: pathlib.Path = pathlib.Path(
         "data/cache/models/lid.176.bin"
     )
-    fasttext_artifact_name: str = (
-        "wandbot/wandbot_public/fasttext-lid.176.bin:v0"
+    fasttext_artifact_path: str = Field(
+        "wandbot/wandbot_public/fasttext-lid.176.bin:v0",
+        env="LANGDETECT_ARTIFACT_PATH",
+        validation_alias="langdetect_artifact_path",
     )
     fasttext_artifact_type: str = "fasttext-model"
+    wandb_project: str = Field(
+        "wandbot-dev", env="WANDB_PROJECT", validation_alias="wandb_project"
+    )
+    wandb_entity: str = Field(
+        "wandbot", env="WANDB_ENTITY", validation_alias="wandb_entity"
+    )
 
 
 class FastTextLangDetect:
@@ -303,7 +172,8 @@ class FastTextLangDetect:
         self._model = self._load_model()
 
     def detect_language(self, text: str):
-        predictions = self.model.predict(text.replace("\n", " "))
+        cleaned_text = strip_punctuation(text).replace("\n", " ")
+        predictions = self.model.predict(cleaned_text)
         return predictions[0][0].replace("__label__", "")
 
     def detect_language_batch(self, texts: List[str]):
@@ -318,9 +188,114 @@ class FastTextLangDetect:
 
     def _load_model(self):
         if not os.path.isfile(self.config.fasttext_file_path):
-            _ = wandb.run.use_artifact(
-                self.config.fasttext_artifact_name,
-                type=self.config.fasttext_artifact_type,
-            ).download(root=str(self.config.fasttext_file_path.parent))
+            if wandb.run is None:
+                api = wandb.Api()
+                artifact = api.artifact(self.config.fasttext_artifact_path)
+            else:
+                artifact = wandb.run.use_artifact(
+                    self.config.fasttext_artifact_path,
+                    type=self.config.fasttext_artifact_type,
+                )
+            _ = artifact.download(
+                root=str(self.config.fasttext_file_path.parent)
+            )
         self._model = fasttext.load_model(str(self.config.fasttext_file_path))
         return self._model
+
+
+def run_async_tasks(
+    tasks: List[Coroutine],
+    show_progress: bool = False,
+    progress_bar_desc: str = "Running async tasks",
+) -> Tuple[Any]:
+    """Run a list of async tasks."""
+    tasks_to_execute: List[Any] = tasks
+
+    nest_asyncio.apply()
+    if show_progress:
+        try:
+            from tqdm.asyncio import tqdm
+
+            # jupyter notebooks already have an event loop running
+            # we need to reuse it instead of creating a new one
+
+            loop = asyncio.get_event_loop()
+
+            async def _tqdm_gather() -> List[Any]:
+                return await tqdm.gather(
+                    *tasks_to_execute, desc=progress_bar_desc
+                )
+
+            tqdm_outputs: Tuple[Any] = loop.run_until_complete(_tqdm_gather())
+            return tqdm_outputs
+        # run the operation w/o tqdm on hitting a fatal
+        # may occur in some environments where tqdm.asyncio
+        # is not supported
+        except Exception:
+            pass
+
+    async def _gather() -> Tuple[Any]:
+        return await asyncio.gather(*tasks_to_execute)
+
+    outputs: Tuple[Any] = asyncio.run(_gather())
+    return outputs
+
+
+def clean_document_content(doc: Document) -> Document:
+    cleaned_content = re.sub(r"\n{3,}", "\n\n", doc.page_content)
+    cleaned_content = cleaned_content.strip()
+    cleaned_document = Document(
+        page_content=cleaned_content, metadata=doc.metadata
+    )
+    cleaned_document = make_document_tokenization_safe(cleaned_document)
+    return cleaned_document
+
+
+def make_document_tokenization_safe(document: Document) -> Document:
+    """Removes special tokens from the given documents.
+
+    Args:
+        documents: A list of strings representing the documents.
+
+    Returns:
+        A list of cleaned documents with special tokens removed.
+    """
+    encoding = tiktoken.get_encoding("cl100k_base")
+    special_tokens_set = encoding.special_tokens_set
+
+    def remove_special_tokens(text: str) -> str:
+        """Removes special tokens from the given text.
+
+        Args:
+            text: A string representing the text.
+
+        Returns:
+            The text with special tokens removed.
+        """
+        for token in special_tokens_set:
+            text = text.replace(token, "")
+        return text
+
+    content = document.page_content
+    cleaned_document = remove_special_tokens(content)
+    return Document(page_content=cleaned_document, metadata=document.metadata)
+
+
+def filter_smaller_documents(
+    documents: List[Document], min_size: int = 3, min_line_size: int = 5
+) -> List[Document]:
+    def filter_small_document(document: Document) -> bool:
+        return (
+            len(
+                [
+                    doc
+                    for doc in document.page_content.split("\n")
+                    if len(doc.strip().split()) >= min_line_size
+                ]
+            )
+            >= min_size
+        )
+
+    return [
+        document for document in documents if filter_small_document(document)
+    ]

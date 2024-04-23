@@ -14,20 +14,16 @@ Typical usage example:
 
 import json
 import pathlib
-from typing import Any, Dict, List
+from typing import List
 
-from langchain.schema import Document as LcDocument
-from llama_index.callbacks import WandbCallbackHandler
+from langchain_community.vectorstores.chroma import Chroma
+from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
+from tqdm import trange
 
 import wandb
-from wandbot.ingestion import preprocess_data
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.utils import (
-    get_logger,
-    load_index,
-    load_service_context,
-    load_storage_context,
-)
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -55,45 +51,47 @@ def load(
         wandb.Error: An error occurred during the loading process.
     """
     config: VectorStoreConfig = VectorStoreConfig()
-    run: wandb.Run = wandb.init(
+    run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="create_vectorstore"
     )
     artifact: wandb.Artifact = run.use_artifact(
         source_artifact_path, type="dataset"
     )
     artifact_dir: str = artifact.download()
-    storage_context = load_storage_context(config.embedding_dim)
-    service_context = load_service_context(
-        embeddings_cache=str(config.embeddings_cache),
-        llm="gpt-3.5-turbo-16k-0613",
-        temperature=config.temperature,
-        max_retries=config.max_retries,
+
+    # Todo: Change to LiteLLM Embeddings
+    embedding_fn = OpenAIEmbeddings(
+        model=config.embeddings_model, dimensions=config.embedding_dim
     )
+    vectorstore_dir = config.persist_dir
+    vectorstore_dir.mkdir(parents=True, exist_ok=True)
 
     document_files: List[pathlib.Path] = list(
         pathlib.Path(artifact_dir).rglob("documents.jsonl")
     )
 
-    transformed_documents: List[LcDocument] = []
+    transformed_documents = []
     for document_file in document_files:
-        documents: List[LcDocument] = []
         with document_file.open() as f:
             for line in f:
-                doc_dict: Dict[str, Any] = json.loads(line)
-                doc: LcDocument = LcDocument(**doc_dict)
-                documents.append(doc)
-        transformed_documents.extend(preprocess_data.load(documents))
-    unique_objects = {obj.hash: obj for obj in transformed_documents}
-    transformed_documents = list(unique_objects.values())
-    index = load_index(
-        transformed_documents,
-        service_context,
-        storage_context,
-        persist_dir=str(config.persist_dir),
-    )
-    wandb_callback: WandbCallbackHandler = WandbCallbackHandler()
+                transformed_documents.append(Document(**json.loads(line)))
 
-    wandb_callback.persist_index(index, index_name=result_artifact_name)
-    wandb_callback.finish()
+    chroma = Chroma(
+        collection_name=config.name,
+        embedding_function=embedding_fn,
+        persist_directory=str(config.persist_dir),
+    )
+    for batch_idx in trange(0, len(transformed_documents), config.batch_size):
+        batch = transformed_documents[batch_idx : batch_idx + config.batch_size]
+        chroma.add_documents(batch)
+    chroma.persist()
+
+    result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")
+
+    result_artifact.add_dir(
+        local_path=str(config.persist_dir),
+    )
+    run.log_artifact(result_artifact)
+
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"

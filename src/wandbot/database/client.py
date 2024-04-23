@@ -12,6 +12,7 @@ Typical usage example:
   chat_thread = db_client.get_chat_thread(application='app1', thread_id='123')
   question_answer = db_client.create_question_answer(question_answer=QuestionAnswerCreateSchema())
 """
+
 import json
 from typing import Any, List
 

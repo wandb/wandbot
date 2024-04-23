@@ -1,6 +1,6 @@
 import os
 
-from wandbot.ingestion import prepare_data, vectorstores
+from wandbot.ingestion import prepare_data, preprocess_data, vectorstores
 from wandbot.ingestion.report import create_ingestion_report
 from wandbot.utils import get_logger
 
@@ -12,8 +12,11 @@ def main():
     entity = os.environ.get("WANDB_ENTITY", "wandbot")
 
     raw_artifact = prepare_data.load(project, entity)
-    vectorstore_artifact = vectorstores.load(project, entity, raw_artifact)
-    # TODO: include ingestion report
+    preprocessed_artifact = preprocess_data.load(project, entity, raw_artifact)
+    vectorstore_artifact = vectorstores.load(
+        project, entity, preprocessed_artifact
+    )
+
     create_ingestion_report(project, entity, raw_artifact, vectorstore_artifact)
     print(vectorstore_artifact)
 
