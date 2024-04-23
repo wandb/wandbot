@@ -1,8 +1,6 @@
 # wandbot
 
 Wandbot is a question-answering bot designed specifically for Weights & Biases [documentation](https://docs.wandb.ai/).
-Leveraging the power of [llama-index](https://gpt-index.readthedocs.io/en/stable/) and OpenAI's [gpt-4](https://openai.com/research/gpt-4), it provides precise and context-aware responses
-using a combination of [FAISS](https://github.com/facebookresearch/faiss) for RAG and OpenAI's [gpt-4](https://openai.com/research/gpt-4) for generating responses.
 
 ## What's New
 
