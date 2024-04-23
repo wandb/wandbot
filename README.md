@@ -26,7 +26,7 @@ These updates are part of our ongoing commitment to improve performance and usab
 |---|---|---|
 | 1.0.0 | our baseline wandbot |  53.78 % |
 | 1.1.0 | improvement over baseline; in production for the longest | 72.45 %  | 
-| 1.3.0 | our new enhanced wandbot | 81.63 % |
+| 1.2.0 | our new enhanced wandbot | 81.63 % |
 
 ## Features
 
