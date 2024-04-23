@@ -4,7 +4,7 @@ Wandbot is a question-answering bot designed specifically for Weights & Biases [
 
 ## What's New
 
-### wandbot v1.3.0
+### wandbot v1.2.0
 
 This release introduces a number of exciting updates and improvements:
 
