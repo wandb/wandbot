@@ -3,7 +3,6 @@ from typing import List
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
-
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
@@ -44,9 +43,9 @@ def rerank_results(
     language: str = "en",
 ):
     if language == "en":
-        reranker = CohereRerank(top_n=top_k, model="rerank-english-v3.0")
+        reranker = CohereRerank(top_n=top_k, model="rerank-english-v2.0")
     else:
-        reranker = CohereRerank(top_n=top_k, model="rerank-multilingual-v3.0")
+        reranker = CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0")
 
     query = "\n".join(queries)
     ranked_results = reranker.compress_documents(documents=context, query=query)
