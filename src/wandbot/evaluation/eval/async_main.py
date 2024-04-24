@@ -148,7 +148,6 @@ async def evaluate_row(idx: Hashable, row_str: str) -> str:
     eval_result.update(json.loads(await get_answer_correctness(row_str)))
     eval_result.update(json.loads(await get_answer_relevancy(row_str)))
     eval_result.update(json.loads(await get_answer_faithfulness(row_str)))
-    await asyncio.sleep(5)
     eval_result = json.dumps(eval_result)
     return eval_result
 
