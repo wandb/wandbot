@@ -19,9 +19,8 @@ import json
 import pathlib
 from datetime import datetime
 
-import wandb.apis.reports as wr
-
 import wandb
+import wandb.apis.reports as wr
 
 
 def log_raw_counts(metadata: dict[str, dict[str, int]]) -> list[str]:
@@ -55,7 +54,7 @@ def get_metadata_from_artifacts(
     raw_artifact = wandb.run.use_artifact(raw_artifact, type="dataset")
     raw_artifact_dir = raw_artifact.download()
     vectorstore_artifact = wandb.run.use_artifact(
-        vectorstore_artifact, type="storage_context"
+        vectorstore_artifact, type="vectorstore"
     )
     vectorstore_artifact_dir = vectorstore_artifact.download()
 
