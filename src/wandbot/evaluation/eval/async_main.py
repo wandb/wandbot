@@ -158,7 +158,7 @@ async def process_row(idx, row, outfile):
     Process a chunk of the dataframe asynchronously and write results to the file.
     """
     row_str = row.to_json()
-    response = await get_eval_record(row_str, application="test-baseline-ayush")
+    response = await get_eval_record(row_str, application="api-eval")
     logger.info(f"Generated response for idx: {idx}")
     eval_row = await evaluate_row(idx, response)
     logger.info(f"Evaluated response for idx: {idx}")
