@@ -27,5 +27,10 @@ class EvalConfig(BaseSettings):
         env="EVAL_OUTPUT_FILE",
         validation_alias="eval_output_file",
     )
+    eval_judge_model: str = Field(
+        "gpt-4-1106-preview",
+        env="EVAL_JUDGE_MODEL",
+        validation_alias="eval_judge_model",
+    )
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
     wandb_project: str = Field("wandbot-eval", env="WANDB_PROJECT")

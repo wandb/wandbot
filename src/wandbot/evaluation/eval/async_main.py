@@ -8,7 +8,6 @@ import aiofiles
 import httpx
 import pandas as pd
 import wandb
-from llama_index.core import ServiceContext
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
@@ -29,18 +28,17 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-
-service_context = ServiceContext.from_defaults(llm=OpenAI("gpt-4-1106-preview"))
+config = EvalConfig()
 correctness_evaluator = WandbCorrectnessEvaluator(
-    service_context=service_context,
+    llm=OpenAI(config.eval_judge_model),
     eval_template=CORRECTNESS_EVAL_TEMPLATE,
 )
 faithfulness_evaluator = WandbFactfulnessEvaluator(
-    service_context=service_context,
+    llm=OpenAI(config.eval_judge_model),
     eval_template=FACTFULNESS_EVAL_TEMPLATE,
 )
 relevancy_evaluator = WandbRelevancyEvaluator(
-    service_context=service_context,
+    llm=OpenAI(config.eval_judge_model),
     eval_template=RELEVANCY_EVAL_TEMPLATE,
 )
 
@@ -212,8 +210,6 @@ def log_eval_result(config, eval_result_path: str, duration: float) -> None:
 
 
 async def main():
-    config = EvalConfig()
-
     eval_artifact = wandb.Api().artifact(config.eval_artifact)
     eval_artifact_dir = eval_artifact.download(root=config.eval_artifact_root)
 
