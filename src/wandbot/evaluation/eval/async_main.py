@@ -74,9 +74,7 @@ def get_individual_contexts(source_documents: str) -> list[str]:
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-async def get_eval_record(
-    row_str: str, application: str = "api-eval-bharat"
-) -> str:
+async def get_eval_record(row_str: str, application: str = "api-eval") -> str:
     row = json.loads(row_str)
     response = await get_answer(row["question"], application=application)
     response = json.loads(response)
