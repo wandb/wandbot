@@ -7,10 +7,11 @@ from typing import Any, Hashable
 import aiofiles
 import httpx
 import pandas as pd
-import wandb
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
+
+import wandb
 from wandbot.evaluation.config import EvalConfig
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
