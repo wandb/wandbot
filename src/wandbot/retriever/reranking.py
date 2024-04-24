@@ -1,4 +1,4 @@
-from langchain.retrievers.document_compressors import CohereRerank
+from langchain_cohere import CohereRerank
 from langchain_core.runnables import RunnableBranch
 
 
