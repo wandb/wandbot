@@ -12,6 +12,7 @@ from llama_index.core import ServiceContext
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
+from wandbot.evaluation.config import EvalConfig
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
@@ -169,9 +170,9 @@ async def process_row(idx, row, outfile):
         logger.error(f"Failed to parse response for idx: {idx}")
 
 
-def log_eval_result(eval_result_path: str, duration: float) -> None:
-    project = "wandbot-eval"
-    entity = "wandbot"
+def log_eval_result(config, eval_result_path: str, duration: float) -> None:
+    project = config.wandb_project
+    entity = config.wandb_entity
 
     run = wandb.init(project=project, entity=entity)
 
@@ -211,13 +212,13 @@ def log_eval_result(eval_result_path: str, duration: float) -> None:
 
 
 async def main():
-    eval_artifact = wandb.Api().artifact(
-        "wandbot/wandbot-eval/autoeval_dataset:v3"
-    )
-    eval_artifact_dir = eval_artifact.download(root="data/eval")
+    config = EvalConfig()
+
+    eval_artifact = wandb.Api().artifact(config.eval_artifact)
+    eval_artifact_dir = eval_artifact.download(root=config.eval_artifact_root)
 
     df = pd.read_json(
-        "data/eval/wandbot_cleaned_annotated_dataset_11-12-2023.jsonl",
+        f"{eval_artifact_dir}/{config.eval_annotations_file}",
         lines=True,
         orient="records",
     )
@@ -228,7 +229,9 @@ async def main():
 
     start_time = time.time()
 
-    async with aiofiles.open("data/eval/eval.jsonl", "w+") as outfile:
+    async with aiofiles.open(
+        f"{eval_artifact_dir}/{config.eval_output_file}", "w+"
+    ) as outfile:
         tasks = [
             process_row(idx, row, outfile)
             for idx, row in tqdm(correct_df.iterrows())
@@ -239,7 +242,9 @@ async def main():
     duration = end_time - start_time
     logger.info(f"Total runtime: {duration:.2f} seconds")
 
-    log_eval_result("data/eval/eval.jsonl", duration)
+    log_eval_result(
+        config, f"{eval_artifact_dir}/{config.eval_output_file}", duration
+    )
 
 
 if __name__ == "__main__":
