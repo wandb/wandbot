@@ -16,11 +16,12 @@ import json
 import pathlib
 from typing import List
 
-import wandb
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
+
+import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.utils import get_logger
 
@@ -86,13 +87,14 @@ def load(
     chroma.persist()
 
     result_artifact = wandb.Artifact(
-        name=result_artifact_name, type="vectorstore",
+        name=result_artifact_name,
+        type="vectorstore",
     )
 
     result_artifact.add_dir(
         local_path=str(config.persist_dir),
     )
-    run.log_artifact(result_artifact, aliases=['chroma_index', "latest"])
+    run.log_artifact(result_artifact, aliases=["chroma_index", "latest"])
 
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"

@@ -3,6 +3,7 @@ from typing import Any, Optional, Sequence
 
 import regex as re
 from llama_index.core.evaluation import CorrectnessEvaluator, EvaluationResult
+
 from wandbot.evaluation.eval.utils import (
     make_eval_template,
     safe_parse_eval_response,

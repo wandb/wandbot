@@ -26,6 +26,8 @@ Typical usage example:
 """
 from typing import List
 
+from weave.monitoring import StreamTable
+
 import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
@@ -33,7 +35,6 @@ from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
-from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
