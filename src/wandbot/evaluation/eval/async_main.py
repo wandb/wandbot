@@ -1,18 +1,17 @@
-import re
+import asyncio
 import json
+import re
 import time
 from typing import Any, Hashable
 
-import asyncio
-import httpx
-import wandb
-import pandas as pd
 import aiofiles
-from llama_index import ServiceContext
+import httpx
+import pandas as pd
+import wandb
+from llama_index.core import ServiceContext
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
-
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
@@ -25,7 +24,7 @@ from wandbot.evaluation.eval.relevancy import (
     RELEVANCY_EVAL_TEMPLATE,
     WandbRelevancyEvaluator,
 )
-from wandbot.utils import cachew, get_logger
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -46,7 +45,9 @@ relevancy_evaluator = WandbRelevancyEvaluator(
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-async def get_answer(question: str, application: str = "api-eval-bharat") -> str:
+async def get_answer(
+    question: str, application: str = "api-eval-bharat"
+) -> str:
     url = "http://0.0.0.0:8000/chat/query"
     payload = {
         "question": question,
@@ -54,9 +55,10 @@ async def get_answer(question: str, application: str = "api-eval-bharat") -> str
         "language": "en",
     }
     async with httpx.AsyncClient(timeout=200.0) as client:
-        response = await client.post(url, data=json.dumps(payload))
+        response = await client.post(url, json=payload)
         response_json = response.json()
     return json.dumps(response_json)
+
 
 context_metadata_pattern = r"\n?source: .+?\nsource_type: .+?\nhas_code: .+?\n"
 
@@ -64,13 +66,16 @@ context_metadata_pattern = r"\n?source: .+?\nsource_type: .+?\nhas_code: .+?\n"
 def get_individual_contexts(source_documents: str) -> list[str]:
     source_documents = source_documents.split("---")
     source_documents = [
-        re.sub(context_metadata_pattern, "", source) for source in source_documents
+        re.sub(context_metadata_pattern, "", source)
+        for source in source_documents
     ]
     return source_documents
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-async def get_eval_record(row_str: str, application: str = "api-eval-bharat") -> str:
+async def get_eval_record(
+    row_str: str, application: str = "api-eval-bharat"
+) -> str:
     row = json.loads(row_str)
     response = await get_answer(row["question"], application=application)
     response = json.loads(response)
@@ -147,7 +152,7 @@ async def evaluate_row(idx: Hashable, row_str: str) -> str:
     eval_result.update(json.loads(await get_answer_correctness(row_str)))
     eval_result.update(json.loads(await get_answer_relevancy(row_str)))
     eval_result.update(json.loads(await get_answer_faithfulness(row_str)))
-
+    await asyncio.sleep(5)
     eval_result = json.dumps(eval_result)
     return eval_result
 
@@ -174,14 +179,14 @@ def log_eval_result(eval_result_path: str, duration: float) -> None:
     entity = "wandbot"
 
     run = wandb.init(project=project, entity=entity)
-    
+
     eval_df = pd.read_json(eval_result_path, lines=True)
-    eval_df = eval_df.sort_values(by='idx').reset_index(drop=True)
+    eval_df = eval_df.sort_values(by="idx").reset_index(drop=True)
 
     logger.info(f"Number of eval samples: {len(eval_df)}")
     run.log({"Evaluation Results": eval_df})
 
-    score_columns = [col for col in eval_df.columns if col.endswith('_score')]
+    score_columns = [col for col in eval_df.columns if col.endswith("_score")]
     mean_scores = eval_df[score_columns].mean()
     mode_scores = eval_df[score_columns].mode()
     percent_grade3 = (eval_df[score_columns] == 3).mean()
@@ -189,8 +194,10 @@ def log_eval_result(eval_result_path: str, duration: float) -> None:
     percent_grade1 = (eval_df[score_columns] == 1).mean()
 
     # Select columns ending with "_result" and calculate the percentage of True values
-    result_columns = [col for col in eval_df.columns if col.endswith('_result')]
-    percentage_true_results = (eval_df[result_columns].sum() / eval_df[result_columns].count())
+    result_columns = [col for col in eval_df.columns if col.endswith("_result")]
+    percentage_true_results = (
+        eval_df[result_columns].sum() / eval_df[result_columns].count()
+    )
 
     final_eval_results = {}
     final_eval_results.update(mean_scores.to_dict())
@@ -200,15 +207,18 @@ def log_eval_result(eval_result_path: str, duration: float) -> None:
     final_eval_results.update(percent_grade1.to_dict())
     final_eval_results.update(percentage_true_results.to_dict())
 
-
-    logger.info(f"Final Eval Results: {json.dumps(final_eval_results, indent=4)}")
+    logger.info(
+        f"Final Eval Results: {json.dumps(final_eval_results, indent=4)}"
+    )
     run.log(final_eval_results)
 
     run.summary["duration(s)"] = duration
 
 
 async def main():
-    eval_artifact = wandb.Api().artifact("wandbot/wandbot-eval/autoeval_dataset:v3")
+    eval_artifact = wandb.Api().artifact(
+        "wandbot/wandbot-eval/autoeval_dataset:v3"
+    )
     eval_artifact_dir = eval_artifact.download(root="data/eval")
 
     df = pd.read_json(
@@ -223,19 +233,19 @@ async def main():
 
     start_time = time.time()
 
-    async with aiofiles.open(
-        "data/eval/eval.jsonl", "w+"
-    ) as outfile:
-        tasks = [process_row(idx, row, outfile) for idx, row in tqdm(correct_df.iterrows())]
+    async with aiofiles.open("data/eval/eval.jsonl", "w+") as outfile:
+        tasks = [
+            process_row(idx, row, outfile)
+            for idx, row in tqdm(correct_df.iterrows())
+        ]
         await asyncio.gather(*tasks)
 
     end_time = time.time()
     duration = end_time - start_time
     logger.info(f"Total runtime: {duration:.2f} seconds")
 
-    log_eval_result(
-        "data/eval/eval.jsonl", duration
-    )
+    log_eval_result("data/eval/eval.jsonl", duration)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

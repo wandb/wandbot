@@ -1,8 +1,7 @@
 import asyncio
 from typing import Any, Optional, Sequence
 
-from llama_index.evaluation import CorrectnessEvaluator, EvaluationResult
-
+from llama_index.core.evaluation import CorrectnessEvaluator, EvaluationResult
 from wandbot.evaluation.eval.utils import (
     make_eval_template,
     safe_parse_eval_response,
@@ -89,14 +88,14 @@ class WandbRelevancyEvaluator(CorrectnessEvaluator):
             print(query, response, reference, flush=True)
             raise ValueError("query, response, and reference must be provided")
 
-        eval_response = await self._service_context.llm.apredict(
+        eval_response = await self._llm.apredict(
             prompt=self._eval_template,
             query=query,
             generated_answer=response,
             reference_answer=reference,
         )
 
-        passing, reasoning, score = safe_parse_eval_response(
+        passing, reasoning, score = await safe_parse_eval_response(
             eval_response, "relevant"
         )
 
