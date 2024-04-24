@@ -7,12 +7,11 @@ from typing import Any, Hashable
 import aiofiles
 import httpx
 import pandas as pd
+import wandb
 from llama_index.core import ServiceContext
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
-
-import wandb
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
@@ -46,9 +45,7 @@ relevancy_evaluator = WandbRelevancyEvaluator(
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-async def get_answer(
-    question: str, application: str = "api-eval-bharat"
-) -> str:
+async def get_answer(question: str, application: str = "api-eval") -> str:
     url = "http://0.0.0.0:8000/chat/query"
     payload = {
         "question": question,
