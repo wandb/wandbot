@@ -86,12 +86,15 @@ def load(
         chroma.add_documents(batch)
     chroma.persist()
 
-    result_artifact = wandb.Artifact(name="chroma_index", type="vectorstore")
+    result_artifact = wandb.Artifact(
+        name=result_artifact_name,
+        type="vectorstore",
+    )
 
     result_artifact.add_dir(
         local_path=str(config.persist_dir),
     )
-    run.log_artifact(result_artifact)
+    run.log_artifact(result_artifact, aliases=["chroma_index", "latest"])
 
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"

@@ -27,7 +27,6 @@ discord = "^2.3.2"
 markdown = "^3.5.1"
 fastapi = "^0.109.2"
 tree-sitter-languages = "^1.7.1"
-cohere = "^4.32"
 markdownify = "^0.11.6"
 uvicorn = "^0.24.0"
 zenpy = "^2.0.46"
@@ -43,10 +42,17 @@ langchain = "^0.1.5"
 langchain-openai = "^0.0.5"
 chromadb = "^0.4.22"
 langchain-experimental = "^0.0.50"
-simsimd = "^3.7.4"
+simsimd = "3.7.7"
+langchain-core = "^0.1.44"
+langchain-cohere = "^0.1.3"
 
 [tool.poetry.dev-dependencies]
 #fasttext = {git = "https://github.com/cfculhane/fastText"} # FastText doesn't come with pybind11 and we need to use this workaround.
+
+[tool.poetry.group.eval.dependencies]
+ragas = "^0.1.7"
+dataclasses-json = "^0.6.4"
+llama-index = "^0.10.30"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

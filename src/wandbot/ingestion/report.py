@@ -55,7 +55,7 @@ def get_metadata_from_artifacts(
     raw_artifact = wandb.run.use_artifact(raw_artifact, type="dataset")
     raw_artifact_dir = raw_artifact.download()
     vectorstore_artifact = wandb.run.use_artifact(
-        vectorstore_artifact, type="storage_context"
+        vectorstore_artifact, type="vectorstore"
     )
     vectorstore_artifact_dir = vectorstore_artifact.download()
 
