@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -182,6 +181,22 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("weave_examples")
+
+
+class WeaveDocStoreConfig(DataStoreConfig):
+    name: str = "Weave Documentation"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://wandb.github.io/weave/",
+        repo_path="https://github.com/wandb/weave",
+        base_path="docs/docs",
+        file_patterns=[
+            "*.md",
+        ],
+        is_git_repo=True,
+    )
+    language: str = "en"
+    docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):
