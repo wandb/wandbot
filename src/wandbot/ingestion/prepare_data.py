@@ -29,7 +29,6 @@ from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
-
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,

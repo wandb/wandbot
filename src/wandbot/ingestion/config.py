@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -32,6 +31,7 @@ class DataSource(BaseSettings):
     remote_path: str = ""
     repo_path: str = ""
     local_path: Optional[pathlib.Path] = None
+    branch: Optional[str] = None
     base_path: Optional[str] = ""
     file_patterns: List[str] = ["*.*"]
     is_git_repo: bool = False
@@ -98,9 +98,10 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/ja/",
         repo_path="https://github.com/wandb/docodile",
-        base_path="i18n/ja/docusaurus-plugin-content-docs/current",
+        base_path="docs",
         file_patterns=["*.md"],
         is_git_repo=True,
+        branch="japanese_docs",
     )
     language: str = "ja"
     docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ja")
