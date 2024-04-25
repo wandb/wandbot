@@ -107,6 +107,21 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ja")
 
 
+class DocodileKoreanStoreConfig(DataStoreConfig):
+    name: str = "Korean Documentation"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://docs.wandb.ai/ko/",
+        repo_path="https://github.com/wandb/docodile",
+        base_path="docs",
+        file_patterns=["*.md"],
+        is_git_repo=True,
+        branch="korean_docs",
+    )
+    language: str = "ko"
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ko")
+
+
 class ExampleCodeStoreConfig(DataStoreConfig):
     name: str = "Examples code"
     source_type: str = "code"

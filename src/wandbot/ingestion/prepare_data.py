@@ -33,6 +33,7 @@ from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,
+    DocodileKoreanStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     FCReportsStoreConfig,
@@ -882,6 +883,7 @@ def load(
     configs = [
         DocodileEnglishStoreConfig(),
         DocodileJapaneseStoreConfig(),
+        DocodileKoreanStoreConfig(),
         ExampleCodeStoreConfig(),
         ExampleNotebookStoreConfig(),
         SDKCodeStoreConfig(),
