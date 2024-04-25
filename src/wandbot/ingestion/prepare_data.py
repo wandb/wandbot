@@ -32,7 +32,6 @@ from nbconvert import MarkdownExporter
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
-    DocodileJapaneseStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     FCReportsStoreConfig,
@@ -881,7 +880,6 @@ def load(
 
     configs = [
         DocodileEnglishStoreConfig(),
-        DocodileJapaneseStoreConfig(),
         ExampleCodeStoreConfig(),
         ExampleNotebookStoreConfig(),
         SDKCodeStoreConfig(),
