@@ -36,11 +36,10 @@ from typing import Any, Coroutine, List, Tuple
 import fasttext
 import nest_asyncio
 import tiktoken
+import wandb
 from langchain_core.documents import Document
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-import wandb
 
 
 def get_logger(name: str) -> logging.Logger:
