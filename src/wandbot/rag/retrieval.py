@@ -3,7 +3,6 @@ from typing import List
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
-
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
@@ -64,7 +63,7 @@ class FusionRetrieval:
         self.top_k = top_k
         self.search_type = search_type
 
-        self.retriever = self.vectorstore.as_parent_retriever(
+        self.retriever = self.vectorstore.as_retriever(
             search_type=self.search_type, search_kwargs={"k": self.top_k}
         )
 
