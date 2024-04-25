@@ -38,7 +38,6 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -131,6 +130,8 @@ def fetch_git_repo(paths: Any, id_file: Path) -> Dict[str, str]:
             f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
         )
         with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
+            if paths.branch is not None:
+                repo.git.checkout(paths.branch)
             repo.remotes.origin.pull()
     else:
         remote_url = giturlparse.parse(f"{paths.repo_path}").urls.get("ssh")
@@ -139,6 +140,8 @@ def fetch_git_repo(paths: Any, id_file: Path) -> Dict[str, str]:
         repo = Repo.clone_from(
             remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command)
         )
+        if paths.branch is not None:
+            repo.git.checkout(paths.branch)
     return fetch_repo_metadata(repo)
 
 

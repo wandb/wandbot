@@ -18,7 +18,6 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -32,6 +31,7 @@ class DataSource(BaseSettings):
     remote_path: str = ""
     repo_path: str = ""
     local_path: Optional[pathlib.Path] = None
+    branch: Optional[str] = None
     base_path: Optional[str] = ""
     file_patterns: List[str] = ["*.*"]
     is_git_repo: bool = False
@@ -98,12 +98,28 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/ja/",
         repo_path="https://github.com/wandb/docodile",
-        base_path="i18n/ja/docusaurus-plugin-content-docs/current",
+        base_path="docs",
         file_patterns=["*.md"],
         is_git_repo=True,
+        branch="japanese_docs",
     )
     language: str = "ja"
     docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ja")
+
+
+class DocodileKoreanStoreConfig(DataStoreConfig):
+    name: str = "Korean Documentation"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://docs.wandb.ai/ko/",
+        repo_path="https://github.com/wandb/docodile",
+        base_path="docs",
+        file_patterns=["*.md"],
+        is_git_repo=True,
+        branch="korean_docs",
+    )
+    language: str = "ko"
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ko")
 
 
 class ExampleCodeStoreConfig(DataStoreConfig):
@@ -182,6 +198,22 @@ class WeaveExamplesStoreConfig(DataStoreConfig):
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("weave_examples")
+
+
+class WeaveDocStoreConfig(DataStoreConfig):
+    name: str = "Weave Documentation"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://wandb.github.io/weave/",
+        repo_path="https://github.com/wandb/weave",
+        base_path="docs/docs",
+        file_patterns=[
+            "*.md",
+        ],
+        is_git_repo=True,
+    )
+    language: str = "en"
+    docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):

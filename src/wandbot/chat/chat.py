@@ -26,9 +26,9 @@ Typical usage example:
 """
 from typing import List
 
+import wandb
 from weave.monitoring import StreamTable
 
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse

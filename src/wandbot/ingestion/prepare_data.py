@@ -23,17 +23,17 @@ from urllib.parse import urljoin, urlparse
 
 import nbformat
 import pandas as pd
+import wandb
 from google.cloud import bigquery
 from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
-
-import wandb
 from wandbot.ingestion.config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,
+    DocodileKoreanStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     FCReportsStoreConfig,
@@ -41,6 +41,7 @@ from wandbot.ingestion.config import (
     SDKTestsStoreConfig,
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
+    WeaveDocStoreConfig,
     WeaveExamplesStoreConfig,
 )
 from wandbot.ingestion.utils import (
@@ -253,7 +254,7 @@ class DocodileDataLoader(DataLoader):
                     document.metadata["source"]
                 )[-1]
                 document.metadata["source"] = document_files[
-                    document.metadata["source"]
+                    pathlib.Path(document.metadata["source"])
                 ]
                 document.metadata["language"] = self.config.language
                 document.metadata["description"] = self.extract_description(
@@ -268,6 +269,24 @@ class DocodileDataLoader(DataLoader):
                 logger.warning(
                     f"Failed to load documentation {f_name} due to {e}"
                 )
+
+
+class WeaveDocsDataLoader(DocodileDataLoader):
+    def generate_site_url(
+        self, base_path: pathlib.Path, file_path: pathlib.Path
+    ) -> str:
+        chapter = ""
+        slug = ""
+        file_loc = ""
+
+        file_name = file_path.stem
+        if file_path.name in ("introduction.md",):
+            file_name = ""
+        site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
+        site_url = urljoin(
+            str(self.config.data_source.remote_path), str(site_relative_path)
+        )
+        return site_url
 
 
 class CodeDataLoader(DataLoader):
@@ -788,15 +807,35 @@ class FCReportsDataLoader(DataLoader):
 
 
 SOURCE_TYPE_TO_LOADER_MAP = {
-    "documentation": DocodileDataLoader,
+    "wandb_documentation": DocodileDataLoader,
+    "weave_documentation": WeaveDocsDataLoader,
     "code": CodeDataLoader,
     "notebook": CodeDataLoader,
     "report": FCReportsDataLoader,
 }
 
 
+def get_loader_from_config(config: DataStoreConfig) -> DataLoader:
+    """Get the DataLoader class based on the source type.
+
+    Args:
+        config: The configuration for the data store.
+
+    Returns:
+        The DataLoader class.
+    """
+    source_type = config.source_type
+    if source_type == "documentation":
+        if "weave" in config.name.lower():
+            source_type = "weave_documentation"
+        else:
+            source_type = "wandb_documentation"
+
+    return SOURCE_TYPE_TO_LOADER_MAP[source_type](config)
+
+
 def load_from_config(config: DataStoreConfig) -> pathlib.Path:
-    loader = SOURCE_TYPE_TO_LOADER_MAP[config.source_type](config)
+    loader = get_loader_from_config(config)
     loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
 
     with (loader.config.docstore_dir / "config.json").open("w") as f:
@@ -844,10 +883,12 @@ def load(
     configs = [
         DocodileEnglishStoreConfig(),
         DocodileJapaneseStoreConfig(),
+        DocodileKoreanStoreConfig(),
         ExampleCodeStoreConfig(),
         ExampleNotebookStoreConfig(),
         SDKCodeStoreConfig(),
         SDKTestsStoreConfig(),
+        WeaveDocStoreConfig(),
         WeaveCodeStoreConfig(),
         WeaveExamplesStoreConfig(),
         WandbEduCodeStoreConfig(),
