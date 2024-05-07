@@ -27,14 +27,13 @@ Typical usage example:
 from typing import List
 
 import wandb
-from weave.monitoring import StreamTable
-
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -66,6 +65,11 @@ class Chat:
             job_type="chat",
         )
         self.run._label(repo="wandbot")
+        self.stream_table = StreamTable(
+            table_name="chat_logs",
+            project_name=self.config.wandb_project,
+            entity_name=self.config.wandb_entity,
+        )
 
         self.rag_pipeline = RAGPipeline(vector_store=vector_store)
 
@@ -104,6 +108,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
+            self.stream_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
@@ -125,4 +130,5 @@ class Chat:
                     "end_time": timer.stop,
                 }
             )
+            self.stream_table.log(result)
             return ChatResponse(**result)
