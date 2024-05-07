@@ -8,7 +8,6 @@ from wandbot.utils import get_logger
 logger = get_logger(__name__)
 
 chat_config = ChatConfig()
-logger.info(f"Chat config: {chat_config}")
 chat: Chat | None = None
 
 router = APIRouter(
