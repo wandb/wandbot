@@ -1,13 +1,10 @@
 import os
 os.environ["WANDB_ENTITY"] = "wandbot"
 
-import time
 import json
 import httpx
-import wandb
 import weave
 import asyncio
-import pandas as pd
 from weave import Evaluation
 from llama_index.llms.openai import OpenAI
 
@@ -30,7 +27,7 @@ correctness_evaluator = WandbCorrectnessEvaluator(
 wandb_project = config.wandb_project
 wandb_entity = config.wandb_entity
 
-weave.init("weave_test_eval")
+weave.init(f"{wandb_entity}/{wandb_project}")
 
 
 @weave.op()
@@ -48,39 +45,41 @@ async def get_answer(question: str, application: str = "api-eval") -> str:
 
 
 @weave.op()
-async def get_eval_record(row_str: str) -> str:
-    row = json.loads(row_str)
-    response = await get_answer(row["question"])
+async def get_eval_record(
+    question: str,
+    ground_truth: str,
+) -> dict:
+    response = await get_answer(question)
     response = json.loads(response)
-    response["ground_truths"] = row["answer"]
-    response["reference_notes"] = row["notes"]
-    response["contexts"] = response["source_documents"]
-    response = json.dumps(response)
-    return response
-
-
-@weave.op()
-def parse_answer_eval(metric: str, row):
-    print("result is: ", row.get("passing"), type(row.get("passing")))
     return {
-        f"{metric}_result": True if row.get("passing") is True else False,
+        "system_prompt": response["system_prompt"],
+        "generated_answer": response["answer"],
+        "retrieved_contexts": response["source_documents"],
+        "model": response["model"],
+        "total_tokens": response["total_tokens"],
+        "prompt_tokens": response["prompt_tokens"],
+        "completion_tokens": response["completion_tokens"],
+        "time_taken": response["time_taken"],
     }
 
 
 @weave.op()
-async def get_answer_correctness(model_output: str) -> str:
-    row = json.loads(model_output)
+async def get_answer_correctness(
+    question: str,
+    ground_truth: str,
+    notes: str,
+    model_output: dict
+) -> dict:
     result = await correctness_evaluator.aevaluate(
-        query=row["question"],
-        response=row["answer"],
-        reference=row["ground_truths"],
-        contexts=row["contexts"],
-        reference_notes=row["reference_notes"],
+        query=question,
+        response=model_output["generated_answer"],
+        reference=ground_truth,
+        contexts=model_output["retrieved_contexts"],
+        reference_notes=notes,
     )
-    # result = parse_answer_eval("answer_correctness", result.dict())
-    # result = json.dumps(result)
-    return {"answer_correctness": result.dict()["passing"]}
-    # return result
+    return {
+        "answer_correctness": result.dict()["passing"]
+    }
 
 
 dataset_ref = weave.ref(
@@ -89,7 +88,9 @@ dataset_ref = weave.ref(
 question_rows = dataset_ref.rows
 question_rows = [
     {
-        "row_str": json.dumps(row)
+        "question": row["question"],
+        "ground_truth": row["answer"],
+        "notes": row["notes"],
     } for row in question_rows
 ]
 logger.info("Number of evaluation samples: %s", len(question_rows))
