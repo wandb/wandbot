@@ -6,6 +6,7 @@ import httpx
 import weave
 import asyncio
 from weave import Evaluation
+from weave import Model
 from llama_index.llms.openai import OpenAI
 
 from wandbot.evaluation.config import EvalConfig
@@ -47,7 +48,6 @@ async def get_answer(question: str, application: str = "api-eval") -> str:
 @weave.op()
 async def get_eval_record(
     question: str,
-    ground_truth: str,
 ) -> dict:
     response = await get_answer(question)
     response = json.loads(response)
@@ -61,6 +61,16 @@ async def get_eval_record(
         "completion_tokens": response["completion_tokens"],
         "time_taken": response["time_taken"],
     }
+
+
+class EvaluatorModel(Model):
+    eval_judge_model: str = config.eval_judge_model
+
+    @weave.op()
+    async def predict(self, question: str) -> dict:
+        # Model logic goes here
+        prediction = await get_eval_record(question)
+        return prediction
 
 
 @weave.op()
@@ -100,4 +110,4 @@ evaluation = Evaluation(
 )
 
 if __name__ == "__main__":
-    asyncio.run(evaluation.evaluate(get_eval_record))
+    asyncio.run(evaluation.evaluate(EvaluatorModel()))
