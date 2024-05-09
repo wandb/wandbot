@@ -30,7 +30,7 @@ import pathlib
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import frontmatter
 import giturlparse
@@ -38,6 +38,10 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
+
+from litellm import embedding, aembedding
+from langchain_core.embeddings import Embeddings
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -291,3 +295,45 @@ def extract_frontmatter(file_path: pathlib.Path) -> Dict[str, Any]:
     with open(file_path, "r") as f:
         contents = frontmatter.load(f)
         return {k: contents[k] for k in contents.keys()}
+    
+
+class LiteLLMEmbeddings(Embeddings):
+    def __init__(
+        self,
+        model: str,
+        dimensions: int | None = None,
+        input_type: int | None = None,
+    ):
+        self.args = dict()
+        if dimensions is not None and input_type is None: # OpenAI
+            self.args["model"] = model
+            self.args["dimensions"] = dimensions
+        elif input_type is not None and dimensions is None: # Cohere
+            assert isinstance(input_type, str)
+            self.args["model"] = model
+            self.args["input_type"] = input_type
+        else: # Rest
+            self.args["model"] = model
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed search docs."""
+        self.args["input"] = texts
+        response = embedding(
+            **self.args,
+        )
+
+        embeddings = []
+        for embedding_dict in response.data:
+            embeddings.append(embedding_dict["embedding"])
+
+        return embeddings
+
+    def embed_query(self, text: str) -> List[float]:
+        """Embed query text."""
+        self.args["input"] = [text]
+        response = embedding(
+            **self.args,
+        )
+
+        assert len(response.data) == 1
+        return response.data[0]["embedding"]
