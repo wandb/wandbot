@@ -26,7 +26,7 @@ Typical usage example:
 """
 from typing import List
 
-from weave.monitoring import StreamTable
+# from weave.monitoring import StreamTable
 
 import wandb
 from wandbot.chat.config import ChatConfig
@@ -66,11 +66,11 @@ class Chat:
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        self.stream_table = StreamTable(
-            table_name="chat_logs",
-            project_name=self.config.wandb_project,
-            entity_name=self.config.wandb_entity,
-        )
+        # self.stream_table = StreamTable(
+        #     table_name="chat_logs",
+        #     project_name=self.config.wandb_project,
+        #     entity_name=self.config.wandb_entity,
+        # )
 
         self.rag_pipeline = RAGPipeline(vector_store=vector_store)
 
@@ -109,7 +109,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            self.stream_table.log(result_dict)
+            # self.stream_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
@@ -131,5 +131,5 @@ class Chat:
                     "end_time": timer.stop,
                 }
             )
-            self.stream_table.log(result)
+            # self.stream_table.log(result)
             return ChatResponse(**result)

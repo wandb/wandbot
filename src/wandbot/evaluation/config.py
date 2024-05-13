@@ -33,4 +33,4 @@ class EvalConfig(BaseSettings):
         validation_alias="eval_judge_model",
     )
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
-    wandb_project: str = Field("wandbot-eval", env="WANDB_PROJECT")
+    wandb_project: str = Field("wandbot-eval")

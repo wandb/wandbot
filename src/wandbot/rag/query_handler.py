@@ -262,7 +262,7 @@ class QueryEnhancer:
     def __init__(
         self,
         model: str = "gpt-4-0125-preview",
-        fallback_model: str = "gpt-4-1106-preview",
+        fallback_model: str = "gpt-4-0125-preview",
     ):
         self.model = model  # type: ignore
         self.fallback_model = fallback_model  # type: ignore

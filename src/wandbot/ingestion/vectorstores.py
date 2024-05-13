@@ -23,6 +23,7 @@ from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 from wandbot.ingestion.config import VectorStoreConfig
+from wandbot.ingestion.utils import LiteLLMEmbeddings
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -60,7 +61,10 @@ def load(
     artifact_dir: str = artifact.download()
 
     # Todo: Change to LiteLLM Embeddings
-    embedding_fn = OpenAIEmbeddings(
+    # embedding_fn = OpenAIEmbeddings(
+    #     model=config.embeddings_model, dimensions=config.embedding_dim
+    # )
+    embedding_fn = LiteLLMEmbeddings(
         model=config.embeddings_model, dimensions=config.embedding_dim
     )
     vectorstore_dir = config.persist_dir
