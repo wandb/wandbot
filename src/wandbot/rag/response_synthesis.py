@@ -1,10 +1,11 @@
 from operator import itemgetter
+from typing import Any, Dict
 
+import weave
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 from langchain_openai import ChatOpenAI
-
 from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """You are Wandbot - a support expert in Weights & Biases, wandb and weave. 
@@ -162,3 +163,7 @@ class ResponseSynthesizer:
         )
 
         return response_synthesis_chain
+
+    @weave.op()
+    def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        return self.chain.invoke(inputs)

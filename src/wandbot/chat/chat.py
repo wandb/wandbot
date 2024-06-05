@@ -26,15 +26,15 @@ Typical usage example:
 """
 from typing import List
 
-from weave.monitoring import StreamTable
-
 import wandb
+import weave
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
+from weave.monitoring import StreamTable
 
 logger = get_logger(__name__)
 
@@ -86,6 +86,7 @@ class Chat:
 
         return result
 
+    @weave.op()
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
 
