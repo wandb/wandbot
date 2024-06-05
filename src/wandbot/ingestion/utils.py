@@ -38,6 +38,7 @@ import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
 from git import Repo
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
