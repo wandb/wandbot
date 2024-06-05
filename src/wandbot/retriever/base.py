@@ -1,12 +1,12 @@
 from operator import itemgetter
 from typing import List
 
-import wandb
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
+import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
@@ -87,7 +87,7 @@ class VectorStore:
 class SimpleRetrievalEngine:
     cohere_rerank_chain = CohereRerankChain()
     embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel(
-        dimensions=768
+        dimensions=512
     )
 
     def __init__(self, vector_store: VectorStore, top_k=5):
@@ -126,7 +126,7 @@ class SimpleRetrievalEngine:
 
         self.top_k = top_k
 
-        retriever = self.vector_store.as_parent_retriever(
+        retriever = self.vector_store.as_retriever(
             search_type=search_type, search_kwargs=search_kwargs
         )
 
@@ -134,9 +134,7 @@ class SimpleRetrievalEngine:
             RunnableParallel(
                 question=itemgetter("question"),
                 language=itemgetter("language"),
-                context=(
-                    itemgetter("question") | retriever | self.redundant_filter
-                ),
+                context=(itemgetter("question") | retriever),
             )
             | self.cohere_rerank_chain
         )
@@ -152,8 +150,7 @@ class SimpleRetrievalEngine:
             metadata_dict = {
                 k: v
                 for k, v in result.metadata.items()
-                if k
-                not in ["relevance_score", "source_content", "id", "parent_id"]
+                if k not in ["relevance_score", "id", "parent_id"]
             }
             result_dict["metadata"] = metadata_dict
             outputs.append(result_dict)
