@@ -7,6 +7,7 @@ from langchain.text_splitter import (
     TokenTextSplitter,
 )
 from langchain_core.documents import BaseDocumentTransformer, Document
+
 from wandbot.ingestion.preprocessors.md import (
     MarkdownTextTransformer,
     create_id_from_document,

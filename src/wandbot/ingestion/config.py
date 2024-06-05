@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
+
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
