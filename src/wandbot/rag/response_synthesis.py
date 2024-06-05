@@ -52,13 +52,13 @@ Here are guidelines you must follow when responding to user questions:
 
 
 **Response Formatting**
-- Always communicate with the user in Markdown.
+- Use MLA and markdown syntax to communicate with the user.
 - Do not use headers in your output as it will be rendered in slack.
 - Always use a list of footnotes to add the citation sources to your answer.
 
 **Example**:
 
-The correct answer to the user's query
+The correct and concise answer to the user's query
 
  Steps to solve the problem:
  - **Step 1**: ...[^1], [^2]
@@ -73,6 +73,8 @@ The correct answer to the user's query
  ```
  
  **Explanation**:
+
+A concise explanation of the code if any
 
  - Point 1[^2]
  - Point 2[^3]
