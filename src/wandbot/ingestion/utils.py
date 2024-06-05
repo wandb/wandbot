@@ -25,18 +25,12 @@ Typical usage example:
     git_repo_metadata = fetch_git_repo(paths, id_file)
     cell_info = concatenate_cells(cell, include_outputs, max_output_length, traceback)
 """
-
-import pathlib
 import re
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import frontmatter
 import giturlparse
-import markdown
-import markdownify
-from bs4 import BeautifulSoup, Comment
 from git import Repo
 from wandbot.utils import get_logger
 
@@ -207,87 +201,3 @@ EXTENSION_MAP: Dict[str, str] = {
     ".js": "javascript",
     ".ts": "typescript",
 }
-
-
-def convert_contents_to_soup(contents: str) -> BeautifulSoup:
-    """Converts contents to BeautifulSoup object.
-
-    Args:
-        contents: The contents to convert.
-
-    Returns:
-        The BeautifulSoup object.
-    """
-    markdown_document = markdown.markdown(
-        contents,
-        extensions=[
-            "toc",
-            "pymdownx.extra",
-            "pymdownx.blocks.admonition",
-            "pymdownx.magiclink",
-            "pymdownx.blocks.tab",
-            "pymdownx.pathconverter",
-            "pymdownx.saneheaders",
-            "pymdownx.striphtml",
-        ],
-    )
-    soup = BeautifulSoup(markdown_document, "html.parser")
-    return soup
-
-
-def clean_soup(soup: BeautifulSoup) -> BeautifulSoup:
-    """Cleans the BeautifulSoup object.
-
-    Args:
-        soup: The BeautifulSoup object to clean.
-
-    Returns:
-        The cleaned BeautifulSoup object.
-    """
-    for img_tag in soup.find_all("img", src=True):
-        img_tag.extract()
-    comments = soup.find_all(string=lambda text: isinstance(text, Comment))
-    for comment in comments:
-        comment.extract()
-    for p_tag in soup.find_all("p"):
-        if not p_tag.text.strip():
-            p_tag.decompose()
-    return soup
-
-
-def clean_contents(contents: str) -> str:
-    """Cleans the contents.
-
-    Args:
-        contents: The contents to clean.
-
-    Returns:
-        The cleaned contents.
-    """
-    soup = convert_contents_to_soup(contents)
-    soup = clean_soup(soup)
-    cleaned_document = markdownify.MarkdownConverter(
-        heading_style="ATX"
-    ).convert_soup(soup)
-    # Regular expression pattern to match import lines
-    js_import_pattern = r"import .* from [‘’']@theme/.*[‘’'];\s*\n*"
-    cleaned_document = re.sub(js_import_pattern, "", cleaned_document)
-    cleaned_document = cleaned_document.replace("![]()", "\n")
-    cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
-    cleaned_document = re.sub(r"\n{3,}", "\n\n", cleaned_document)
-    cleaned_document = frontmatter.loads(cleaned_document).content
-    return cleaned_document
-
-
-def extract_frontmatter(file_path: pathlib.Path) -> Dict[str, Any]:
-    """Extracts the frontmatter from a file.
-
-    Args:
-        file_path: The path to the file.
-
-    Returns:
-        The extracted frontmatter.
-    """
-    with open(file_path, "r") as f:
-        contents = frontmatter.load(f)
-        return {k: contents[k] for k in contents.keys()}

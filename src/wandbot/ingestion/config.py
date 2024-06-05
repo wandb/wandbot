@@ -229,19 +229,6 @@ class WandbEduCodeStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("wandb_edu_code")
 
 
-class WeaveJsStoreConfig(DataStoreConfig):
-    name: str = "Weave JS code"
-    source_type: str = "code"
-    data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/tree/master/",
-        repo_path="https://github.com/wandb/weave",
-        base_path="weave-js",
-        file_patterns=["*.js", "*.ts"],
-        is_git_repo=True,
-    )
-    docstore_dir: pathlib.Path = pathlib.Path("weave_js")
-
-
 class FCReportsStoreConfig(DataStoreConfig):
     name: str = "FC Reports"
     source_type: str = "report"

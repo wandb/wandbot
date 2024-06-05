@@ -44,11 +44,11 @@ from wandbot.ingestion.config import (
     WeaveDocStoreConfig,
     WeaveExamplesStoreConfig,
 )
-from wandbot.ingestion.utils import (
+from wandbot.ingestion.preprocessors.md import (
     clean_contents,
     extract_frontmatter,
-    fetch_git_repo,
 )
+from wandbot.ingestion.utils import fetch_git_repo
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
@@ -329,8 +329,9 @@ class CodeDataLoader(DataLoader):
                     document = TextLoader(f_name).load()[0]
                     contents = document.page_content
                     notebook = nbformat.reads(contents, as_version=4)
+                    nb_fixed = nbformat.validator.normalize(notebook)
                     md_exporter = MarkdownExporter(template="classic")
-                    (body, resources) = md_exporter.from_notebook_node(notebook)
+                    (body, resources) = md_exporter.from_notebook_node(nb_fixed)
                     cleaned_body = clean_contents(body)
                     document.page_content = cleaned_body
                     document.metadata["source_type"] = (

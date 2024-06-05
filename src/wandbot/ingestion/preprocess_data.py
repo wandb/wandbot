@@ -26,8 +26,7 @@ from typing import Any, List, Sequence
 import tiktoken
 import wandb
 from langchain_core.documents import BaseDocumentTransformer, Document
-
-from wandbot.ingestion.preprocessors.markdown import MarkdownTextTransformer
+from wandbot.ingestion.preprocessors.md import MarkdownTextTransformer
 from wandbot.ingestion.preprocessors.source_code import CodeTextTransformer
 from wandbot.utils import (
     FastTextLangDetect,
@@ -75,12 +74,12 @@ class DocumentTransformer(BaseDocumentTransformer):
         self.length_function = length_function
         self.markdown_transformer = MarkdownTextTransformer(
             lang_detect=lang_detect,
-            chunk_size=self.chunk_size,
+            # chunk_size=self.chunk_size,
             length_function=self.length_function,
         )
         self.code_transformer = CodeTextTransformer(
             lang_detect=self.lang_detect,
-            chunk_size=self.chunk_size,
+            # chunk_size=self.chunk_size,
             length_function=length_function,
         )
 
