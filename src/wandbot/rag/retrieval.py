@@ -1,8 +1,10 @@
-from typing import List
+from typing import Any, Dict, List
 
-from langchain.retrievers.document_compressors import CohereRerank
+import weave
+from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
+
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
@@ -100,3 +102,7 @@ class FusionRetrieval:
                 )
             )
         return self._chain
+
+    @weave.op()
+    def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        return self.chain.invoke(inputs)

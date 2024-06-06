@@ -24,9 +24,9 @@ import pathlib
 from typing import Any, List, Sequence
 
 import tiktoken
-import wandb
 from langchain_core.documents import BaseDocumentTransformer, Document
 
+import wandb
 from wandbot.ingestion.preprocessors.markdown import MarkdownTextTransformer
 from wandbot.ingestion.preprocessors.source_code import CodeTextTransformer
 from wandbot.utils import (

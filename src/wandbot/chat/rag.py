@@ -1,6 +1,7 @@
 import datetime
 from typing import List, Tuple
 
+import weave
 from langchain_community.callbacks import get_openai_callback
 from pydantic import BaseModel
 
@@ -59,22 +60,23 @@ class RAGPipeline:
         )
         self.response_synthesizer = ResponseSynthesizer()
 
+    @weave.op()
     def __call__(
         self, question: str, chat_history: List[Tuple[str, str]] | None = None
-    ):
+    ) -> RAGPipelineOutput:
         if chat_history is None:
             chat_history = []
 
         with get_openai_callback() as query_enhancer_cb, Timer() as query_enhancer_tb:
-            enhanced_query = self.query_enhancer.chain.invoke(
+            enhanced_query = self.query_enhancer(
                 {"query": question, "chat_history": chat_history}
             )
 
         with Timer() as retrieval_tb:
-            retrieval_results = self.retrieval.chain.invoke(enhanced_query)
+            retrieval_results = self.retrieval(enhanced_query)
 
         with get_openai_callback() as response_cb, Timer() as response_tb:
-            response = self.response_synthesizer.chain.invoke(retrieval_results)
+            response = self.response_synthesizer(retrieval_results)
 
         output = RAGPipelineOutput(
             question=enhanced_query["standalone_query"],

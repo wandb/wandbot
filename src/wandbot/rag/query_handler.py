@@ -4,7 +4,7 @@ from operator import itemgetter
 from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
-from langchain.chains.openai_functions import create_structured_output_runnable
+import weave
 from langchain_core.messages import convert_to_messages, get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
@@ -279,8 +279,8 @@ class QueryEnhancer:
         return self._chain
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
-        query_enhancer_chain = create_structured_output_runnable(
-            EnhancedQuery, model, self.prompt
+        query_enhancer_chain = self.prompt | model.with_structured_output(
+            EnhancedQuery
         )
 
         input_chain = RunnableParallel(
@@ -307,3 +307,7 @@ class QueryEnhancer:
         )
 
         return chain
+
+    @weave.op()
+    def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
+        return self.chain.invoke(inputs)

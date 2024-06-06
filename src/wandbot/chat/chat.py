@@ -26,6 +26,7 @@ Typical usage example:
 """
 from typing import List
 
+import weave
 from weave.monitoring import StreamTable
 
 import wandb
@@ -86,6 +87,7 @@ class Chat:
 
         return result
 
+    @weave.op()
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
 

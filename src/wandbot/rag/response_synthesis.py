@@ -1,5 +1,7 @@
 from operator import itemgetter
+from typing import Any, Dict
 
+import weave
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
@@ -162,3 +164,7 @@ class ResponseSynthesizer:
         )
 
         return response_synthesis_chain
+
+    @weave.op()
+    def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        return self.chain.invoke(inputs)

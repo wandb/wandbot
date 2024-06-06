@@ -29,13 +29,15 @@ It uses logger from the utils module for logging purposes.
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-import wandb
+import weave
 from fastapi import FastAPI
 
+import wandb
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
@@ -45,6 +47,8 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 last_backup = datetime.now().astimezone(timezone.utc)
+
+weave.init(f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}")
 
 
 @asynccontextmanager
