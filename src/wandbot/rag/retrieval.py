@@ -3,6 +3,7 @@ from typing import List
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
+
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
@@ -29,11 +30,14 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
 
 
 def run_web_search(query, avoid=False) -> list:
-    if avoid:
+    try:
+        if avoid:
+            return []
+        yousearch = YouSearch(YouSearchConfig())
+        web_results = yousearch(query)
+        return get_web_contexts(web_results)
+    except Exception as e:
         return []
-    yousearch = YouSearch(YouSearchConfig())
-    web_results = yousearch(query)
-    return get_web_contexts(web_results)
 
 
 def rerank_results(
