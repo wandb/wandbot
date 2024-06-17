@@ -31,11 +31,14 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
 
 
 def run_web_search(query, avoid=False) -> list:
-    if avoid:
+    try:
+        if avoid:
+            return []
+        yousearch = YouSearch(YouSearchConfig())
+        web_results = yousearch(query)
+        return get_web_contexts(web_results)
+    except Exception as e:
         return []
-    yousearch = YouSearch(YouSearchConfig())
-    web_results = yousearch(query)
-    return get_web_contexts(web_results)
 
 
 def rerank_results(
