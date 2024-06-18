@@ -12,6 +12,7 @@ Typical usage example:
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from wandbot.database.config import DataBaseConfig
 from wandbot.database.models import Base
 
