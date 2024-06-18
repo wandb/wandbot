@@ -1,11 +1,8 @@
+import wandb
 from fastapi import APIRouter
 from starlette import status
 from starlette.responses import Response
-
-import wandb
 from wandbot.database.client import DatabaseClient
-from wandbot.database.database import engine
-from wandbot.database.models import Base
 from wandbot.database.schemas import (
     ChatThread,
     ChatThreadCreate,
@@ -18,7 +15,6 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-Base.metadata.create_all(bind=engine)
 
 db_client: DatabaseClient | None = None
 
