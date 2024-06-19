@@ -16,7 +16,6 @@ from collections import OrderedDict
 from typing import Any, List
 
 from pydantic_settings import BaseSettings
-
 from wandbot.api.routers.chat import APIQueryResponse
 
 
@@ -62,7 +61,7 @@ def format_response(
             sources_list = deduplicate(
                 [
                     item
-                    for item in response.sources.split(",")
+                    for item in response.sources.split("\n")
                     if item.strip().startswith("http")
                 ]
             )
@@ -72,13 +71,13 @@ def format_response(
                     result = (
                         f"{result}\n\n*参考文献*\n\n>"
                         + "\n> ".join(sources_list[:items])
-                        + "\n\n"
+                        + "\n"
                     )
                 else:
                     result = (
                         f"{result}\n\n*References*\n\n>"
                         + "\n> ".join(sources_list[:items])
-                        + "\n\n"
+                        + "\n"
                     )
         if outro_message:
             result = f"{result}\n\n{outro_message}"
