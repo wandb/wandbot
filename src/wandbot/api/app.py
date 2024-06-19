@@ -34,13 +34,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import pandas as pd
-import weave
-from fastapi import FastAPI
-
 import wandb
+import weave
+from fastapi import BackgroundTasks, FastAPI
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
+from wandbot.database.database import engine
+from wandbot.database.models import Base
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever import VectorStore
 from wandbot.utils import get_logger
@@ -49,6 +50,20 @@ logger = get_logger(__name__)
 last_backup = datetime.now().astimezone(timezone.utc)
 
 weave.init(f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}")
+
+is_initialized = False
+
+
+async def initialize():
+    global is_initialized
+    if not is_initialized:
+        vector_store = VectorStore.from_config(VectorStoreConfig())
+        chat_router.chat = chat_router.Chat(vector_store=vector_store)
+        database_router.db_client = database_router.DatabaseClient()
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            vector_store=vector_store
+        )
+        is_initialized = True
 
 
 @asynccontextmanager
@@ -61,12 +76,8 @@ async def lifespan(app: FastAPI):
     Returns:
         None
     """
-    vector_store = VectorStore.from_config(VectorStoreConfig())
-    chat_router.chat = chat_router.Chat(vector_store=vector_store)
-    database_router.db_client = database_router.DatabaseClient()
-    retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-        vector_store=vector_store
-    )
+
+    Base.metadata.create_all(bind=engine)
 
     async def backup_db():
         """Periodically backs up the database to a table.
@@ -107,10 +118,15 @@ app = FastAPI(
 )
 
 
+@app.get("/")
+async def root(background_tasks: BackgroundTasks):
+    background_tasks.add_task(initialize)
+    return {"message": "Initialization started in the background"}
+
+
 app.include_router(chat_router.router)
 app.include_router(database_router.router)
 app.include_router(retrieve_router.router)
-
 
 if __name__ == "__main__":
     import uvicorn
