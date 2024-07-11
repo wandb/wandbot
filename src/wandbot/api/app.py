@@ -80,6 +80,8 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
 
+    await initialize()
+
     async def backup_db():
         """Periodically backs up the database to a table.
 
