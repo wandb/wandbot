@@ -99,6 +99,26 @@ For more detailed instructions on installing and running the bot, please refer t
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.
 
+### Running the Evaluation pipeline
+
+Make sure to set the environments in your terminal.
+
+```
+set -o allexport; source .env; set +o allexport
+```
+
+Launch the wandbot with 8 workers. This speeds up evaluation
+
+```
+gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=200 --workers=8 --worker-class uvicorn.workers.UvicornWorker
+```
+
+Launch W&B Weave evaluation
+
+```
+python src/wandbot/evaluation/weave_eval/main.py
+```
+
 ## Overview of the Implementation
 
 1. Creating Document Embeddings with ChromaDB
