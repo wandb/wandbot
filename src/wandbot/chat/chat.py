@@ -71,6 +71,10 @@ class Chat:
             top_k=self.config.top_k,
             english_reranker_model=self.config.english_reranker_model,
             multilingual_reranker_model=self.config.multilingual_reranker_model,
+            response_synthesizer_model=self.config.response_synthesizer_model,
+            response_synthesizer_temperature=self.config.response_synthesizer_temperature,
+            response_synthesizer_fallback_model=self.config.response_synthesizer_fallback_model,
+            response_synthesizer_fallback_temperature=self.config.response_synthesizer_fallback_temperature,
         )
 
     def _get_answer(

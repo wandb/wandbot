@@ -9,8 +9,7 @@ from wandbot.retriever.web_search import YouSearchResults
 
 
 class ChatModel:
-    def __init__(self, temperature: float = 0.1, max_retries: int = 2):
-        self.temperature = temperature
+    def __init__(self, max_retries: int = 2):
         self.max_retries = max_retries
 
     def __set_name__(self, owner, name):
@@ -23,8 +22,8 @@ class ChatModel:
 
     def __set__(self, obj, value):
         model = ChatOpenAI(
-            model_name=value,
-            temperature=self.temperature,
+            model_name=value["model_name"],
+            temperature=value["temperature"],
             max_retries=self.max_retries,
         )
         setattr(obj, self.private_name, model)

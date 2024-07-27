@@ -55,6 +55,10 @@ class RAGPipeline:
         search_type: str = "mmr",
         english_reranker_model: str = "rerank-english-v2.0",
         multilingual_reranker_model: str = "rerank-multilingual-v2.0",
+        response_synthesizer_model: str = "gpt-4-0125-preview",
+        response_synthesizer_temperature: float = 0.1,
+        response_synthesizer_fallback_model: str = "gpt-4-0125-preview",
+        response_synthesizer_fallback_temperature: float = 0.1,
     ):
         self.vector_store = vector_store
         self.query_enhancer = QueryEnhancer()
@@ -65,7 +69,12 @@ class RAGPipeline:
             english_reranker_model=english_reranker_model,
             multilingual_reranker_model=multilingual_reranker_model,
         )
-        self.response_synthesizer = ResponseSynthesizer()
+        self.response_synthesizer = ResponseSynthesizer(
+            model=response_synthesizer_model,
+            temperature=response_synthesizer_temperature,
+            fallback_model=response_synthesizer_fallback_model,
+            fallback_temperature=response_synthesizer_fallback_temperature,
+        )
 
     @weave.op()
     def __call__(

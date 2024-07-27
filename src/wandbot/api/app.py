@@ -68,11 +68,15 @@ async def initialize():
     global is_initialized
     if not is_initialized:
         vector_store = VectorStore.from_config(VectorStoreConfig())
-        chat_router.chat = chat_router.Chat(vector_store=vector_store)
+        chat_config = ChatConfig()
+        chat_router.chat = chat_router.Chat(
+                vector_store=vector_store,
+                config=chat_config
+            )
         logger.info(f"Initialized chat router")
         database_router.db_client = database_router.DatabaseClient()
         logger.info(f"Initialized database client")
-        chat_config = ChatConfig()
+        
         retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
             vector_store=vector_store,
             rerank_models={

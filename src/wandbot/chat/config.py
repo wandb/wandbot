@@ -35,3 +35,8 @@ class ChatConfig(BaseSettings):
     # Cohere reranker models
     english_reranker_model: str = "rerank-english-v2.0"
     multilingual_reranker_model: str = "rerank-multilingual-v2.0"
+    # Response synthesis settings
+    response_synthesizer_model: str = "gpt-4-0125-preview"
+    response_synthesizer_temperature: float = 0.1
+    response_synthesizer_fallback_model: str = "gpt-4-0125-preview"
+    response_synthesizer_fallback_temperature: float = 0.1
