@@ -262,10 +262,12 @@ class QueryEnhancer:
     def __init__(
         self,
         model: str = "gpt-4-0125-preview",
+        temperature: float = 0.1,
         fallback_model: str = "gpt-4-0125-preview",
+        fallback_temperature: float = 0.1,
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = {"model_name": model, "temperature": temperature}  # type: ignore
+        self.fallback_model = {"model_name": fallback_model, "temperature": fallback_temperature}  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
         self._chain = None
 
