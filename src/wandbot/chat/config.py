@@ -29,3 +29,9 @@ class ChatConfig(BaseSettings):
     )
     wandb_project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
     wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
+    # Retrieval settings
+    top_k: int = 15
+    search_type: str = "mmr"
+    # Cohere reranker models
+    english_reranker_model: str = "rerank-english-v2.0"
+    multilingual_reranker_model: str = "rerank-multilingual-v2.0"

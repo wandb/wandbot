@@ -95,6 +95,11 @@ Once these environment variables are set, you can start the Q&A bot application 
 (poetry run python -m wandbot.apps.discord > discord_app.log 2>&1)
 ```
 
+You might need to then call the endpoint to trigger the final wandbot app initialisation:
+```bash
+curl http://localhost:8000/
+```
+
 For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.

@@ -27,7 +27,6 @@ Typical usage example:
 from typing import List
 
 import weave
-from weave.monitoring import StreamTable
 
 import wandb
 from wandbot.chat.config import ChatConfig
@@ -48,10 +47,10 @@ class Chat:
         run: An instance of wandb.Run for logging experiment information.
     """
 
-    config: ChatConfig = ChatConfig()
-
     def __init__(
-        self, vector_store: VectorStore, config: ChatConfig | None = None
+        self, 
+        vector_store: VectorStore, 
+        config: ChatConfig
     ):
         """Initializes the Chat instance.
 
@@ -59,21 +58,20 @@ class Chat:
             config: An instance of ChatConfig containing configuration settings.
         """
         self.vector_store = vector_store
-        if config is not None:
-            self.config = config
+        self.config = config
         self.run = wandb.init(
             project=self.config.wandb_project,
             entity=self.config.wandb_entity,
             job_type="chat",
         )
         self.run._label(repo="wandbot")
-        self.stream_table = StreamTable(
-            table_name="chat_logs",
-            project_name=self.config.wandb_project,
-            entity_name=self.config.wandb_entity,
-        )
 
-        self.rag_pipeline = RAGPipeline(vector_store=vector_store)
+        self.rag_pipeline = RAGPipeline(
+            vector_store=vector_store,
+            top_k=self.config.top_k,
+            english_reranker_model=self.config.english_reranker_model,
+            multilingual_reranker_model=self.config.multilingual_reranker_model,
+        )
 
     def _get_answer(
         self, question: str, chat_history: List[QuestionAnswer]
@@ -108,10 +106,10 @@ class Chat:
                 "total_tokens": result.total_tokens,
                 "prompt_tokens": result.prompt_tokens,
                 "completion_tokens": result.completion_tokens,
+                "web_search_success": result.api_call_statuses["web_search_success"],
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
-            self.stream_table.log(result_dict)
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
@@ -133,5 +131,4 @@ class Chat:
                     "end_time": timer.stop,
                 }
             )
-            self.stream_table.log(result)
             return ChatResponse(**result)

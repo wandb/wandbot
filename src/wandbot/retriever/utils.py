@@ -2,8 +2,8 @@ from langchain_openai import OpenAIEmbeddings
 
 
 class OpenAIEmbeddingsModel:
-    def __init__(self, dimensions: int):
-        self.dimensions = dimensions
+    def __init__(self):
+        pass
 
     def __set_name__(self, owner, name):
         self.public_name = name
@@ -15,8 +15,8 @@ class OpenAIEmbeddingsModel:
 
     def __set__(self, obj, value):
         model = OpenAIEmbeddings(
-            model=value,
-            tiktoken_model_name="text-embedding-ada-002",
-            dimensions=self.dimensions,
+            model=value["embedding_model_name"],
+            tiktoken_model_name=value["tokenizer_model_name"],
+            dimensions=value["embedding_dimensions"],
         )
         setattr(obj, self.private_name, model)

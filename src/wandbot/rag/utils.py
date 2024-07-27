@@ -5,6 +5,7 @@ from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
 
 from wandbot.utils import clean_document_content
+from wandbot.retriever.web_search import YouSearchResults
 
 
 class ChatModel:
@@ -92,7 +93,7 @@ def process_input_for_retrieval(retrieval_input):
     return retrieval_input
 
 
-def get_web_contexts(web_results):
+def get_web_contexts(web_results: YouSearchResults):
     output_documents = []
     if not web_results:
         return []
@@ -102,8 +103,8 @@ def get_web_contexts(web_results):
             Document(
                 page_content=document["context"], metadata=document["metadata"]
             )
-            for document in web_results["web_context"]
+            for document in web_results.web_context
         ]
-        if web_results.get("web_context")
+        if web_results.web_context
         else []
     )

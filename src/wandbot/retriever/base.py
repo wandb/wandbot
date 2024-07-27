@@ -2,10 +2,11 @@ from operator import itemgetter
 from typing import List
 
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
-from langchain_community.vectorstores.chroma import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
+import weave
 import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
@@ -13,36 +14,28 @@ from wandbot.retriever.utils import OpenAIEmbeddingsModel
 
 
 class VectorStore:
-    embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel(
-        dimensions=512
-    )
-    config: VectorStoreConfig = VectorStoreConfig()
+    embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel()
 
     def __init__(
         self,
-        embeddings_model: str,
-        collection_name: str,
-        persist_dir: str,
-        config: VectorStoreConfig = None,
+        config: VectorStoreConfig,
     ):
-        if config is not None:
-            self.config = config
-        self.embeddings_model = embeddings_model  # type: ignore
+        self.config = config
+        self.embeddings_model = {
+            "embedding_model_name": self.config.embedding_model_name,
+            "tokenizer_model_name": self.config.tokenizer_model_name,
+            "embedding_dimensions": self.config.embedding_dimensions,
+        }  # type: ignore
         self.vectorstore = Chroma(
-            collection_name=collection_name,
             embedding_function=self.embeddings_model,  # type: ignore
-            persist_directory=persist_dir,
+            collection_name=self.config.collection_name,
+            persist_directory=str(self.config.persist_dir),
         )
 
     @classmethod
     def from_config(cls, config: VectorStoreConfig):
         if config.persist_dir.exists():
-            return cls(
-                embeddings_model=config.embeddings_model,
-                collection_name=config.name,
-                persist_dir=str(config.persist_dir),
-                config=config,
-            )
+            return cls(config=config)
         if wandb.run is None:
             api = wandb.Api()
             artifact = api.artifact(config.artifact_url)
@@ -50,12 +43,7 @@ class VectorStore:
             artifact = wandb.run.use_artifact(config.artifact_url)
         _ = artifact.download(root=str(config.persist_dir))
 
-        return cls(
-            embeddings_model=config.embeddings_model,
-            collection_name=config.name,
-            persist_dir=str(config.persist_dir),
-            config=config,
-        )
+        return cls(config=config)
 
     def as_retriever(self, search_type="mmr", search_kwargs=None):
         if search_kwargs is None:
@@ -86,18 +74,16 @@ class VectorStore:
 
 class SimpleRetrievalEngine:
     cohere_rerank_chain = CohereRerankChain()
-    embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel(
-        dimensions=768
-    )
 
-    def __init__(self, vector_store: VectorStore, top_k=5):
+    def __init__(self, vector_store: VectorStore, rerank_models:dict):
         self.vector_store = vector_store
-        self.embeddings_model = vector_store.config.embeddings_model  # type: ignore
+        self.cohere_rerank_chain = rerank_models # type: ignore
+        self.embeddings_model = self.vector_store.embeddings_model
         self.redundant_filter = EmbeddingsRedundantFilter(
             embeddings=self.embeddings_model
         ).transform_documents
-        self.top_k = top_k
 
+    @weave.op()
     def __call__(
         self,
         question: str,
@@ -123,8 +109,6 @@ class SimpleRetrievalEngine:
             search_kwargs = {"k": top_k * 4, "filter": filters}
         else:
             search_kwargs = {"k": top_k * 4}
-
-        self.top_k = top_k
 
         retriever = self.vector_store.as_parent_retriever(
             search_type=search_type, search_kwargs=search_kwargs

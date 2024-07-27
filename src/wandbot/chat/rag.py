@@ -44,6 +44,7 @@ class RAGPipelineOutput(BaseModel):
     time_taken: float
     start_time: datetime.datetime
     end_time: datetime.datetime
+    api_call_statuses: dict = {}
 
 
 class RAGPipeline:
@@ -52,11 +53,17 @@ class RAGPipeline:
         vector_store: VectorStore,
         top_k: int = 15,
         search_type: str = "mmr",
+        english_reranker_model: str = "rerank-english-v2.0",
+        multilingual_reranker_model: str = "rerank-multilingual-v2.0",
     ):
         self.vector_store = vector_store
         self.query_enhancer = QueryEnhancer()
         self.retrieval = FusionRetrieval(
-            vector_store=vector_store, top_k=top_k, search_type=search_type
+            vector_store=vector_store, 
+            top_k=top_k, 
+            search_type=search_type,
+            english_reranker_model=english_reranker_model,
+            multilingual_reranker_model=multilingual_reranker_model,
         )
         self.response_synthesizer = ResponseSynthesizer()
 
@@ -74,6 +81,7 @@ class RAGPipeline:
 
         with Timer() as retrieval_tb:
             retrieval_results = self.retrieval(enhanced_query)
+            logger.debug(f"Retrieval results: {retrieval_results}")
 
         with get_openai_callback() as response_cb, Timer() as response_tb:
             response = self.response_synthesizer(retrieval_results)
@@ -101,6 +109,9 @@ class RAGPipeline:
             + response_tb.elapsed,
             start_time=query_enhancer_tb.start,
             end_time=response_tb.stop,
+            api_call_statuses={
+                "web_search_success": retrieval_results["web_search_success"],
+            },
         )
 
         return output

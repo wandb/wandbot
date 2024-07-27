@@ -49,7 +49,7 @@ INTENT_DESCRIPTIONS = {
     Labels.INTEGRATIONS.value: "The query is related to integrating Weights & Biases with other tools, frameworks, "
     "or libraries",
     Labels.PRODUCT_FEATURES.value: "The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, "
-    "Reports, Experiments, Tables, Prompts, Launch, Weave, StreamTables and more",
+    "Reports, Experiments, Tables, Prompts, Launch, Weave and more",
     Labels.SALES_AND_GTM_RELATED.value: "The query is related to sales, marketing, or other business related topics "
     "such as pricing, billing, or partnerships etc",
     Labels.BEST_PRACTICES.value: "The query is related to best practices for using Weights & Biases",
@@ -70,7 +70,7 @@ QUERY_INTENTS = {
     "or libraries. Help with a detailed code snippet and explanation and ask for more information about the "
     "integration if needed",
     Labels.PRODUCT_FEATURES.value: "The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, "
-    "Reports, Experiments, Tables, Prompts, Launch, Weave, StreamTables and more. Provide a link to the relevant "
+    "Reports, Experiments, Tables, Prompts, Launch, Weave and more. Provide a link to the relevant "
     "documentation and explain the feature in detail",
     Labels.SALES_AND_GTM_RELATED.value: "The query is related to sales, marketing, or other business related topics "
     "such as pricing, billing, or partnerships etc. Ask the user to reach out to the relevant team by contacting "
@@ -262,7 +262,7 @@ class QueryEnhancer:
     def __init__(
         self,
         model: str = "gpt-4-0125-preview",
-        fallback_model: str = "gpt-4-1106-preview",
+        fallback_model: str = "gpt-4-0125-preview",
     ):
         self.model = model  # type: ignore
         self.fallback_model = fallback_model  # type: ignore
