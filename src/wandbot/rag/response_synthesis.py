@@ -92,7 +92,7 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     ("system", RESPONSE_SYNTHESIS_SYSTEM_PROMPT),
     (
         "human",
-        '<!--start-context-information-->\n\nsource: https://docs.wandb.ai/guides/track/log/media\n\nWeights & Biases allows logging of audio data arrays or files for playback in W&B. \nYou can use the `wandb.Audio()` to create audio instances and log them to W&B using `wandb.log()`.\n\nLog an audio array or file\nwandb.log({{"my whale song": wandb.Audio(array_or_path, caption="montery whale 0034", sample_rate=32)}})\n\n---\n\nsource: https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb\n\nLog multiple audio files\nLog audio within a W&B Table\n\nmy_table = wandb.Table(columns=["audio", "spectrogram", "bird_class", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)\n\nLog the Table to wandb\nwandb.log({{"validation_samples" : my_table}})\n\n<!--end-context-information-->\n<!--start-question-->\n\n**Question**: Hi How do I log audio using wandb?\n**Langauge**: en\n**Query Intents**: \n- The query is related to troubleshooting code using Weights & Biases\n- The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, Reports, Experiments, Tables, Prompts, Weave, StreamTables and more\n\n<!--end-question-->\n<!--final-answer-in-markdown-->\n',
+        '<!--start-context-information-->\n\nsource: https://docs.wandb.ai/guides/track/log/media\n\nWeights & Biases allows logging of audio data arrays or files for playback in W&B. \nYou can use the `wandb.Audio()` to create audio instances and log them to W&B using `wandb.log()`.\n\nLog an audio array or file\nwandb.log({{"my whale song": wandb.Audio(array_or_path, caption="montery whale 0034", sample_rate=32)}})\n\n---\n\nsource: https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb\n\nLog multiple audio files\nLog audio within a W&B Table\n\nmy_table = wandb.Table(columns=["audio", "spectrogram", "bird_class", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)\n\nLog the Table to wandb\nwandb.log({{"validation_samples" : my_table}})\n\n<!--end-context-information-->\n<!--start-question-->\n\n**Question**: Hi How do I log audio using wandb?\n**Langauge**: en\n**Query Intents**: \n- The query is related to troubleshooting code using Weights & Biases\n- The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, Reports, Experiments, Tables, Prompts, Weave, and more\n\n<!--end-question-->\n<!--final-answer-in-markdown-->\n',
     ),
     (
         "assistant",
@@ -120,10 +120,12 @@ class ResponseSynthesizer:
     def __init__(
         self,
         model: str = "gpt-4-0125-preview",
-        fallback_model: str = "gpt-4-1106-preview",
+        temperature: float = 0.1,
+        fallback_model: str = "gpt-4-0125-preview",
+        fallback_temperature: float = 0.1,
     ):
-        self.model = model  # type: ignore
-        self.fallback_model = fallback_model  # type: ignore
+        self.model = {"model_name": model, "temperature": temperature}  # type: ignore
+        self.fallback_model = {"model_name": fallback_model, "temperature": fallback_temperature}  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )

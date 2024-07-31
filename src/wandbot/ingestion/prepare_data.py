@@ -28,6 +28,7 @@ from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
+from nbformat.validator import normalize
 
 import wandb
 from wandbot.ingestion.config import (
@@ -330,6 +331,9 @@ class CodeDataLoader(DataLoader):
                     document = TextLoader(f_name).load()[0]
                     contents = document.page_content
                     notebook = nbformat.reads(contents, as_version=4)
+                    _, notebook = normalize(
+                        notebook, version=4, strip_invalid_metadata=True
+                    )  # Normalize the notebook
                     md_exporter = MarkdownExporter(template="classic")
                     (body, resources) = md_exporter.from_notebook_node(notebook)
                     cleaned_body = clean_contents(body)

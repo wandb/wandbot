@@ -1,8 +1,17 @@
+import os
 from typing import Any, Dict, List
 
 import requests
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from wandbot.utils import get_logger
+
+logger = get_logger(__name__)
+
+dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
+load_dotenv(dotenv_path)
 
 
 class YouSearchResults(BaseModel):
@@ -10,6 +19,7 @@ class YouSearchResults(BaseModel):
     web_context: List[Dict[str, Any]] = Field(
         [{}], description="context for the response"
     )
+    success: bool = Field(..., description="success of the web search")
 
 
 class YouSearchConfig(BaseSettings):
@@ -53,9 +63,18 @@ class YouSearch:
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
-                return YouSearchResults()
+                logger.error(
+                    f"Error in RAG web search, status code: {response.status_code}"
+                )
+                return YouSearchResults(success=False)
+            elif response.json()["error_code"].lower() == "payment required":
+                logger.error(
+                    f"Error in RAG web search, error code: {response.json()['error_code']}"
+                )
+                return YouSearchResults(success=False)
             else:
                 results = response.json()
+                logger.info(f"RAG web search results: {results}")
 
             snippets = [
                 f'Title: {hit["title"]}\nDescription: {hit["description"]}\n{hit["snippet"]}'
@@ -80,9 +99,11 @@ class YouSearch:
             return YouSearchResults(
                 web_answer=results["answer"],
                 web_context=search_hits[: self.config.top_k],
+                success=True,
             )
         except Exception as e:
-            return YouSearchResults()
+            logger.error(f"Error in RAG web search: {e}")
+            return YouSearchResults(success=False)
 
     def _retrieve(self, query: str) -> YouSearchResults:
         """Retrieve."""
@@ -96,7 +117,15 @@ class YouSearch:
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
-                return YouSearchResults()
+                logger.error(
+                    f"Error in retrieve web search, Status code: {response.status_code}"
+                )
+                return YouSearchResults(success=False)
+            elif response.json()["error_code"].lower() == "payment required":
+                logger.error(
+                    f"Error in retrieve web search, error code: {response.json()['error_code']}"
+                )
+                return YouSearchResults(success=False)
             else:
                 results = response.json()
 
@@ -123,17 +152,17 @@ class YouSearch:
             return YouSearchResults(
                 web_answer="",
                 web_context=search_hits[: self.config.top_k],
+                success=True,
             )
         except Exception as e:
-            print(e)
-            return YouSearchResults()
+            logger.error(f"Error in retrieve web search: {e}")
+            return YouSearchResults(success=False)
 
     def __call__(
         self,
         question: str,
-    ) -> Dict[str, Any]:
+    ) -> YouSearchResults:
         if self.config.search_type == "rag":
-            web_results = self._rag(question)
+            return self._rag(question)
         else:
-            web_results = self._retrieve(question)
-        return web_results.dict()
+            return self._retrieve(question)

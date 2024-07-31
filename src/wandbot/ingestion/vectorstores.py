@@ -16,7 +16,7 @@ import json
 import pathlib
 from typing import List
 
-from langchain_community.vectorstores.chroma import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
@@ -61,7 +61,8 @@ def load(
 
     # Todo: Change to LiteLLM Embeddings
     embedding_fn = OpenAIEmbeddings(
-        model=config.embeddings_model, dimensions=config.embedding_dim
+        model=config.embedding_model_name,
+        dimensions=config.embedding_dimensions,
     )
     vectorstore_dir = config.persist_dir
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
@@ -77,14 +78,13 @@ def load(
                 transformed_documents.append(Document(**json.loads(line)))
 
     chroma = Chroma(
-        collection_name=config.name,
+        collection_name=config.collection_name,
         embedding_function=embedding_fn,
         persist_directory=str(config.persist_dir),
     )
     for batch_idx in trange(0, len(transformed_documents), config.batch_size):
         batch = transformed_documents[batch_idx : batch_idx + config.batch_size]
         chroma.add_documents(batch)
-    chroma.persist()
 
     result_artifact = wandb.Artifact(
         name=result_artifact_name,

@@ -61,3 +61,4 @@ class ChatResponse(BaseModel):
     time_taken: float
     start_time: datetime
     end_time: datetime
+    api_call_statuses: dict = {}

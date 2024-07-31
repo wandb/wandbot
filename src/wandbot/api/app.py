@@ -33,6 +33,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+import dotenv
 import pandas as pd
 import weave
 from fastapi import BackgroundTasks, FastAPI
@@ -41,6 +42,7 @@ import wandb
 from wandbot.api.routers import chat as chat_router
 from wandbot.api.routers import database as database_router
 from wandbot.api.routers import retrieve as retrieve_router
+from wandbot.chat.chat import ChatConfig
 from wandbot.database.database import engine
 from wandbot.database.models import Base
 from wandbot.ingestion.config import VectorStoreConfig
@@ -50,20 +52,39 @@ from wandbot.utils import get_logger
 logger = get_logger(__name__)
 last_backup = datetime.now().astimezone(timezone.utc)
 
+dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
+dotenv.load_dotenv(dotenv_path)
+
+# turn off chromadb telemetry
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+
 weave.init(f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}")
 
 is_initialized = False
 
 
 async def initialize():
+    logger.info(f"Initializing wandbot")
     global is_initialized
     if not is_initialized:
         vector_store = VectorStore.from_config(VectorStoreConfig())
-        chat_router.chat = chat_router.Chat(vector_store=vector_store)
-        database_router.db_client = database_router.DatabaseClient()
-        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-            vector_store=vector_store
+        chat_config = ChatConfig()
+        chat_router.chat = chat_router.Chat(
+            vector_store=vector_store, config=chat_config
         )
+        logger.info(f"Initialized chat router")
+        database_router.db_client = database_router.DatabaseClient()
+        logger.info(f"Initialized database client")
+
+        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            vector_store=vector_store,
+            rerank_models={
+                "english_reranker_model": chat_config.english_reranker_model,
+                "multilingual_reranker_model": chat_config.multilingual_reranker_model,
+            },
+        )
+        logger.info(f"Initialized retrieve router")
+        logger.info(f"wandbot initialization complete")
         is_initialized = True
 
 
@@ -121,7 +142,9 @@ app = FastAPI(
 
 @app.get("/")
 async def root(background_tasks: BackgroundTasks):
+    logger.info("Received request to root endpoint")
     background_tasks.add_task(initialize)
+    logger.info("Added initialize task to background tasks")
     return {"message": "Initialization started in the background"}
 
 
