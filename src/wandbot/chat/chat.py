@@ -47,11 +47,7 @@ class Chat:
         run: An instance of wandb.Run for logging experiment information.
     """
 
-    def __init__(
-        self, 
-        vector_store: VectorStore, 
-        config: ChatConfig
-    ):
+    def __init__(self, vector_store: VectorStore, config: ChatConfig):
         """Initializes the Chat instance.
 
         Args:
@@ -110,7 +106,9 @@ class Chat:
                 "total_tokens": result.total_tokens,
                 "prompt_tokens": result.prompt_tokens,
                 "completion_tokens": result.completion_tokens,
-                "web_search_success": result.api_call_statuses["web_search_success"],
+                "web_search_success": result.api_call_statuses[
+                    "web_search_success"
+                ],
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)

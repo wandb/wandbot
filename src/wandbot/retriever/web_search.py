@@ -1,17 +1,18 @@
 import os
-import requests
 from typing import Any, Dict, List
 
+import requests
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import load_dotenv
 
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '../../../.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
 load_dotenv(dotenv_path)
+
 
 class YouSearchResults(BaseModel):
     web_answer: str = Field("", description="response from you.com RAG model")
@@ -62,10 +63,14 @@ class YouSearch:
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
-                logger.error(f"Error in RAG web search, status code: {response.status_code}")
+                logger.error(
+                    f"Error in RAG web search, status code: {response.status_code}"
+                )
                 return YouSearchResults(success=False)
             elif response.json()["error_code"].lower() == "payment required":
-                logger.error(f"Error in RAG web search, error code: {response.json()['error_code']}")
+                logger.error(
+                    f"Error in RAG web search, error code: {response.json()['error_code']}"
+                )
                 return YouSearchResults(success=False)
             else:
                 results = response.json()
@@ -94,7 +99,7 @@ class YouSearch:
             return YouSearchResults(
                 web_answer=results["answer"],
                 web_context=search_hits[: self.config.top_k],
-                success=True
+                success=True,
             )
         except Exception as e:
             logger.error(f"Error in RAG web search: {e}")
@@ -112,10 +117,14 @@ class YouSearch:
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
-                logger.error(f"Error in retrieve web search, Status code: {response.status_code}")
+                logger.error(
+                    f"Error in retrieve web search, Status code: {response.status_code}"
+                )
                 return YouSearchResults(success=False)
             elif response.json()["error_code"].lower() == "payment required":
-                logger.error(f"Error in retrieve web search, error code: {response.json()['error_code']}")
+                logger.error(
+                    f"Error in retrieve web search, error code: {response.json()['error_code']}"
+                )
                 return YouSearchResults(success=False)
             else:
                 results = response.json()
@@ -143,7 +152,7 @@ class YouSearch:
             return YouSearchResults(
                 web_answer="",
                 web_context=search_hits[: self.config.top_k],
-                success=True
+                success=True,
             )
         except Exception as e:
             logger.error(f"Error in retrieve web search: {e}")
@@ -156,4 +165,4 @@ class YouSearch:
         if self.config.search_type == "rag":
             return self._rag(question)
         else:
-           return self._retrieve(question)
+            return self._retrieve(question)

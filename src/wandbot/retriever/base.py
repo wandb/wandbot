@@ -1,12 +1,12 @@
 from operator import itemgetter
 from typing import List
 
-from langchain_community.document_transformers import EmbeddingsRedundantFilter
+import weave
 from langchain_chroma import Chroma
+from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
-import weave
 import wandb
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
@@ -75,9 +75,9 @@ class VectorStore:
 class SimpleRetrievalEngine:
     cohere_rerank_chain = CohereRerankChain()
 
-    def __init__(self, vector_store: VectorStore, rerank_models:dict):
+    def __init__(self, vector_store: VectorStore, rerank_models: dict):
         self.vector_store = vector_store
-        self.cohere_rerank_chain = rerank_models # type: ignore
+        self.cohere_rerank_chain = rerank_models  # type: ignore
         self.embeddings_model = self.vector_store.embeddings_model
         self.redundant_filter = EmbeddingsRedundantFilter(
             embeddings=self.embeddings_model

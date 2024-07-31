@@ -1,5 +1,4 @@
 import weave
-
 from langchain_cohere import CohereRerank
 from langchain_core.runnables import RunnableBranch
 

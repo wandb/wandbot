@@ -4,8 +4,8 @@ from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
 
-from wandbot.utils import clean_document_content
 from wandbot.retriever.web_search import YouSearchResults
+from wandbot.utils import clean_document_content
 
 
 class ChatModel:

@@ -63,8 +63,8 @@ class RAGPipeline:
         self.vector_store = vector_store
         self.query_enhancer = QueryEnhancer()
         self.retrieval = FusionRetrieval(
-            vector_store=vector_store, 
-            top_k=top_k, 
+            vector_store=vector_store,
+            top_k=top_k,
             search_type=search_type,
             english_reranker_model=english_reranker_model,
             multilingual_reranker_model=multilingual_reranker_model,

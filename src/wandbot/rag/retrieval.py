@@ -5,17 +5,19 @@ import weave
 from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
+from pydantic import BaseModel
 
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
 
 class WebSearchResults(BaseModel):
     web_search_success: bool
     web_contexts: List
+
 
 @weave.op()
 def reciprocal_rank_fusion(results: list[list[Document]], k=60):
@@ -37,6 +39,7 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     ranked_results = [text_to_doc[text] for text in ranked_results.keys()]
     return ranked_results
 
+
 @weave.op()
 def run_web_search(query, avoid=False) -> WebSearchResults:
     try:
@@ -51,7 +54,9 @@ def run_web_search(query, avoid=False) -> WebSearchResults:
         if web_results.success:
             web_contexts = get_web_contexts(web_results)
         else:
-            logger.debug(f"Issue running web search, web_results: {web_results}")
+            logger.debug(
+                f"Issue running web search, web_results: {web_results}"
+            )
             web_contexts = []
         return WebSearchResults(
             web_search_success=web_results.success,
@@ -95,14 +100,20 @@ class FusionRetrieval:
         language: str = "en",
     ):
         if language == "en":
-            reranker = CohereRerank(top_n=top_k, model=self.english_reranker_model)
+            reranker = CohereRerank(
+                top_n=top_k, model=self.english_reranker_model
+            )
         else:
-            reranker = CohereRerank(top_n=top_k, model=self.multilingual_reranker_model)
+            reranker = CohereRerank(
+                top_n=top_k, model=self.multilingual_reranker_model
+            )
 
         query = "\n".join(queries)
-        ranked_results = reranker.compress_documents(documents=context, query=query)
+        ranked_results = reranker.compress_documents(
+            documents=context, query=query
+        )
         return ranked_results
-    
+
     @weave.op()
     def retriever_batch(self, queries):
         """wrapped for weave tracking"""
@@ -123,7 +134,9 @@ class FusionRetrieval:
                 | RunnablePassthrough().assign(
                     full_context=lambda x: x["docs_context"]
                     + [x["search_results"].web_contexts],
-                    web_search_success=lambda x: x["search_results"].web_search_success,
+                    web_search_success=lambda x: x[
+                        "search_results"
+                    ].web_search_success,
                 )
                 | RunnablePassthrough().assign(
                     fused_context=lambda x: reciprocal_rank_fusion(
