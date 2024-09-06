@@ -101,8 +101,6 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
 
-    await initialize()
-
     async def backup_db():
         """Periodically backs up the database to a table.
 
@@ -144,7 +142,11 @@ app = FastAPI(
 
 @app.get("/")
 async def root(background_tasks: BackgroundTasks):
-    return {"message": "Initialization happened in the background"}
+    logger.info("Received request to root endpoint")
+    background_tasks.add_task(initialize)
+    logger.info("Added initialize task to background tasks")
+    return {"message": "Initialization started in the background"}
+
 
 app.include_router(chat_router.router)
 app.include_router(database_router.router)
