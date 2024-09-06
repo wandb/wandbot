@@ -101,6 +101,10 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
 
+    if os.getenv("WANDBOT_EVALUATION"):
+        logger.info("Lifespan starting, initializing wandbot for evaluation mode.")
+        await initialize()
+
     async def backup_db():
         """Periodically backs up the database to a table.
 

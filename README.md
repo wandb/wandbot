@@ -115,7 +115,7 @@ set -o allexport; source .env; set +o allexport
 Launch the wandbot with 8 workers. This speeds up evaluation
 
 ```
-gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=200 --workers=8 --worker-class uvicorn.workers.UvicornWorker
+WANDBOT_EVALUATION=1 gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=200 --workers=8 --worker-class uvicorn.workers.UvicornWorker
 ```
 
 Launch W&B Weave evaluation
