@@ -123,8 +123,7 @@ app = FastAPI(
 
 @app.get("/")
 async def root(background_tasks: BackgroundTasks):
-    background_tasks.add_task(initialize)
-    return {"message": "Initialization started in the background"}
+    return {"message": "Initialization happened background"}
 
 
 app.include_router(chat_router.router)
