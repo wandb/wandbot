@@ -1,15 +1,25 @@
+import logging
 from typing import Any, Dict, List
 
 import weave
 from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
+from pydantic import BaseModel
 
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
 
+logger = logging.getLogger(__name__)
 
+
+class WebSearchResults(BaseModel):
+    web_search_success: bool
+    web_contexts: List
+
+
+@weave.op()
 def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     text_to_doc = {}
     fused_scores = {}
@@ -30,31 +40,34 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     return ranked_results
 
 
-def run_web_search(query, avoid=False) -> list:
+@weave.op()
+def run_web_search(query, avoid=False) -> WebSearchResults:
     try:
         if avoid:
-            return []
+            logger.debug(f"Skipping web search, avoid: {avoid}")
+            return WebSearchResults(
+                web_search_success=False,
+                web_contexts=[],
+            )
         yousearch = YouSearch(YouSearchConfig())
         web_results = yousearch(query)
-        return get_web_contexts(web_results)
+        if web_results.success:
+            web_contexts = get_web_contexts(web_results)
+        else:
+            logger.debug(
+                f"Issue running web search, web_results: {web_results}"
+            )
+            web_contexts = []
+        return WebSearchResults(
+            web_search_success=web_results.success,
+            web_contexts=web_contexts,
+        )
     except Exception as e:
-        return []
-
-
-def rerank_results(
-    queries: List[str],
-    context: List[Document],
-    top_k: int = 5,
-    language: str = "en",
-):
-    if language == "en":
-        reranker = CohereRerank(top_n=top_k, model="rerank-english-v2.0")
-    else:
-        reranker = CohereRerank(top_n=top_k, model="rerank-multilingual-v2.0")
-
-    query = "\n".join(queries)
-    ranked_results = reranker.compress_documents(documents=context, query=query)
-    return ranked_results
+        logger.error(f"Error running web search: {e}")
+        return WebSearchResults(
+            web_search_success=False,
+            web_contexts=[],
+        )
 
 
 class FusionRetrieval:
@@ -63,6 +76,8 @@ class FusionRetrieval:
         vector_store: VectorStore,
         top_k: int = 5,
         search_type: str = "mmr",
+        english_reranker_model: str = "rerank-english-v2.0",
+        multilingual_reranker_model: str = "rerank-multilingual-v2.0",
     ):
         self.vectorstore = vector_store
         self.top_k = top_k
@@ -73,22 +88,55 @@ class FusionRetrieval:
         )
 
         self._chain = None
+        self.english_reranker_model = english_reranker_model
+        self.multilingual_reranker_model = multilingual_reranker_model
+
+    @weave.op()
+    def rerank_results(
+        self,
+        queries: List[str],
+        context: List[Document],
+        top_k: int = 5,
+        language: str = "en",
+    ):
+        if language == "en":
+            reranker = CohereRerank(
+                top_n=top_k, model=self.english_reranker_model
+            )
+        else:
+            reranker = CohereRerank(
+                top_n=top_k, model=self.multilingual_reranker_model
+            )
+
+        query = "\n".join(queries)
+        ranked_results = reranker.compress_documents(
+            documents=context, query=query
+        )
+        return ranked_results
+
+    @weave.op()
+    def retriever_batch(self, queries):
+        """wrapped for weave tracking"""
+        return self.retriever.batch(queries)
 
     @property
     def chain(self) -> Runnable:
         if self._chain is None:
             self._chain = (
                 RunnablePassthrough().assign(
-                    docs_context=lambda x: self.retriever.batch(
+                    docs_context=lambda x: self.retriever_batch(
                         x["all_queries"]
                     ),
-                    web_context=lambda x: run_web_search(
+                    search_results=lambda x: run_web_search(
                         x["standalone_query"], x["avoid_query"]
                     ),
                 )
                 | RunnablePassthrough().assign(
                     full_context=lambda x: x["docs_context"]
-                    + [x["web_context"]]
+                    + [x["search_results"].web_contexts],
+                    web_search_success=lambda x: x[
+                        "search_results"
+                    ].web_search_success,
                 )
                 | RunnablePassthrough().assign(
                     fused_context=lambda x: reciprocal_rank_fusion(
@@ -96,7 +144,7 @@ class FusionRetrieval:
                     )
                 )
                 | RunnablePassthrough().assign(
-                    context=lambda x: rerank_results(
+                    context=lambda x: self.rerank_results(
                         [x["standalone_query"]],
                         x["fused_context"],
                         self.top_k,

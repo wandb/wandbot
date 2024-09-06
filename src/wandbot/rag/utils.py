@@ -4,12 +4,12 @@ from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
 
+from wandbot.retriever.web_search import YouSearchResults
 from wandbot.utils import clean_document_content
 
 
 class ChatModel:
-    def __init__(self, temperature: float = 0.1, max_retries: int = 2):
-        self.temperature = temperature
+    def __init__(self, max_retries: int = 2):
         self.max_retries = max_retries
 
     def __set_name__(self, owner, name):
@@ -22,8 +22,8 @@ class ChatModel:
 
     def __set__(self, obj, value):
         model = ChatOpenAI(
-            model_name=value,
-            temperature=self.temperature,
+            model_name=value["model_name"],
+            temperature=value["temperature"],
             max_retries=self.max_retries,
         )
         setattr(obj, self.private_name, model)
@@ -92,7 +92,7 @@ def process_input_for_retrieval(retrieval_input):
     return retrieval_input
 
 
-def get_web_contexts(web_results):
+def get_web_contexts(web_results: YouSearchResults):
     output_documents = []
     if not web_results:
         return []
@@ -102,8 +102,8 @@ def get_web_contexts(web_results):
             Document(
                 page_content=document["context"], metadata=document["metadata"]
             )
-            for document in web_results["web_context"]
+            for document in web_results.web_context
         ]
-        if web_results.get("web_context")
+        if web_results.web_context
         else []
     )

@@ -17,7 +17,7 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from wandbot.utils import get_logger
 
@@ -273,10 +273,14 @@ class FCReportsStoreConfig(DataStoreConfig):
 
 
 class VectorStoreConfig(BaseSettings):
-    name: str = "vectorstore"
-    embeddings_model: str = "text-embedding-3-small"
-    embedding_dim: int = 512
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
+    collection_name: str = "vectorstore"
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
+    embedding_model_name: str = "text-embedding-3-small"
+    tokenizer_model_name: str = "text-embedding-ada-002"
+    embedding_dimensions: int = 512
     batch_size: int = 256
     artifact_url: str = Field(
         "wandbot/wandbot-dev/chroma_index:latest",
