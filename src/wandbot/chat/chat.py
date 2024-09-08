@@ -112,6 +112,7 @@ class Chat:
             }
             result_dict.update({"application": chat_request.application})
             self.run.log(usage_stats)
+            
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:
@@ -133,4 +134,5 @@ class Chat:
                     "end_time": timer.stop,
                 }
             )
+
             return ChatResponse(**result)
