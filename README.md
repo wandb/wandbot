@@ -19,12 +19,17 @@ This release introduces a number of exciting updates and improvements:
 These updates are part of our ongoing commitment to improve performance and usability.
 
 ## Evaluation
-
+English
 | wandbot version  | Comment  | response accuracy |
 |---|---|---|
-| 1.0.0 | our baseline wandbot |  53.78 % |
-| 1.1.0 | improvement over baseline; in production for the longest | 72.45 %  | 
-| 1.2.0 | our new enhanced wandbot | 81.63 % |
+| 1.0.0 | our baseline wandbot |  53.8 % |
+| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 
+| 1.2.0 | our new enhanced wandbot | 81.6 % |
+
+Japanese
+| wandbot version  | Comment  | response accuracy |
+| 1.2.0-jp | our new enhanced wandbot | 56.3 % |
+| 1.2.1-jp | add translation process | 71.9 % |
 
 ## Features
 
@@ -78,6 +83,7 @@ SLACK_JA_APP_TOKEN
 SLACK_JA_BOT_TOKEN
 SLACK_JA_SIGNING_SECRET
 WANDB_API_KEY
+YOU_API_KEY
 DISCORD_BOT_TOKEN
 COHERE_API_KEY
 WANDBOT_API_URL="http://localhost:8000"
@@ -119,7 +125,13 @@ WANDBOT_EVALUATION=1 gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=
 ```
 
 Launch W&B Weave evaluation
-
+set up wandbot/src/wandbot/evaluation/config.py
+- evaluation_strategy_name : attribute name in Weave Evaluation dashboard
+- eval_dataset : 
+    - Latest English evaluation dataset: "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
+    - Latest Japanese evaluation dataset: "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
+- language : language for application (en or ja)
+Then run,
 ```
 python src/wandbot/evaluation/weave_eval/main.py
 ```
