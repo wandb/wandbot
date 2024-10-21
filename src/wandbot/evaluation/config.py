@@ -8,10 +8,6 @@ class EvalConfig(BaseSettings):
         "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
         ,description="Dataset reference for evaluation"
     )
-    # en evaluation dataset: "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
-    # jp evaluation dataset: "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
-    # jp small evaluation dataset: "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp_test:Qp5qAlNYhzLJSfDZONaBNDzjhEmlfOTXNI1NvYhELKQ"
-
     language: str = Field("ja", description="language for application (en or ja)")
 
     eval_judge_model: str = Field(
@@ -20,4 +16,4 @@ class EvalConfig(BaseSettings):
         validation_alias="eval_judge_model",
     )
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
-    wandb_project: str = Field("wandbot-eval-jp", env="WANDB_PROJECT")
+    wandb_project: str = Field("wandbot-eval", env="WANDB_PROJECT")
