@@ -18,7 +18,7 @@ question_rows = [
     } for row in question_rows
 ]
 
-def translate_with_claude(text: str) -> str:
+def translate_with_openai(text: str) -> str:
     # Get the OpenAI API key from environment variables
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
