@@ -19,12 +19,19 @@ This release introduces a number of exciting updates and improvements:
 These updates are part of our ongoing commitment to improve performance and usability.
 
 ## Evaluation
-
+English 
 | wandbot version  | Comment  | response accuracy |
 |---|---|---|
-| 1.0.0 | our baseline wandbot |  53.78 % |
-| 1.1.0 | improvement over baseline; in production for the longest | 72.45 %  | 
-| 1.2.0 | our new enhanced wandbot | 81.63 % |
+| 1.0.0 | our baseline wandbot |  53.8 % |
+| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 
+| 1.2.0 | our new enhanced wandbot | 81.6 % |
+
+
+Japanese
+| wandbot version  | Comment  | response accuracy |
+|---|---|---|
+| 1.2.0 | our new enhanced wandbot | 56.3 % |
+| 1.2.1 | add translation process | 71.9 % |
 
 ## Features
 
@@ -118,8 +125,20 @@ Launch the wandbot with 8 workers. This speeds up evaluation
 WANDBOT_EVALUATION=1 gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=200 --workers=8 --worker-class uvicorn.workers.UvicornWorker
 ```
 
-Launch W&B Weave evaluation
 
+
+Set up for evaluation
+
+wandbot/src/wandbot/evaluation/config.py
+- `evaluation_strategy_name` : attribute name in Weave Evaluation dashboard
+- `eval_dataset` : 
+    - [Latest English evaluation dataset](https://wandb.ai/wandbot/wandbot-eval/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval%2Fobjects%2Fwandbot_eval_data%2Fversions%2FeCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU%3F%26): "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
+    - [Latest Japanese evaluation dataset](https://wandb.ai/wandbot/wandbot-eval-jp/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval-jp%2Fobjects%2Fwandbot_eval_data_jp%2Fversions%2FoCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA%3F%26): "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
+- `eval_judge_model` : model used for judge
+- `wandb_entity` : wandb entity name for record
+- `wandb_project` : wandb project name for record
+
+Launch W&B Weave evaluation
 ```
 python src/wandbot/evaluation/weave_eval/main.py
 ```

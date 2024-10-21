@@ -3,30 +3,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class EvalConfig(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    evaluation_strategy_name: str = Field("jp v1.2.0-beta", description="Will be shown in evaluation page, and be used for just visibility")
+    eval_dataset: str = Field(
+        "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
+        ,description="Dataset reference for evaluation"
     )
-    eval_artifact: str = Field(
-        "wandbot/wandbot-eval/autoeval_dataset:v3",
-        env="EVAL_ARTIFACT",
-        validation_alias="eval_artifact",
-    )
-    eval_artifact_root: str = Field(
-        "data/eval",
-        env="EVAL_ARTIFACT_ROOT",
-        validation_alias="eval_artifact_root",
-    )
+    language: str = Field("ja", description="language for application (en or ja)")
 
-    eval_annotations_file: str = Field(
-        "wandbot_cleaned_annotated_dataset_11-12-2023.jsonl",
-        env="EVAL_ANNOTATIONS_FILE",
-        validation_alias="eval_annotations_file",
-    )
-    eval_output_file: str = Field(
-        "eval.jsonl",
-        env="EVAL_OUTPUT_FILE",
-        validation_alias="eval_output_file",
-    )
     eval_judge_model: str = Field(
         "gpt-4-1106-preview",
         env="EVAL_JUDGE_MODEL",
