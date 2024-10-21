@@ -85,7 +85,6 @@ SLACK_JA_APP_TOKEN
 SLACK_JA_BOT_TOKEN
 SLACK_JA_SIGNING_SECRET
 WANDB_API_KEY
-YOU_API_KEY
 DISCORD_BOT_TOKEN
 COHERE_API_KEY
 WANDBOT_API_URL="http://localhost:8000"
@@ -131,11 +130,13 @@ WANDBOT_EVALUATION=1 gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=
 Set up for evaluation
 
 wandbot/src/wandbot/evaluation/config.py
-- evaluation_strategy_name : attribute name in Weave Evaluation dashboard
-- eval_dataset : 
-    - Latest English evaluation dataset: "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
-    - Latest Japanese evaluation dataset: "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
-- language : language for application (en or ja)
+- `evaluation_strategy_name` : attribute name in Weave Evaluation dashboard
+- `eval_dataset` : 
+    - [Latest English evaluation dataset](https://wandb.ai/wandbot/wandbot-eval/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval%2Fobjects%2Fwandbot_eval_data%2Fversions%2FeCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU%3F%26): "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
+    - [Latest Japanese evaluation dataset](https://wandb.ai/wandbot/wandbot-eval-jp/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval-jp%2Fobjects%2Fwandbot_eval_data_jp%2Fversions%2FoCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA%3F%26): "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
+- `eval_judge_model` : model used for judge
+- `wandb_entity` : wandb entity name for record
+- `wandb_project` : wandb project name for record
 
 Launch W&B Weave evaluation
 ```
