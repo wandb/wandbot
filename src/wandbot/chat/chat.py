@@ -244,11 +244,13 @@ class Chat:
             An instance of `ChatResponse` representing the chat response.
         """
         original_language = chat_request.language
+        translation = True
+
         try:
-            if original_language == "ja" or original_language == "ko":
+            if translation:
                 if original_language == "ja":
                     translated_question = self._translate_ja_to_en(chat_request.question)
-                else:
+                elif  original_language == "kr":
                     translated_question = self._translate_kr_to_en(chat_request.question)
                 chat_request.language = "en"
                 chat_request = ChatRequest(
@@ -264,10 +266,11 @@ class Chat:
 
             result_dict = result.model_dump()
 
-            if original_language == "ja":
-                result_dict["answer"] = self._translate_en_to_ja(result_dict["answer"])
-            elif original_language == "ko":
-                result_dict["answer"] = self._translate_en_to_kr(result_dict["answer"])
+            if translation:
+                if original_language == "ja":
+                    result_dict["answer"] = self._translate_en_to_ja(result_dict["answer"])
+                elif original_language == "kr":
+                    result_dict["answer"] = self._translate_en_to_kr(result_dict["answer"])
 
             usage_stats = {
                 "total_tokens": result.total_tokens,
