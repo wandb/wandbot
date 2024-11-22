@@ -65,6 +65,7 @@ async def get_eval_record(
     return {
         "system_prompt": response["system_prompt"],
         "generated_answer": response["answer"],
+        "retrieved_contexts": response["source_documents"],
         "retrieved_contexts_individual": parse_text_to_json(response["source_documents"]),
         "model": response["model"],
         "total_tokens": response["total_tokens"],
