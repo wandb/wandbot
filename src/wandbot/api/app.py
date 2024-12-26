@@ -29,7 +29,6 @@ async def initialize():
 
             # Check disk usage
             disk_info = log_disk_usage()
-            # # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             initial_disk_used = disk_info['used_mb']
             logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
@@ -51,7 +50,6 @@ async def initialize():
 
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_0 = disk_info['used_mb']
             logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
@@ -73,7 +71,6 @@ async def initialize():
 
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_1 = disk_info['used_mb']
             logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
@@ -111,10 +108,10 @@ async def initialize():
             
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_2 = disk_info['used_mb']
             logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
+            
             # 3/5: Init Chat
             try:
                 logger.info("STARTUP: 3/5, 💬 Starting Chat initialization")
@@ -139,7 +136,6 @@ async def initialize():
             
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_3 = disk_info['used_mb']
             logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
@@ -171,7 +167,6 @@ async def initialize():
 
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_4 = disk_info['used_mb']
             logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
@@ -192,7 +187,6 @@ async def initialize():
             
             # Check disk usage
             disk_info = log_disk_usage()
-            # if os.getenv("LOG_LEVEL") == "DEBUG":
             log_top_disk_usage()
             disk_used_5 = disk_info['used_mb']
             logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
@@ -294,12 +288,11 @@ async def status():
 
 
 @app.get("/")
-async def root(background_tasks: BackgroundTasks):
+async def root():
     global is_initializing, is_initialized
     return {
         "is_initializing": is_initializing,
         "is_initialized": is_initialized,
-        "message": "Hello.",
     }
 
 
