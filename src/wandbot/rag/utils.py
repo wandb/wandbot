@@ -2,13 +2,15 @@ import json
 
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
-from langchain_openai import ChatOpenAI
+import litellm
 
 from wandbot.retriever.web_search import YouSearchResults
 from wandbot.utils import clean_document_content
 
 
 class ChatModel:
+    """Chat model descriptor that wraps LiteLLM for provider-agnostic interface."""
+    
     def __init__(self, max_retries: int = 2):
         self.max_retries = max_retries
 
@@ -21,12 +23,61 @@ class ChatModel:
         return value
 
     def __set__(self, obj, value):
-        model = ChatOpenAI(
-            model_name=value["model_name"],
-            temperature=value["temperature"],
-            max_retries=self.max_retries,
-        )
-        setattr(obj, self.private_name, model)
+        """Configure LiteLLM with the given model settings.
+        
+        Args:
+            value: Dictionary containing:
+                - model_name: Name of the model to use (e.g., "openai/gpt-4")
+                - temperature: Sampling temperature between 0 and 1
+                - fallback_models: Optional list of fallback models
+        """
+        if not 0 <= value["temperature"] <= 1:
+            raise ValueError("Temperature must be between 0 and 1")
+
+        # Configure LiteLLM
+        litellm.drop_params = True  # Remove unsupported params
+        litellm.set_verbose = False
+        litellm.success_callback = []
+        litellm.failure_callback = []
+        
+        # Configure fallbacks
+        litellm.model_fallbacks = {}  # Reset fallbacks
+        litellm.fallbacks = False  # Reset fallbacks flag
+        if value.get("fallback_models"):
+            litellm.model_fallbacks = {
+                value["model_name"]: value["fallback_models"]
+            }
+            litellm.fallbacks = True
+
+        # Create completion function
+        def completion_fn(messages, **kwargs):
+            try:
+                response = litellm.completion(
+                    model=value["model_name"],
+                    messages=messages,
+                    temperature=value["temperature"],
+                    num_retries=self.max_retries,
+                    **kwargs
+                )
+                return response
+            except Exception as e:
+                # Return error response
+                return type("Response", (), {
+                    "choices": [
+                        type("Choice", (), {
+                            "message": type("Message", (), {
+                                "content": ""
+                            })()
+                        })()
+                    ],
+                    "error": {
+                        "type": type(e).__name__,
+                        "message": str(e)
+                    },
+                    "model": value["model_name"]
+                })()
+
+        setattr(obj, self.private_name, completion_fn)
 
 
 DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(

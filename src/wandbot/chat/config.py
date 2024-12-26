@@ -36,7 +36,7 @@ class ChatConfig(BaseSettings):
     english_reranker_model: str = "rerank-english-v2.0"
     multilingual_reranker_model: str = "rerank-multilingual-v2.0"
     # Response synthesis settings
-    response_synthesizer_model: str = "gpt-4-0125-preview"
+    response_synthesizer_model: str = "openai/gpt-4-0125-preview"  # Format: provider/model_name
     response_synthesizer_temperature: float = 0.1
-    response_synthesizer_fallback_model: str = "gpt-4-0125-preview"
+    response_synthesizer_fallback_model: str = "openai/gpt-4-0125-preview"  # Format: provider/model_name
     response_synthesizer_fallback_temperature: float = 0.1
