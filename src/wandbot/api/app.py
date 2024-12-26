@@ -7,6 +7,7 @@ from wandbot.database.models import Base
 import os
 import shutil
 from pathlib import Path
+from typing import Dict
 
 logger = get_logger(__name__)
 
@@ -14,28 +15,47 @@ is_initialized = False
 is_initializing = False
 
 
-def get_disk_usage():
+def get_disk_usage() -> Dict:
+    """
+    Get disk usage information and return it as a dictionary.
+    Can be used both as a helper function and route handler.
+    """
     try:
         total, used, free = shutil.disk_usage("/")
         current_dir = Path(".")
         current_dir_size = sum(
             f.stat().st_size for f in current_dir.glob("**/*") if f.is_file()
         )
+        
+        # Calculate values in GB
         total_gb = total // (2**30)
         used_gb = used // (2**30)
         free_gb = free // (2**30)
         current_dir_gb = current_dir_size // (2**30)
+        usage_percentage = (used * 100 // total)
+        
+        # Create response dictionary
+        disk_info = {
+            "total_gb": total_gb,
+            "used_gb": used_gb,
+            "free_gb": free_gb,
+            "current_dir_gb": current_dir_gb,
+            "usage_percentage": usage_percentage
+        }
+        
+        # Log the information
         logger.info(f"DISK USAGE: 💾 Total Disk Size: {total_gb} GB")
         logger.info(f"DISK USAGE: 📊 Used Space: {used_gb} GB")
         logger.info(f"DISK USAGE: ✨ Free Space: {free_gb} GB")
-        logger.info(
-            f"DISK USAGE: 📂 Current Directory Size: {current_dir_gb} GB"
-        )
-        logger.info(
-            f"DISK USAGE: 💯 Disk Usage Percentage: {(used * 100 // total)}%"
-        )
+        logger.info(f"DISK USAGE: 📂 Current Directory Size: {current_dir_gb} GB")
+        logger.info(f"DISK USAGE: 💯 Disk Usage Percentage: {usage_percentage}%")
+        
+        return disk_info
+        
     except Exception as e:
-        logger.error(f"❌ Error getting disk usage: {str(e)}")
+        error_msg = f"❌ Error getting disk usage: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg}
 
 
 async def initialize():
@@ -77,7 +97,9 @@ async def initialize():
                 raise
 
             try:
-                get_disk_usage()
+                disk_info = get_disk_usage()
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
@@ -112,7 +134,9 @@ async def initialize():
                 raise
 
             try:
-                get_disk_usage()
+                disk_info = get_disk_usage()
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
@@ -138,7 +162,9 @@ async def initialize():
                 raise
 
             try:
-                get_disk_usage()
+                disk_info = get_disk_usage()
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
@@ -180,7 +206,9 @@ async def initialize():
                 logger.error(f"STARTUP: 5/5 ❌, Error: {e}")
 
             try:
-                get_disk_usage()
+                disk_info = get_disk_usage()
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
