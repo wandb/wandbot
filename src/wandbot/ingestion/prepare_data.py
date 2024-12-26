@@ -727,7 +727,7 @@ class FCReportsDataLoader(DataLoader):
                     .encode("raw_unicode_escape")
                     .decode("unicode_escape")
                 )
-            except UnicodeDecodeError as e:
+            except UnicodeDecodeError:
                 # fix escape characters with raw_unicode_escape
                 content = self.clean_invalid_unicode_escapes(
                     row_dict["content"]

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from starlette import status
-from pydantic import BaseModel
 from wandbot.chat.schemas import ChatRequest, ChatResponse  
 from wandbot.utils import get_logger
 

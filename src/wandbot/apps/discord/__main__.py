@@ -60,7 +60,7 @@ async def on_message(message: discord.Message):
                 or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
             ):
                 thread = await message.channel.create_thread(
-                    name=f"Thread", type=discord.ChannelType.public_thread
+                    name="Thread", type=discord.ChannelType.public_thread
                 )  # currently calling it "Thread" because W&B Support makes it sound too official.
                 is_following = False
         if thread is not None:

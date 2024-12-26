@@ -12,8 +12,6 @@ Typical usage example:
   print(config.chat_model_name)
 """
 
-import pathlib
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

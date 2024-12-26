@@ -271,20 +271,20 @@ def post_process_definitions(definitions, name_delimiter="!"):
                 # Calculate the indent by looking backwards from the start_index to find the newline character
                 indent = " " * (len(child_body) - len(child_body.lstrip()))
 
-                placeholder_child_name = ":".join(
-                    name
-                    for name in child_full_name.split(name_delimiter)
-                    if name
-                    not in [
-                        "class",
-                        "function",
-                        "method",
-                        "docstring",
-                        "decorated_class",
-                        "decorated_function",
-                        "decorated_method",
-                    ]
-                )
+                # placeholder_child_name = ":".join(
+                #     name
+                #     for name in child_full_name.split(name_delimiter)
+                #     if name
+                #     not in [
+                #         "class",
+                #         "function",
+                #         "method",
+                #         "docstring",
+                #         "decorated_class",
+                #         "decorated_function",
+                #         "decorated_method",
+                #     ]
+                # )
                 placeholder = f"{indent}#{child['name']}:"
                 # placeholder = ""
                 # Replace the child's body in the parent's body with an indented placeholder

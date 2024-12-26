@@ -89,7 +89,7 @@ def translate_data(data: List[Dict[str, Any]], output_file: str) -> None:
         translated_item = item.copy()
         for key in ["question", "ground_truth", "notes", "context"]:
             if key in item:
-                translated_item[key] = translate_with_claude(item[key])
+                translated_item[key] = translate_with_openai(item[key])
         
         processed_data.append(translated_item)
         

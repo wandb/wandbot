@@ -28,7 +28,6 @@ from typing import List
 
 import weave
 
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
@@ -108,12 +107,12 @@ class Chat:
                 "role":
                 "system",
                 "content":
-                f"You are a professional translator. \n\n\
-                    Translate the user's question about Weights & Biases into English according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Keep code unchanged.\n\
-                    - Only return the English translation without any additional explanation"
+                "You are a professional translator. \n\n\
+Translate the user's question about Weights & Biases into English according to the specified rules. \n\
+Rule of translation. \n\
+- Maintain the original nuance\n\
+- Keep code unchanged.\n\
+- Only return the English translation without any additional explanation"
             }, {
                 "role": "user",
                 "content": text
@@ -141,15 +140,15 @@ class Chat:
                 "role":
                 "system",
                 "content":
-                f"You are a professional translator. \n\n\
-                    Translate the user's text into Japanese according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
-                    - Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
-                    - Include specific terms in English or Katakana where appropriate\n\
-                    - Keep code unchanged.\n\
-                    - Only return the Japanese translation without any additional explanation"
+                "You are a professional translator. \n\n\
+Translate the user's text into Japanese according to the specified rules. \n\
+Rule of translation. \n\
+- Maintain the original nuance\n\
+- Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
+- Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
+- Include specific terms in English or Katakana where appropriate\n\
+- Keep code unchanged.\n\
+- Only return the Japanese translation without any additional explanation"
             }, {
                 "role": "user",
                 "content": text
@@ -190,18 +189,7 @@ class Chat:
                 result_dict["answer"] = self._translate_en_to_ja(
                     result_dict["answer"])
 
-            usage_stats = {
-                "total_tokens":
-                result.total_tokens,
-                "prompt_tokens":
-                result.prompt_tokens,
-                "completion_tokens":
-                result.completion_tokens,
-                "web_search_success":
-                result.api_call_statuses["web_search_success"],
-            }
             result_dict.update({"application": chat_request.application})
-            # self.run.log(usage_stats)
 
             return ChatResponse(**result_dict)
         except Exception as e:

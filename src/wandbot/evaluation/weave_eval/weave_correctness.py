@@ -9,7 +9,6 @@ from wandbot.evaluation.eval.utils import (
     safe_parse_eval_response,
 )
 
-import wandb
 import weave
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a a technical support chatbot.
