@@ -1,28 +1,16 @@
-run = "bash run.sh"
 entrypoint = "main.py"
-
-disableInstallBeforeRun = true
-
-hidden = [".pythonlibs"]
-modules = ["cpp-clang14"]
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = [
-  "gcc",
-  "gcc.cc.lib",
-  "libstdcxx5",
-  "stdenv.cc.cc.lib"
-]
+
+[unitTest]
+language = "python3"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
 run = ["sh", "-c", "bash run.sh"]
-build = ["sh", "-c", "bash build.sh"]
 deploymentTarget = "gce"
-
-[env]
-REPLIT_DISABLE_PACKAGE_LAYER = "1"
-
-[[ports]]
-localPort = 8000
-externalPort = 80
+build = ["sh", "-c", "bash build.sh"]
