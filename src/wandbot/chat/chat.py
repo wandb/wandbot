@@ -36,7 +36,7 @@ from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
 
-from openai import OpenAI
+from wandbot.rag.utils import ChatModel
 
 logger = get_logger(__name__)
 
@@ -87,6 +87,9 @@ class Chat:
 
         return result
     
+    # Translation model
+    ja_to_en_model: ChatModel = ChatModel(max_retries=2)
+
     @weave.op()
     def _translate_ja_to_en(self, text: str) -> str:
         """
@@ -98,30 +101,35 @@ class Chat:
         Returns:
             The translated text in English.
         """
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"You are a professional translator. \n\n\
-                    Translate the user's question about Weights & Biases into English according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Keep code unchanged.\n\
-                    - Only return the English translation without any additional explanation"
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-            temperature=0,
-            max_tokens=1000,
-            top_p=1
-        )
+        # Configure model
+        self.ja_to_en_model = {
+            "model_name": "openai/gpt-4o-2024-08-06",
+            "temperature": 0
+        }
+
+        # Call model
+        response = self.ja_to_en_model([
+            {
+                "role": "system",
+                "content": """You are a professional translator.
+
+                Translate the user's question about Weights & Biases into English according to the specified rules.
+                Rule of translation:
+                - Maintain the original nuance
+                - Keep code unchanged.
+                - Only return the English translation without any additional explanation"""
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ], max_tokens=1000)
+
         return response.choices[0].message.content
     
+    # Translation model
+    en_to_ja_model: ChatModel = ChatModel(max_retries=2)
+
     @weave.op()
     def _translate_en_to_ja(self, text: str) -> str:
         """
@@ -133,31 +141,33 @@ class Chat:
         Returns:
             The translated text in Japanese.
         """
-        client = OpenAI()
-        response = client.chat.completions.create(
-                        model="gpt-4o-2024-08-06",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"You are a professional translator. \n\n\
-                    Translate the user's text into Japanese according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
-                    - Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
-                    - Include specific terms in English or Katakana where appropriate\n\
-                    - Keep code unchanged.\n\
-                    - Only return the Japanese translation without any additional explanation"
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-            temperature=0,
-            max_tokens=1000,
-            top_p=1
-        )
+        # Configure model
+        self.en_to_ja_model = {
+            "model_name": "openai/gpt-4o-2024-08-06",
+            "temperature": 0
+        }
+
+        # Call model
+        response = self.en_to_ja_model([
+            {
+                "role": "system",
+                "content": """You are a professional translator.
+
+                Translate the user's text into Japanese according to the specified rules.
+                Rule of translation:
+                - Maintain the original nuance
+                - Use 'run' in English where appropriate, as it's a term used in Wandb.
+                - Translate the terms 'reference artifacts' and 'lineage' into Katakana.
+                - Include specific terms in English or Katakana where appropriate
+                - Keep code unchanged.
+                - Only return the Japanese translation without any additional explanation"""
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ], max_tokens=1000)
+
         return response.choices[0].message.content
 
     @weave.op()
