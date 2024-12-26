@@ -1,13 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks
-from wandbot.utils import get_logger
+from wandbot.utils import get_logger, log_disk_usage, log_top_disk_usage
 from wandbot.api.routers import chat as chat_router
 from wandbot.database.database import engine
 from wandbot.database.models import Base
 import os
-import shutil
-from pathlib import Path
-from typing import Dict
 from dotenv import load_dotenv
 
 dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
@@ -17,51 +14,6 @@ logger = get_logger(__name__)
 
 is_initialized = False
 is_initializing = False
-
-
-def get_disk_usage() -> Dict:
-    """
-    Get disk usage information and return it as a dictionary.
-    Can be used both as a helper function and route handler.
-    """
-    try:
-        total, used, free = shutil.disk_usage("/")
-        current_dir = Path(".")
-        current_dir_size = sum(
-            f.stat().st_size for f in current_dir.glob("**/*") if f.is_file()
-        )
-        
-        # Calculate values in GB
-        total_gb = round(total / (2**30), 2)
-        used_gb = round(used / (2**30), 2)
-        used_mb = round(used / (2**20), 2)
-        free_gb = round(free / (2**30), 2)
-        current_dir_gb = round(current_dir_size / (2**30), 2)
-        usage_percentage = round((used * 100 / total), 2)
-        
-        # Create response dictionary
-        disk_info = {
-            "total_gb": total_gb,
-            "used_gb": used_gb,
-            "used_mb": used_mb,
-            "free_gb": free_gb,
-            "current_dir_gb": current_dir_gb,
-            "usage_percentage": usage_percentage
-        }
-        
-        # Log the information
-        logger.info(f"DISK USAGE: 💾 Total Disk Size: {total_gb} GB")
-        logger.info(f"DISK USAGE: 📊 Used Space: {used_gb} GB")
-        logger.info(f"DISK USAGE: ✨ Free Space: {free_gb} GB")
-        logger.info(f"DISK USAGE: 📂 Current Directory Size: {current_dir_gb} GB")
-        logger.info(f"DISK USAGE: 💯 Disk Usage Percentage: {usage_percentage}%")
-        
-        return disk_info
-        
-    except Exception as e:
-        error_msg = f"❌ Error getting disk usage: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg}
 
 
 async def initialize():
@@ -76,17 +28,11 @@ async def initialize():
             logger.info("STARTUP: ⏳ Beginning initialization")
 
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                initial_disk_used = disk_info['used_mb']
-                logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            initial_disk_used = disk_info['used_mb']
+            logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
 
             # 0/5: Initalise Weave
             try:
@@ -104,17 +50,11 @@ async def initialize():
                 raise
 
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_0 = disk_info['used_mb']
-                logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_0 = disk_info['used_mb']
+            logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
             
             # 1/5: Init Chat config
             try:
@@ -132,17 +72,11 @@ async def initialize():
                 raise
 
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_1 = disk_info['used_mb']
-                logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_1 = disk_info['used_mb']
+            logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
 
             # 2/5: Init Vector store config
             try:
@@ -176,18 +110,11 @@ async def initialize():
                 raise
             
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_2 = disk_info['used_mb']
-                logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
-            
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_2 = disk_info['used_mb']
+            logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
             # 3/5: Init Chat
             try:
                 logger.info("STARTUP: 3/5, 💬 Starting Chat initialization")
@@ -211,17 +138,12 @@ async def initialize():
                 raise
             
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_3 = disk_info['used_mb']
-                logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_3 = disk_info['used_mb']
+            logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
+
             
             # 4/5: Init Retriever
             try:
@@ -248,17 +170,11 @@ async def initialize():
                 raise
 
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_4 = disk_info['used_mb']
-                logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_4 = disk_info['used_mb']
+            logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
 
             # 5/5: Init Database
             try:
@@ -275,17 +191,11 @@ async def initialize():
                 raise
             
             # Check disk usage
-            try:
-                disk_info = get_disk_usage()
-                disk_used_5 = disk_info['used_mb']
-                logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
-                if "error" in disk_info:
-                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
-                )
-                raise
+            disk_info = log_disk_usage()
+            # if os.getenv("LOG_LEVEL") == "DEBUG":
+            log_top_disk_usage()
+            disk_used_5 = disk_info['used_mb']
+            logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
 
             is_initialized = True
             is_initializing = False
@@ -344,7 +254,7 @@ async def disk_usage_route():
     """
     Route to get disk usage information
     """
-    return get_disk_usage()
+    return log_disk_usage()
 
 
 @app.get("/status")

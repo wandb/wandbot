@@ -31,7 +31,9 @@ import pathlib
 import re
 import sqlite3
 import string
-from typing import Any, Coroutine, List, Tuple
+from typing import Any, Coroutine, List, Tuple, Dict
+import shutil
+from pathlib import Path
 
 import fasttext
 import nest_asyncio
@@ -299,3 +301,67 @@ def filter_smaller_documents(
     return [
         document for document in documents if filter_small_document(document)
     ]
+
+
+def log_disk_usage(dir: str = ".") -> Dict:
+    """
+    Get disk usage information and return it as a dictionary.
+    Can be used both as a helper function and route handler.
+    """
+    try:
+        total, used, free = shutil.disk_usage(dir)
+        current_dir = Path(dir)
+        current_dir_size = sum(
+            f.stat().st_size for f in current_dir.glob("**/*") if f.is_file()
+        )
+        
+        # Calculate values in GB
+        total_gb = round(total / (2**30), 2)
+        used_gb = round(used / (2**30), 2)
+        used_mb = round(used / (2**20), 2)
+        free_gb = round(free / (2**30), 2)
+        current_dir_gb = round(current_dir_size / (2**30), 2)
+        usage_percentage = round((used * 100 / total), 2)
+        
+        # Create response dictionary
+        disk_info = {
+            "total_gb": total_gb,
+            "used_gb": used_gb,
+            "used_mb": used_mb,
+            "free_gb": free_gb,
+            "current_dir_gb": current_dir_gb,
+            "usage_percentage": usage_percentage
+        }
+        
+        # Log the information
+        logger.info(f"DISK USAGE: 💾 Total Disk Size: {total_gb} GB")
+        logger.info(f"DISK USAGE: 📊 Used Space: {used_gb} GB")
+        logger.info(f"DISK USAGE: ✨ Free Space: {free_gb} GB")
+        logger.info(f"DISK USAGE: 📂 Current Directory Size: {current_dir_gb} GB")
+        logger.info(f"DISK USAGE: 💯 Disk Usage Percentage: {usage_percentage}%")
+        
+        return disk_info
+        
+    except Exception as e:
+        error_msg = f"❌ Error getting disk usage: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg}
+
+
+def log_top_disk_usage(dir: str = ".", top_n: int = 20):
+    try:
+        logger.info("STARTUP: --, 📂 Getting top 20 files/directories by disk usage")
+        import subprocess
+        command = f"du -ah {dir} | sort -rh | head -n {top_n}"
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            logger.info(f"STARTUP: --, 📂 Top {top_n} files/directories by disk usage:\n{result.stdout}\n")
+        else:
+            logger.error(f"STARTUP: -- ❌, Failed to get disk usage, error: {result.stderr}")
+    except Exception as e:
+        logger.error(f"STARTUP: -- ❌, Error getting top {top_n} files/directories by disk usage: {e}")

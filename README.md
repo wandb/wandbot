@@ -5,6 +5,13 @@ Wandbot is a question-answering bot designed specifically for Weights & Biases [
 ## What's New
 
 ### wandbot v1.3.0
+Note that to trigger the final initalization after running `run.sh`, a request has to be made to the `/startup` endpoint, as tiggering the heavy initialzations during app startup causes replit to timeout:
+
+```bash
+curl https://wandbot.replit.app/startup
+```
+**New:**
+
 - **Move to uv for package management**: Installs and dependency checks cut down from minutes to seconds
 - **Support python 3.11 on replit**
 - **Move to lazing loading in app.py to help with startup**: Replit app deployments can't seen to handle the delay from loading the app, despite attempting async or background tasks
