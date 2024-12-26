@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import litellm
 
-from wandbot.chat.chat_model import ChatModel
+from wandbot.rag.utils import ChatModel
 
 class TestChatModel(unittest.TestCase):
     def setUp(self):
