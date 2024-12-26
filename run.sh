@@ -1,7 +1,7 @@
 set -e # Exit on error
 
 # Ensure we're using the virtual environment from build.sh
-export VIRTUAL_ENV=.venv
+export VIRTUAL_ENV=wandbot_venv
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
 

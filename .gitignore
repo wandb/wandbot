@@ -105,6 +105,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+wandbot_venv/
 env/
 venv/
 ENV/

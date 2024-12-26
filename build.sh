@@ -14,8 +14,8 @@ done
 
 # Create virtualenv & set up
 rm -rf .venv
-python3.11 -m venv .venv --clear
-export VIRTUAL_ENV=.venv
+python3.11 -m venv wandbot_venv --clear
+export VIRTUAL_ENV=wandbot_venv
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
 

@@ -28,16 +28,18 @@ def get_disk_usage() -> Dict:
         )
         
         # Calculate values in GB
-        total_gb = total // (2**30)
-        used_gb = used // (2**30)
-        free_gb = free // (2**30)
-        current_dir_gb = current_dir_size // (2**30)
-        usage_percentage = (used * 100 // total)
+        total_gb = round(total / (2**30), 2)
+        used_gb = round(used / (2**30), 2)
+        used_mb = round(used / (2**20), 2)
+        free_gb = round(free / (2**30), 2)
+        current_dir_gb = round(current_dir_size / (2**30), 2)
+        usage_percentage = round((used * 100 / total), 2)
         
         # Create response dictionary
         disk_info = {
             "total_gb": total_gb,
             "used_gb": used_gb,
+            "used_mb": used_mb,
             "free_gb": free_gb,
             "current_dir_gb": current_dir_gb,
             "usage_percentage": usage_percentage
@@ -69,6 +71,20 @@ async def initialize():
             is_initializing = True
             logger.info("STARTUP: ⏳ Beginning initialization")
 
+            # Check disk usage
+            try:
+                disk_info = get_disk_usage()
+                initial_disk_used = disk_info['used_mb']
+                logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
+            except Exception as e:
+                logger.error(
+                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
+                )
+                raise
+
+            # 0/5: Initalise Weave
             try:
                 logger.info("STARTUP: 0/5, Starting Weave...")
                 import weave
@@ -81,7 +97,22 @@ async def initialize():
                 logger.error(
                     f"STARTUP: 0/5, ❌ Weave failed to initialize:\n{e}"
                 )
+                raise
 
+            # Check disk usage
+            try:
+                disk_info = get_disk_usage()
+                disk_used_0 = disk_info['used_mb']
+                logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {disk_used_0 - initial_disk_used} MB")
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
+            except Exception as e:
+                logger.error(
+                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
+                )
+                raise
+            
+            # 1/5: Init Chat config
             try:
                 logger.info("STARTUP: 1/5, 📋 Init Chat config")
                 from wandbot.chat.chat import ChatConfig
@@ -96,15 +127,20 @@ async def initialize():
                 logger.error(f"STARTUP: 1/5 ❌, Error: {e}")
                 raise
 
+            # Check disk usage
             try:
                 disk_info = get_disk_usage()
+                disk_used_1 = disk_info['used_mb']
+                logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {disk_used_1 - disk_used_0} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
                 )
+                raise
 
+            # 2/5: Init Vector store config
             try:
                 logger.info("STARTUP: 2/5, 💿 Initializing vector store")
                 from wandbot.retriever import VectorStore
@@ -114,8 +150,10 @@ async def initialize():
                 chat_router.chat_components[
                     "vector_store_config"
                 ] = vector_store_config
+                safe_vs_config = {k: v for k, v in vars(vector_store_config).items() 
+                             if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
                 logger.info(
-                    f"STARTUP: 2/5, Vector store config: {vector_store_config}"
+                    f"STARTUP: 2/5, Vector store config: {safe_vs_config}"
                 )
 
                 vector_store = VectorStore.from_config(vector_store_config)
@@ -132,20 +170,27 @@ async def initialize():
                     f"STARTUP: 2/5 ❌, 💿 Vector store config details: {vars(vector_store_config)}"
                 )
                 raise
-
+            
+            # Check disk usage
             try:
                 disk_info = get_disk_usage()
+                disk_used_2 = disk_info['used_mb']
+                logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {disk_used_2 - disk_used_1} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
                 )
-
+                raise
+            
+            # 3/5: Init Chat
             try:
                 logger.info("STARTUP: 3/5, 💬 Starting Chat initialization")
+                safe_chat_config = {k: v for k, v in vars(chat_router.chat_components['chat_config']).items() 
+                             if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
                 logger.info(
-                    f"STARTUP: 3/5, 💬 Chat config to be used: {str(chat_router.chat_components['chat_config'])}"
+                    f"STARTUP: 3/5, 💬 Chat config to be used: {str(safe_chat_config)}"
                 )
                 from wandbot.chat.chat import Chat
 
@@ -160,16 +205,21 @@ async def initialize():
                 )
                 logger.error(f"STARTUP: 3/5 ❌, Error: {e}")
                 raise
-
+            
+            # Check disk usage
             try:
                 disk_info = get_disk_usage()
+                disk_used_3 = disk_info['used_mb']
+                logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {disk_used_3 - disk_used_2} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
                 )
-
+                raise
+            
+            # 4/5: Init Retriever
             try:
                 logger.info(
                     "STARTUP 4/5: ⚙️ Starting Retriever engine initialization"
@@ -193,6 +243,20 @@ async def initialize():
                 logger.error(f"STARTUP: 4/5 ❌, Error: {e}")
                 raise
 
+            # Check disk usage
+            try:
+                disk_info = get_disk_usage()
+                disk_used_4 = disk_info['used_mb']
+                logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {disk_used_4 - disk_used_3} MB")
+                if "error" in disk_info:
+                    logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
+            except Exception as e:
+                logger.error(
+                    f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
+                )
+                raise
+
+            # 5/5: Init Database
             try:
                 Base.metadata.create_all(bind=engine)
                 from wandbot.api.routers import database as database_router
@@ -204,19 +268,25 @@ async def initialize():
             except Exception as e:
                 logger.error("STARTUP: 5/5 ❌, 🦉 Databse initializaion failed.")
                 logger.error(f"STARTUP: 5/5 ❌, Error: {e}")
-
+                raise
+            
+            # Check disk usage
             try:
                 disk_info = get_disk_usage()
+                disk_used_5 = disk_info['used_mb']
+                logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {disk_used_5 - disk_used_4} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
                 logger.error(
                     f"STARTUP: -- ❌, Get disk usage failed, error: {e}"
                 )
+                raise
 
             is_initialized = True
             is_initializing = False
             logger.info("STARTUP: ✅ Initialization complete 🎉")
+            logger.info(f"STARTUP: 💾 Total disk usage increment during intialization: {disk_used_5 - initial_disk_used} MB")
             return {"startup_status": f"is_initialized: {is_initialized}"}
 
         except Exception as e:
