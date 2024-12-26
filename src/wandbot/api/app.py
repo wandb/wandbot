@@ -8,6 +8,10 @@ import os
 import shutil
 from pathlib import Path
 from typing import Dict
+from dotenv import load_dotenv
+
+dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
+load_dotenv(dotenv_path)
 
 logger = get_logger(__name__)
 
@@ -103,7 +107,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_0 = disk_info['used_mb']
-                logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {disk_used_0 - initial_disk_used} MB")
+                logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -131,7 +135,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_1 = disk_info['used_mb']
-                logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {disk_used_1 - disk_used_0} MB")
+                logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -175,7 +179,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_2 = disk_info['used_mb']
-                logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {disk_used_2 - disk_used_1} MB")
+                logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -210,7 +214,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_3 = disk_info['used_mb']
-                logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {disk_used_3 - disk_used_2} MB")
+                logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -247,7 +251,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_4 = disk_info['used_mb']
-                logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {disk_used_4 - disk_used_3} MB")
+                logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -274,7 +278,7 @@ async def initialize():
             try:
                 disk_info = get_disk_usage()
                 disk_used_5 = disk_info['used_mb']
-                logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {disk_used_5 - disk_used_4} MB")
+                logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
                 if "error" in disk_info:
                     logger.error(f"STARTUP: -- ❌, {disk_info['error']}")
             except Exception as e:
@@ -286,7 +290,7 @@ async def initialize():
             is_initialized = True
             is_initializing = False
             logger.info("STARTUP: ✅ Initialization complete 🎉")
-            logger.info(f"STARTUP: 💾 Total disk usage increment during intialization: {disk_used_5 - initial_disk_used} MB")
+            logger.info(f"STARTUP: 💾 Total disk usage increment during intialization: {round(disk_used_5 - initial_disk_used, 1)} MB")
             return {"startup_status": f"is_initialized: {is_initialized}"}
 
         except Exception as e:
