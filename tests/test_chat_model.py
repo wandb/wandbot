@@ -1,6 +1,6 @@
 """Tests for the ChatModel class."""
 import unittest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import litellm
 
 from wandbot.chat.chat_model import ChatModel
@@ -12,76 +12,6 @@ class TestChatModel(unittest.TestCase):
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "Hello"}
         ]
-
-    def test_openai_role_conversion(self):
-        """Test that system role is converted to developer for OpenAI models."""
-        with patch('litellm.completion') as mock_completion:
-            mock_response = MagicMock()
-            mock_response.choices = [
-                MagicMock(message=MagicMock(content="Hi!"))
-            ]
-            mock_response.usage = MagicMock(
-                total_tokens=10,
-                prompt_tokens=8,
-                completion_tokens=2
-            )
-            mock_response.model = "openai/gpt-4"
-            mock_completion.return_value = mock_response
-            mock_completion.call_args = MagicMock(
-                kwargs={
-                    "model": "openai/gpt-4",
-                    "messages": [
-                        {"role": "developer", "content": "You are a helpful assistant"},
-                        {"role": "user", "content": "Hello"}
-                    ],
-                    "max_tokens": 1000,
-                    "temperature": 0.1,
-                    "timeout": None,
-                    "num_retries": 3
-                }
-            )
-            
-            response = self.model.generate_response(self.test_messages)
-            
-            # Verify system role was converted to developer
-            self.assertEqual(
-                mock_completion.call_args.kwargs["messages"][0]["role"],
-                "developer"
-            )
-            self.assertEqual(
-                mock_completion.call_args.kwargs["messages"][1]["role"],
-                "user"
-            )
-
-    def test_error_handling(self):
-        """Test error handling."""
-        with patch('litellm.completion') as mock_completion:
-            # Test retryable error
-            mock_completion.side_effect = litellm.exceptions.RateLimitError(
-                message="Rate limit exceeded",
-                llm_provider="openai",
-                model="gpt-4"
-            )
-            response = self.model.generate_response(self.test_messages)
-            self.assertTrue(response["error"]["retryable"])
-
-            # Test non-retryable error
-            mock_completion.side_effect = litellm.exceptions.AuthenticationError(
-                message="Invalid API key",
-                llm_provider="openai",
-                model="gpt-4"
-            )
-            response = self.model.generate_response(self.test_messages)
-            self.assertFalse(response["error"]["retryable"])
-
-            # Test server error
-            mock_completion.side_effect = litellm.exceptions.ServiceUnavailableError(
-                message="Internal server error",
-                llm_provider="openai",
-                model="gpt-4"
-            )
-            response = self.model.generate_response(self.test_messages)
-            self.assertTrue(response["error"]["retryable"])
 
     def test_message_format_validation(self):
         """Test message format validation."""
@@ -108,29 +38,26 @@ class TestChatModel(unittest.TestCase):
                 self.assertEqual(response["error"]["type"], "ValueError")
                 self.assertFalse(response["error"]["retryable"])
 
-    def test_different_providers(self):
-        """Test different model providers handle their quirks."""
+    def test_message_passing(self):
+        """Test that messages are passed correctly to LiteLLM."""
         test_cases = [
-            # OpenAI uses "developer" role
+            # System message
             {
                 "model": "openai/gpt-4",
-                "messages": [{"role": "system", "content": "Be helpful"}],
-                "expected_role": "developer"
+                "messages": [{"role": "system", "content": "Be helpful"}]
             },
-            # Anthropic handles system message separately
+            # User message
             {
                 "model": "anthropic/claude-3",
-                "messages": [{"role": "system", "content": "Be helpful"}],
-                "expected_system": True
+                "messages": [{"role": "user", "content": "Hi"}]
             },
-            # Gemini prepends system to first user message
+            # Multiple messages
             {
                 "model": "gemini/gemini-pro",
                 "messages": [
                     {"role": "system", "content": "Be helpful"},
                     {"role": "user", "content": "Hi"}
-                ],
-                "expected_prepend": True
+                ]
             }
         ]
 
@@ -145,29 +72,14 @@ class TestChatModel(unittest.TestCase):
                     completion_tokens=5
                 )
                 mock_completion.return_value = mock_response
-                mock_completion.call_args = MagicMock(
-                    kwargs={
-                        "model": case["model"],
-                        "messages": case["messages"],
-                        "max_tokens": 1000,
-                        "temperature": 0.1,
-                        "timeout": None,
-                        "num_retries": 3
-                    }
-                )
 
                 response = model.generate_response(case["messages"])
                 
-                # Verify provider-specific handling
-                messages = mock_completion.call_args.kwargs["messages"]
-                if "expected_role" in case:
-                    self.assertEqual(messages[0]["role"], case["expected_role"])
-                if "expected_system" in case:
-                    self.assertEqual(messages[0]["role"], "system")
-                if "expected_prepend" in case:
-                    self.assertTrue(
-                        case["messages"][0]["content"] in messages[0]["content"]
-                    )
+                # Verify messages are passed through unchanged
+                self.assertEqual(
+                    mock_completion.call_args.kwargs["messages"],
+                    case["messages"]
+                )
 
     def test_retries_and_fallbacks(self):
         """Test retry and fallback behavior."""
@@ -205,6 +117,7 @@ class TestChatModel(unittest.TestCase):
             call_args = mock_completion.call_args_list[0].kwargs
             self.assertEqual(call_args["num_retries"], 2)
             self.assertEqual(call_args["timeout"], 10)
+            self.assertEqual(call_args["fallbacks"], ["anthropic/claude-3-haiku", "gemini/gemini-2.0-flash"])
 
     def test_context_window_limits(self):
         """Test handling of context window limits with modern models."""

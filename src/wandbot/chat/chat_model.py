@@ -68,35 +68,8 @@ class ChatModel:
             if msg["role"] not in self.VALID_ROLES:
                 raise ValueError(f"Invalid role: {msg['role']}")
 
-        # Handle provider-specific message formats
-        if "openai" in self.model_name:
-            # OpenAI: Convert system to developer role
-            return [
-                {
-                    "role": "developer" if msg["role"] == "system" else msg["role"],
-                    "content": msg["content"]
-                }
-                for msg in messages
-            ]
-        elif "anthropic" in self.model_name:
-            # Anthropic: Handle system message separately
-            system_msg = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
-            messages = [msg for msg in messages if msg["role"] != "system"]
-            if system_msg:
-                messages.insert(0, {"role": "system", "content": system_msg})
-            return messages
-        elif "gemini" in self.model_name:
-            # Gemini: Prepend system message to first user message
-            system_msg = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
-            if system_msg:
-                messages = [msg for msg in messages if msg["role"] != "system"]
-                for msg in messages:
-                    if msg["role"] == "user":
-                        msg["content"] = f"{system_msg}\n\n{msg['content']}"
-                        break
-            return messages
-        else:
-            return messages
+        # LiteLLM handles provider-specific message formats
+        return messages
 
     def generate_response(
         self,
