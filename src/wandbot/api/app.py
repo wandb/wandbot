@@ -184,6 +184,10 @@ async def initialize():
                 logger.error("STARTUP: 5/5 ❌, 🦉 Databse initializaion failed.")
                 logger.error(f"STARTUP: 5/5 ❌, Error: {e}")
                 raise
+
+            # Cleanup wandb artifacts cache
+            logger.info("STARTUP: 5/5, 🧹 Cleaning up wandb artifacts cache")
+            os.system("wandb artifact cache cleanup 0.01GB --remove-temp")
             
             # Check disk usage
             disk_info = log_disk_usage()
