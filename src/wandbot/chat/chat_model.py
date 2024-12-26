@@ -123,9 +123,6 @@ class ChatModel:
 
             return {
                 "content": response.choices[0].message.content,
-                "total_tokens": response.usage.total_tokens,
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
                 "error": None,
                 "model_used": response.model
             }
@@ -133,9 +130,6 @@ class ChatModel:
         except Exception as e:
             return {
                 "content": "",
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
                 "error": {
                     "type": type(e).__name__,
                     "message": str(e)

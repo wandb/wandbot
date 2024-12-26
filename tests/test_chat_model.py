@@ -65,11 +65,7 @@ class TestChatModel(unittest.TestCase):
             with patch('litellm.completion') as mock_completion:
                 mock_response = MagicMock()
                 mock_response.choices = [MagicMock(message=MagicMock(content="Hi"))]
-                mock_response.usage = MagicMock(
-                    total_tokens=10,
-                    prompt_tokens=5,
-                    completion_tokens=5
-                )
+
                 mock_completion.return_value = mock_response
 
                 response = model.generate_response(case["messages"])
@@ -94,11 +90,7 @@ class TestChatModel(unittest.TestCase):
             # Mock successful response
             mock_response = MagicMock()
             mock_response.choices = [MagicMock(message=MagicMock(content="Success!"))]
-            mock_response.usage = MagicMock(
-                total_tokens=10,
-                prompt_tokens=5,
-                completion_tokens=5
-            )
+
             mock_response.model = "anthropic/claude-3-haiku"
 
             # Test retry behavior
