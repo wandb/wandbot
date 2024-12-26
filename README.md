@@ -4,19 +4,13 @@ Wandbot is a question-answering bot designed specifically for Weights & Biases [
 
 ## What's New
 
-### wandbot v1.2.0
+### wandbot v1.2.1
 
-This release introduces a number of exciting updates and improvements:
-
-- **Parallel LLM Calls**: Replaced the llama-index with the LECL, enabling parallel LLM calls for increased efficiency.
-- **ChromaDB Integration**: Transitioned from FAISS to ChromaDB to leverage metadata filtering and speed.
-- **Query Enhancer Optimization**: Improved the query enhancer to operate with a single LLM call.
-- **Modular RAG Pipeline**: Split the RAG pipeline into three distinct modules: query enhancement, retrieval, and response synthesis, for improved clarity and maintenance.
-- **Parent Document Retrieval**: Introduced parent document retrieval functionality within the retrieval module to enhance contextuality.
-- **Sub-query Answering**: Added sub-query answering capabilities in the response synthesis module to handle complex queries more effectively.
-- **API Restructuring**: Redesigned the API into separate routers for retrieval, database, and chat operations.
-
-These updates are part of our ongoing commitment to improve performance and usability.
+Key updates:
+- Model-agnostic fallback system with LiteLLM
+- Support for OpenAI, Anthropic, and Google models
+- Improved error handling and automatic model fallback
+- Provider/model format (e.g., "openai/gpt-4-0125-preview")
 
 ## Evaluation
 English 
@@ -39,7 +33,7 @@ Japanese
 - It features periodic data ingestion and report generation, contributing to the bot's continuous improvement. You can view the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist).
 - The bot is integrated with Discord and Slack, facilitating seamless integration with these popular collaboration platforms.
 - Performance monitoring and continuous improvement are made possible through logging and analysis with Weights & Biases Tables. Visit the workspace for more details [here](https://wandb.ai/wandbot/wandbot_public).
-- Wandbot has a fallback mechanism for model selection, which is used when GPT-4 fails to generate a response.
+- Model-agnostic fallback system with support for OpenAI, Anthropic, and Google models.
 - The bot's performance is evaluated using a mix of metrics, including retrieval accuracy, string similarity, and the correctness of model-generated responses.
 - Curious about the custom system prompt used by the bot? You can view the full prompt [here](data/prompts/chat_prompt.json).
 
@@ -59,6 +53,20 @@ poetry install --all-extras
 ```
 
 ## Usage
+
+### Model Configuration
+
+Models are specified using provider/model format. Example:
+```python
+model_config = {
+    "model_name": "openai/gpt-4-0125-preview",  # Required
+    "temperature": 0.1,                         # Required
+    "fallback_models": [                        # Optional
+        "anthropic/claude-3-haiku",
+        "gemini/gemini-pro"
+    ]
+}
+```
 
 ### Data Ingestion
 
