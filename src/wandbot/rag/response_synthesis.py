@@ -5,7 +5,7 @@ import weave
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
-from langchain_core.language_models.chat_models import BaseChatModel
+
 
 from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
 
@@ -139,7 +139,7 @@ class ResponseSynthesizer:
             self._chain = base_chain.with_fallbacks([fallback_chain])
         return self._chain
 
-    def _load_chain(self, model: BaseChatModel) -> Runnable:
+    def _load_chain(self, model: ChatModel) -> Runnable:
         response_synthesis_chain = (
             RunnableLambda(
                 lambda x: {
