@@ -10,7 +10,7 @@ repository = "https://github.com/wandb/wandbot"
 include = ["src/**/*", "LICENSE", "README.md"]
 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<=3.12.4"
+python = ">=3.10.0,<=3.13"
 numpy = "^1.26.1"
 pandas = "^2.1.2"
 pydantic-settings = "^2.0.3"

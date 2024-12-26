@@ -33,6 +33,11 @@ class APIRetrievalRequest(BaseModel):
 
 
 @router.post(
+    "",
+    response_model=APIRetrievalResponse,
+    status_code=status.HTTP_200_OK,
+)
+@router.post(
     "/",
     response_model=APIRetrievalResponse,
     status_code=status.HTTP_200_OK,
@@ -60,7 +65,6 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
                 text=result["text"],
                 score=result["score"],
                 metadata=result["metadata"],
-            )
-            for result in results
+            ) for result in results
         ],
     )
