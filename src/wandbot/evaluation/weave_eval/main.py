@@ -29,7 +29,7 @@ wandb_entity = config.wandb_entity
 weave.init(f"{wandb_entity}/{wandb_project}")
 
 
-@weave.op()
+@weave.op
 async def get_answer(question: str, application: str = "api-eval") -> str:
     url = "http://0.0.0.0:8000/chat/query"
     payload = {
@@ -55,7 +55,7 @@ def parse_text_to_json(text):
     return result
 
 
-@weave.op()
+@weave.op
 async def get_eval_record(
     question: str,
 ) -> dict:
@@ -78,14 +78,14 @@ async def get_eval_record(
 class EvaluatorModel(Model):
     eval_judge_model: str = config.eval_judge_model
 
-    @weave.op()
+    @weave.op
     async def predict(self, question: str) -> dict:
         # Model logic goes here
         prediction = await get_eval_record(question)
         return prediction
 
 
-@weave.op()
+@weave.op
 async def get_answer_correctness(
     question: str, ground_truth: str, notes: str, model_output: dict
 ) -> dict:

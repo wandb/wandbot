@@ -101,7 +101,7 @@ class SimpleRetrievalEngine:
             embeddings=self.embeddings_model
         ).transform_documents
 
-    @weave.op()
+    @weave.op
     def __call__(
         self,
         question: str,

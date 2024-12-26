@@ -16,7 +16,7 @@ class CohereRerankChain:
         if getattr(obj, "top_k") is None:
             raise AttributeError("Top k must be set before using rerank chain")
 
-        @weave.op()
+        @weave.op
         def load_rerank_chain(language):
             if language == "en":
                 cohere_rerank = CohereRerank(

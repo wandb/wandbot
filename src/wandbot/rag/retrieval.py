@@ -19,7 +19,7 @@ class WebSearchResults(BaseModel):
     web_contexts: List
 
 
-@weave.op()
+@weave.op
 def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     text_to_doc = {}
     fused_scores = {}
@@ -40,7 +40,7 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     return ranked_results
 
 
-@weave.op()
+@weave.op
 def run_web_search(query, avoid=False) -> WebSearchResults:
     try:
         if avoid:
@@ -91,7 +91,7 @@ class FusionRetrieval:
         self.english_reranker_model = english_reranker_model
         self.multilingual_reranker_model = multilingual_reranker_model
 
-    @weave.op()
+    @weave.op
     def rerank_results(
         self,
         queries: List[str],
@@ -114,7 +114,7 @@ class FusionRetrieval:
         )
         return ranked_results
 
-    @weave.op()
+    @weave.op
     def retriever_batch(self, queries):
         """wrapped for weave tracking"""
         return self.retriever.batch(queries)
@@ -156,6 +156,6 @@ class FusionRetrieval:
             )
         return self._chain
 
-    @weave.op()
+    @weave.op
     def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return self.chain.invoke(inputs)

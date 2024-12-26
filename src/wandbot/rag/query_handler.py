@@ -310,6 +310,6 @@ class QueryEnhancer:
 
         return chain
 
-    @weave.op()
+    @weave.op
     def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
         return self.chain.invoke(inputs)

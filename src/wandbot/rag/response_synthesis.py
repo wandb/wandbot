@@ -167,6 +167,6 @@ class ResponseSynthesizer:
 
         return response_synthesis_chain
 
-    @weave.op()
+    @weave.op
     def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return self.chain.invoke(inputs)
