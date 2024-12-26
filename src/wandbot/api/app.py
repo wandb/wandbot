@@ -41,9 +41,7 @@ def get_disk_usage():
 async def initialize():
     global is_initialized, is_initializing
     logger.info(
-        f"STARTUP: initialize() function called,\
-\nis_initialized: {is_initialized}\
-\is_initializing: {is_initializing}"
+        f"STARTUP: initialize() function called, \nis_initialized: {is_initialized} is_initializing: {is_initializing}"
     )
 
     if not is_initialized and not is_initializing:
@@ -237,6 +235,14 @@ async def startup():
         logger.error(f"💀 Startup initialization failed: {str(e)}")
         is_initializing = False
         return {"status": "initialization_failed", "error": str(e)}
+
+
+@app.get("/disk-usage")
+async def disk_usage_route():
+    """
+    Route to get disk usage information
+    """
+    return get_disk_usage()
 
 
 @app.get("/status")
