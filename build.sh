@@ -14,14 +14,13 @@ done
 
 # Create virtualenv & set up
 rm -rf .venv
-python3.11 -m venv .venv
+python3.11 -m venv .venv --clear
 export VIRTUAL_ENV=.venv
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
 
 # Use uv for faster installs
-pip install pip --upgrade
-pip install uv --upgrade --no-cache
+pip install --no-user pip uv --upgrade
 
 # Clear any existing installations that might conflict
 rm -rf $VIRTUAL_ENV/lib/python*/site-packages/typing_extensions*
