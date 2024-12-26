@@ -36,6 +36,9 @@ uv pip install --no-cache-dir --force-reinstall typing_extensions==4.11.0
 # Install app
 uv pip install -e .
 
+# Free up disk space
+pip cache purge
+
 mkdir -p ./data/cache
 
 # Debug information
