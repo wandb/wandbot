@@ -3,12 +3,17 @@ from pydantic_settings import BaseSettings
 
 
 class EvalConfig(BaseSettings):
-    evaluation_strategy_name: str = Field("jp v1.2.0-beta", description="Will be shown in evaluation page, and be used for just visibility")
-    eval_dataset: str = Field(
-        "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
-        ,description="Dataset reference for evaluation"
+    evaluation_strategy_name: str = Field(
+        "jp v1.2.0-beta",
+        description="Will be shown in evaluation page, and be used for just visibility",
     )
-    language: str = Field("ja", description="language for application (en or ja)")
+    eval_dataset: str = Field(
+        "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA",
+        description="Dataset reference for evaluation",
+    )
+    language: str = Field(
+        "ja", description="language for application (en or ja)"
+    )
 
     eval_judge_model: str = Field(
         "gpt-4-1106-preview",

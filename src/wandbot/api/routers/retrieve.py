@@ -65,6 +65,7 @@ def retrieve(request: APIRetrievalRequest) -> APIRetrievalResponse:
                 text=result["text"],
                 score=result["score"],
                 metadata=result["metadata"],
-            ) for result in results
+            )
+            for result in results
         ],
     )

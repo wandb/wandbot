@@ -412,7 +412,7 @@ class AsyncAPIClient(APIClient):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         language: str | None = None,
-        api_call_statuses: dict | None = None
+        api_call_statuses: dict | None = None,
     ) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 

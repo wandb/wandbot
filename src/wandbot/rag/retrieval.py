@@ -128,7 +128,7 @@ class FusionRetrieval:
                         x["all_queries"]
                     ),
                     search_results=lambda x: run_web_search(
-                        query=x["standalone_query"], 
+                        query=x["standalone_query"],
                         avoid=True  # Always skip web search
                         # x["avoid_query"]
                     ),

@@ -67,19 +67,16 @@ class Chat:
             vector_store=vector_store,
             top_k=self.config.top_k,
             english_reranker_model=self.config.english_reranker_model,
-            multilingual_reranker_model=self.config.
-            multilingual_reranker_model,
+            multilingual_reranker_model=self.config.multilingual_reranker_model,
             response_synthesizer_model=self.config.response_synthesizer_model,
-            response_synthesizer_temperature=self.config.
-            response_synthesizer_temperature,
-            response_synthesizer_fallback_model=self.config.
-            response_synthesizer_fallback_model,
-            response_synthesizer_fallback_temperature=self.config.
-            response_synthesizer_fallback_temperature,
+            response_synthesizer_temperature=self.config.response_synthesizer_temperature,
+            response_synthesizer_fallback_model=self.config.response_synthesizer_fallback_model,
+            response_synthesizer_fallback_temperature=self.config.response_synthesizer_fallback_temperature,
         )
 
-    def _get_answer(self, question: str,
-                    chat_history: List[QuestionAnswer]) -> RAGPipelineOutput:
+    def _get_answer(
+        self, question: str, chat_history: List[QuestionAnswer]
+    ) -> RAGPipelineOutput:
         history = []
         for item in chat_history:
             history.append(("user", item.question))
@@ -103,23 +100,22 @@ class Chat:
         client = OpenAI()
         response = client.chat.completions.create(
             model="gpt-4o-2024-08-06",
-            messages=[{
-                "role":
-                "system",
-                "content":
-                "You are a professional translator. \n\n\
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional translator. \n\n\
 Translate the user's question about Weights & Biases into English according to the specified rules. \n\
 Rule of translation. \n\
 - Maintain the original nuance\n\
 - Keep code unchanged.\n\
-- Only return the English translation without any additional explanation"
-            }, {
-                "role": "user",
-                "content": text
-            }],
+- Only return the English translation without any additional explanation",
+                },
+                {"role": "user", "content": text},
+            ],
             temperature=0,
             max_tokens=1000,
-            top_p=1)
+            top_p=1,
+        )
         return response.choices[0].message.content
 
     @weave.op
@@ -136,11 +132,10 @@ Rule of translation. \n\
         client = OpenAI()
         response = client.chat.completions.create(
             model="gpt-4o-2024-08-06",
-            messages=[{
-                "role":
-                "system",
-                "content":
-                "You are a professional translator. \n\n\
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional translator. \n\n\
 Translate the user's text into Japanese according to the specified rules. \n\
 Rule of translation. \n\
 - Maintain the original nuance\n\
@@ -148,14 +143,14 @@ Rule of translation. \n\
 - Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
 - Include specific terms in English or Katakana where appropriate\n\
 - Keep code unchanged.\n\
-- Only return the Japanese translation without any additional explanation"
-            }, {
-                "role": "user",
-                "content": text
-            }],
+- Only return the Japanese translation without any additional explanation",
+                },
+                {"role": "user", "content": text},
+            ],
             temperature=0,
             max_tokens=1000,
-            top_p=1)
+            top_p=1,
+        )
         return response.choices[0].message.content
 
     @weave.op
@@ -172,22 +167,26 @@ Rule of translation. \n\
         try:
             if original_language == "ja":
                 translated_question = self._translate_ja_to_en(
-                    chat_request.question)
+                    chat_request.question
+                )
                 chat_request.language = "en"
                 chat_request = ChatRequest(
                     question=translated_question,
                     chat_history=chat_request.chat_history,
                     application=chat_request.application,
-                    language="en")
+                    language="en",
+                )
 
-            result = self._get_answer(chat_request.question,
-                                      chat_request.chat_history or [])
+            result = self._get_answer(
+                chat_request.question, chat_request.chat_history or []
+            )
 
             result_dict = result.model_dump()
 
             if original_language == "ja":
                 result_dict["answer"] = self._translate_en_to_ja(
-                    result_dict["answer"])
+                    result_dict["answer"]
+                )
 
             result_dict.update({"application": chat_request.application})
 
@@ -205,10 +204,12 @@ Rule of translation. \n\
                     "prompt_tokens": 0,
                     "completion_tokens": 0,
                 }
-            result.update({
-                "time_taken": timer.elapsed,
-                "start_time": timer.start,
-                "end_time": timer.stop,
-            })
+            result.update(
+                {
+                    "time_taken": timer.elapsed,
+                    "start_time": timer.start,
+                    "end_time": timer.stop,
+                }
+            )
 
             return ChatResponse(**result)

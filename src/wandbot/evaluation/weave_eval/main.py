@@ -42,19 +42,18 @@ async def get_answer(question: str, application: str = "api-eval") -> str:
         response_json = response.json()
     return json.dumps(response_json)
 
+
 def parse_text_to_json(text):
     # Split the text into documents
-    documents = re.split(r'source: https?://', text)[1:]
+    documents = re.split(r"source: https?://", text)[1:]
     result = []
     for doc in documents:
-        source_url = 'https://' + doc.split('\n')[0].strip()     
-        content = '\n'.join(doc.split('\n')[1:]).strip()
-        document = {
-            'source': source_url,
-            'content': content
-        }
-        result.append(document)    
+        source_url = "https://" + doc.split("\n")[0].strip()
+        content = "\n".join(doc.split("\n")[1:]).strip()
+        document = {"source": source_url, "content": content}
+        result.append(document)
     return result
+
 
 @weave.op()
 async def get_eval_record(
@@ -65,7 +64,9 @@ async def get_eval_record(
     return {
         "system_prompt": response["system_prompt"],
         "generated_answer": response["answer"],
-        "retrieved_contexts_individual": parse_text_to_json(response["source_documents"]),
+        "retrieved_contexts_individual": parse_text_to_json(
+            response["source_documents"]
+        ),
         "model": response["model"],
         "total_tokens": response["total_tokens"],
         "prompt_tokens": response["prompt_tokens"],
@@ -86,10 +87,7 @@ class EvaluatorModel(Model):
 
 @weave.op()
 async def get_answer_correctness(
-    question: str,
-    ground_truth: str,
-    notes: str,
-    model_output: dict
+    question: str, ground_truth: str, notes: str, model_output: dict
 ) -> dict:
     result = await correctness_evaluator.aevaluate(
         query=question,
@@ -98,9 +96,8 @@ async def get_answer_correctness(
         contexts=model_output["retrieved_contexts"],
         reference_notes=notes,
     )
-    return {
-        "answer_correctness": result.dict()["passing"]
-    }
+    return {"answer_correctness": result.dict()["passing"]}
+
 
 dataset_ref = weave.ref(config.eval_dataset).get()
 question_rows = dataset_ref.rows
@@ -109,13 +106,14 @@ question_rows = [
         "question": row["question"],
         "ground_truth": row["answer"],
         "notes": row["notes"],
-    } for row in question_rows
+    }
+    for row in question_rows
 ]
 logger.info("Number of evaluation samples: %s", len(question_rows))
 
-evaluation = Evaluation(
-    dataset=question_rows, scorers=[get_answer_correctness]
-)
+evaluation = Evaluation(dataset=question_rows, scorers=[get_answer_correctness])
 if __name__ == "__main__":
-    with weave.attributes({'evaluation_strategy_name': config.evaluation_strategy_name}):
+    with weave.attributes(
+        {"evaluation_strategy_name": config.evaluation_strategy_name}
+    ):
         asyncio.run(evaluation.evaluate(EvaluatorModel()))

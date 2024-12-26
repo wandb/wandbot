@@ -15,7 +15,7 @@ from wandbot.retriever.utils import OpenAIEmbeddingsModel
 
 class VectorStore:
     embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel()
-    
+
     def __init__(self, config: VectorStoreConfig):
         self.config = config
         self._vectorstore = None  # Lazy initialization
@@ -61,25 +61,31 @@ class VectorStore:
                 None, artifact.download, str(config.persist_dir)
             )
         return instance
-        
+
     def as_retriever(self, search_type="mmr", search_kwargs=None):
         if search_kwargs is None:
             search_kwargs = {"k": 5}
-        return self.vectorstore.as_retriever(search_type=search_type,
-                                             search_kwargs=search_kwargs)
+        return self.vectorstore.as_retriever(
+            search_type=search_type, search_kwargs=search_kwargs
+        )
 
     def as_parent_retriever(self, search_type="mmr", search_kwargs=None):
         if search_kwargs is None:
             search_kwargs = {"k": 5}
-        retriever = self.vectorstore.as_retriever(search_type=search_type,
-                                                  search_kwargs=search_kwargs)
-        parent_retriever = retriever | RunnableLambda(lambda docs: [
-            Document(
-                page_content=doc.metadata.get("source_content", doc.
-                                              page_content),
-                metadata=doc.metadata,
-            ) for doc in docs
-        ])
+        retriever = self.vectorstore.as_retriever(
+            search_type=search_type, search_kwargs=search_kwargs
+        )
+        parent_retriever = retriever | RunnableLambda(
+            lambda docs: [
+                Document(
+                    page_content=doc.metadata.get(
+                        "source_content", doc.page_content
+                    ),
+                    metadata=doc.metadata,
+                )
+                for doc in docs
+            ]
+        )
         return parent_retriever
 
 
@@ -92,7 +98,8 @@ class SimpleRetrievalEngine:
         self.cohere_rerank_chain = rerank_models  # type: ignore
         self.embeddings_model = self.vector_store.embeddings_model
         self.redundant_filter = EmbeddingsRedundantFilter(
-            embeddings=self.embeddings_model).transform_documents
+            embeddings=self.embeddings_model
+        ).transform_documents
 
     @weave.op()
     def __call__(
@@ -122,20 +129,22 @@ class SimpleRetrievalEngine:
             search_kwargs = {"k": top_k * 4}
 
         retriever = self.vector_store.as_parent_retriever(
-            search_type=search_type, search_kwargs=search_kwargs)
-
-        retrieval_chain = (RunnableParallel(
-            question=itemgetter("question"),
-            language=itemgetter("language"),
-            context=(itemgetter("question") | retriever
-                     | self.redundant_filter),
+            search_type=search_type, search_kwargs=search_kwargs
         )
-                           | self.cohere_rerank_chain)
-        results = retrieval_chain.invoke({
-            "question": question,
-            "language": language,
-            "top_k": top_k
-        })
+
+        retrieval_chain = (
+            RunnableParallel(
+                question=itemgetter("question"),
+                language=itemgetter("language"),
+                context=(
+                    itemgetter("question") | retriever | self.redundant_filter
+                ),
+            )
+            | self.cohere_rerank_chain
+        )
+        results = retrieval_chain.invoke(
+            {"question": question, "language": language, "top_k": top_k}
+        )
         outputs = []
         for result in results:
             result_dict = {
@@ -144,8 +153,9 @@ class SimpleRetrievalEngine:
             }
             metadata_dict = {
                 k: v
-                for k, v in result.metadata.items() if k not in
-                ["relevance_score", "source_content", "id", "parent_id"]
+                for k, v in result.metadata.items()
+                if k
+                not in ["relevance_score", "source_content", "id", "parent_id"]
             }
             result_dict["metadata"] = metadata_dict
             outputs.append(result_dict)
