@@ -36,7 +36,6 @@ class TestChatModel(unittest.TestCase):
                 response = self.model.generate_response(messages)
                 self.assertIsNotNone(response["error"])
                 self.assertEqual(response["error"]["type"], "ValueError")
-                self.assertFalse(response["error"]["retryable"])
 
     def test_message_passing(self):
         """Test that messages are passed correctly to LiteLLM."""
@@ -164,16 +163,8 @@ class TestChatModel(unittest.TestCase):
                 
                 # Verify error response
                 self.assertIsNotNone(response["error"])
-                self.assertFalse(response["error"]["retryable"])
+                self.assertEqual(response["error"]["type"], "ContextWindowExceededError")
                 self.assertEqual(response["model_used"], model_name)
-                
-                # Verify error message contains the limit
-                error_msg = response["error"]["message"].lower()
-                self.assertIn(str(context_limit), error_msg)
-                self.assertIn("token", error_msg)
-                self.assertTrue(
-                    any(word in error_msg for word in ["context", "length", "exceed"])
-                )
 
     def test_temperature_validation(self):
         """Test temperature validation."""

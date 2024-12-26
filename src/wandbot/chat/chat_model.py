@@ -130,70 +130,7 @@ class ChatModel:
                 "model_used": response.model
             }
 
-        except litellm.exceptions.ContextWindowExceededError as e:
-            return {
-                "content": "",
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "error": {
-                    "type": "ContextWindowExceededError",
-                    "message": str(e),
-                    "retryable": False
-                },
-                "model_used": self.model_name
-            }
-
-        except litellm.exceptions.RateLimitError as e:
-            return {
-                "content": "",
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "error": {
-                    "type": "RateLimitError",
-                    "message": str(e),
-                    "retryable": True
-                },
-                "model_used": self.model_name
-            }
-
-        except litellm.exceptions.AuthenticationError as e:
-            return {
-                "content": "",
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "error": {
-                    "type": "AuthenticationError",
-                    "message": str(e),
-                    "retryable": False
-                },
-                "model_used": self.model_name
-            }
-
-        except litellm.exceptions.ServiceUnavailableError as e:
-            return {
-                "content": "",
-                "total_tokens": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "error": {
-                    "type": "ServiceUnavailableError",
-                    "message": str(e),
-                    "retryable": True
-                },
-                "model_used": self.model_name
-            }
-
         except Exception as e:
-            # Determine if error is retryable
-            error_msg = str(e).lower()
-            retryable = any(
-                err_type in error_msg
-                for err_type in ["timeout", "rate limit", "server", "connection"]
-            )
-
             return {
                 "content": "",
                 "total_tokens": 0,
@@ -201,8 +138,7 @@ class ChatModel:
                 "completion_tokens": 0,
                 "error": {
                     "type": type(e).__name__,
-                    "message": str(e),
-                    "retryable": retryable
+                    "message": str(e)
                 },
                 "model_used": self.model_name
             }
