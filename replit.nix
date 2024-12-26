@@ -4,7 +4,7 @@
     stdenv.cc.cc.lib
     libstdcxx5
 
-    # Make sure gcc and its runtime are available
+    # Make sure gcc and its runtime are available, needed for fasttext
     gcc
     gcc.cc.lib
 

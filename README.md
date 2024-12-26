@@ -4,6 +4,14 @@ Wandbot is a question-answering bot designed specifically for Weights & Biases [
 
 ## What's New
 
+### wandbot v1.3.0
+- **Move to uv for package management**: Installs and dependency checks cut down from minutes to seconds
+- **Support python 3.11 on replit**
+- **Move to lazing loading in app.py to help with startup**: Replit app deployments can't seen to handle the delay from loading the app, despite attempting async or background tasks
+- **Turn off web search**: Currently we don't have a web search provider to use.
+- **Small formatting updates for weave.op**
+
+
 ### wandbot v1.2.0
 
 This release introduces a number of exciting updates and improvements:
