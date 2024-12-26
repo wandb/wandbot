@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wandbot"
-version = "1.2.0"
+version = "1.3.0"
 description = "A Q&A bot for Weights & Biases documentation"
 authors = ["parambharat <bharat.ramanathan@wandb.com>"]
 license = "Apache-2.0"
@@ -10,48 +10,10 @@ repository = "https://github.com/wandb/wandbot"
 include = ["src/**/*", "LICENSE", "README.md"]
 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<=3.13"
-numpy = "^1.26.1"
-pandas = "^2.1.2"
-pydantic-settings = "^2.0.3"
-gitpython = "^3.1.40"
-giturlparse = "^0.12.0"
-scikit-learn = "^1.3.2"
-python-dotenv = "^1.0.0"
-slack-bolt = "^1.18.0"
-slack-sdk = "^3.21.3"
-discord = "^2.3.2"
-markdown = "^3.5.1"
-fastapi = "^0.109.2"
-tree-sitter-languages = "^1.7.1"
-markdownify = "^0.11.6"
-uvicorn = "^0.24.0"
-openai = "^1.3.2"
-weave = "^0.50.12"
-colorlog = "^6.8.0"
-litellm = "^1.15.1"
-google-cloud-bigquery = "^3.14.1"
-db-dtypes = "^1.2.0"
-python-frontmatter = "^1.1.0"
-pymdown-extensions = "^10.5"
-langchain = "^0.2.2"
-langchain-openai = "^0.1.8"
-langchain-experimental = "^0.0.60"
-langchain-core = "^0.2.2"
-langchain-cohere = "^0.1.3"
-langchain-chroma = "^0.1.2"
-simsimd = "3.7.7"
-nbformat = "^5.10.4"
-nbconvert = "^7.16.4"
-wandb = {extras = ["workspaces"], version = "^0.17.5"}
-tree-sitter = "0.21.3"
 
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.group.eval.dependencies]
-ragas = "^0.1.7"
-dataclasses-json = "^0.6.4"
-llama-index = "^0.10.30"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
