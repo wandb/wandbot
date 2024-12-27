@@ -15,8 +15,11 @@ curl https://wandbot.replit.app/startup
 - **Move to uv for package management**: Installs and dependency checks cut down from minutes to seconds
 - **Support python 3.11 on replit**
 - **Move to lazing loading in app.py to help with startup**: Replit app deployments can't seen to handle the delay from loading the app, despite attempting async or background tasks
-- **Add wandb artifacts cache cleanup**
+- **Add wandb artifacts cache cleanup**: Saved 1.2GB of disk space
 - **Turn off web search**: Currently we don't have a web search provider to use.
+- **Refactored EvalConfig and evals script**: Switched config to using simple_parsing for free cli arguments. Added n_trials, debug mode. Undid hardcoding of ja weave eval dataset.
+- **Removed langchain-cohere**: Started hitting dependency errors, removed it in favor of raw cohere client.
+- **wandb Tables Feedback logging disabled in prep for Weave feedback**
 - **Small formatting updates for weave.op**
 - **Add dotenv in app.py for easy env var loads**
 
