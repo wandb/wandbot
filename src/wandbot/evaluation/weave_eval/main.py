@@ -1,3 +1,4 @@
+import os
 import json
 import httpx
 import weave
@@ -14,33 +15,32 @@ from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
 )
+from wandbot.evaluation.config import get_config
 
 logger = get_logger(__name__)
-config = EvalConfig()
+
+# config = EvalConfig()
+config = get_config()
+
+weave.init(f"{config.wandb_entity}/{config.wandb_project}")
 
 correctness_evaluator = WandbCorrectnessEvaluator(
     llm=OpenAI(config.eval_judge_model),
     eval_template=CORRECTNESS_EVAL_TEMPLATE,
 )
 
-wandb_project = config.wandb_project
-wandb_entity = config.wandb_entity
-
-weave.init(f"{wandb_entity}/{wandb_project}")
-
-
 @weave.op
-async def get_answer(question: str, application: str = "api-eval") -> str:
+async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
     url = "http://0.0.0.0:8000/chat/query"
-    payload = {
-        "question": question,
-        "application": application,
-        "language": config.language,
-    }
-    async with httpx.AsyncClient(timeout=900.0) as client:
-        response = await client.post(url, json=payload)
-        response_json = response.json()
-    return json.dumps(response_json)
+    payload = {"question": question, "application": application, "language": language}
+    try:
+        async with httpx.AsyncClient(timeout=900.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status() 
+            return json.dumps(response.json())
+    except Exception as e:
+        logger.error(f"Error getting answer: {str(e)}")
+        return json.dumps({}) 
 
 
 def parse_text_to_json(text):
@@ -56,34 +56,45 @@ def parse_text_to_json(text):
 
 
 @weave.op
-async def get_eval_record(
-    question: str,
-) -> dict:
-    response = await get_answer(question)
+async def get_eval_record(question: str, language: str = "en") -> dict:
+    response = await get_answer(question, language=language)
     response = json.loads(response)
+    
+    # Return default values if response is empty or missing fields
+    if not response:
+        return {
+            "system_prompt": "",
+            "generated_answer": "",
+            "retrieved_contexts_individual": [],
+            "model": "",
+            "total_tokens": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "time_taken": 0,
+        }
+    
     return {
-        "system_prompt": response["system_prompt"],
-        "generated_answer": response["answer"],
+        "system_prompt": response.get("system_prompt", ""),
+        "generated_answer": response.get("answer", ""),
         "retrieved_contexts_individual": parse_text_to_json(
-            response["source_documents"]
+            response.get("source_documents", "")
         ),
-        "model": response["model"],
-        "total_tokens": response["total_tokens"],
-        "prompt_tokens": response["prompt_tokens"],
-        "completion_tokens": response["completion_tokens"],
-        "time_taken": response["time_taken"],
+        "model": response.get("model", ""),
+        "total_tokens": response.get("total_tokens", 0),
+        "prompt_tokens": response.get("prompt_tokens", 0),
+        "completion_tokens": response.get("completion_tokens", 0),
+        "time_taken": response.get("time_taken", 0),
     }
 
 
 class EvaluatorModel(Model):
-    eval_judge_model: str = config.eval_judge_model
+    eval_judge_model: str = None
+    language: str = "en"
 
     @weave.op
     async def predict(self, question: str) -> dict:
-        # Model logic goes here
-        prediction = await get_eval_record(question)
+        prediction = await get_eval_record(question, language=self.language)
         return prediction
-
 
 @weave.op
 async def get_answer_correctness(
@@ -99,21 +110,56 @@ async def get_answer_correctness(
     return {"answer_correctness": result.dict()["passing"]}
 
 
-dataset_ref = weave.ref(config.eval_dataset).get()
-question_rows = dataset_ref.rows
-question_rows = [
-    {
-        "question": row["question"],
-        "ground_truth": row["answer"],
-        "notes": row["notes"],
-    }
-    for row in question_rows
-]
-logger.info("Number of evaluation samples: %s", len(question_rows))
+def main():
+    logger.info("Starting wandbot evaluation...")
+    logger.info(f"Eval Config:\n{vars(config)}\m")
 
-evaluation = Evaluation(dataset=question_rows, scorers=[get_answer_correctness])
-if __name__ == "__main__":
+    os.environ["WEAVE_PARALLELISM"] = str(config.n_weave_parallelism)
+
+    dataset_ref = weave.ref(config.eval_dataset).get()
+    question_rows = dataset_ref.rows
+
+    if config.debug:
+        question_rows = question_rows[:config.n_debug_samples]
+        config.evaluation_name = f"{config.evaluation_name}_debug"
+        config.experiment_name = f"{config.experiment_name}_debug"
+
+    question_rows = [
+        {
+            "question": row["question"],
+            "ground_truth": row["answer"],
+            "notes": row["notes"],
+        }
+        for row in question_rows
+    ]
+    logger.info("Number of evaluation samples: %s", len(question_rows))
+
+    eval_model = EvaluatorModel(
+        eval_judge_model=config.eval_judge_model,
+        language=config.lang
+    )
+
+    evaluation = Evaluation(
+        name=config.evaluation_name,
+        dataset=question_rows, 
+        scorers=[get_answer_correctness],
+        trials=config.n_trials
+    )
+
     with weave.attributes(
-        {"evaluation_strategy_name": config.evaluation_strategy_name}
-    ):
-        asyncio.run(evaluation.evaluate(EvaluatorModel()))
+            {
+            "evaluation_strategy_name": config.experiment_name,
+            "n_samples": len(question_rows),
+            "language": config.lang,
+            "is_debug": config.debug,
+            "eval_judge_model": config.eval_judge_model,
+            }
+        ):
+        asyncio.run(evaluation.evaluate(
+            eval_model,
+            __weave={"display_name": config.experiment_name}
+            ))
+
+if __name__ == "__main__":
+    main()
+    

@@ -1,24 +1,25 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from dataclasses import dataclass
+import simple_parsing as sp
+
+@dataclass
+class EvalConfig:
+    lang: str = "en"  # language for application (en or ja)
+    eval_judge_model: str = "gpt-4-1106-preview"
+    experiment_name: str = "wandbot-eval"
+    evaluation_name: str = "wandbot-eval"
+    n_trials: int = 3
+    n_weave_parallelism: int = 20
+    wandb_entity: str = "wandbot"
+    wandb_project: str = "wandbot-eval"
+    debug: bool = False
+    n_debug_samples: int = 3
+
+    @property
+    def eval_dataset(self) -> str:
+        if self.lang == "ja":
+            return "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
+        return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
 
 
-class EvalConfig(BaseSettings):
-    evaluation_strategy_name: str = Field(
-        "jp v1.2.0-beta",
-        description="Will be shown in evaluation page, and be used for just visibility",
-    )
-    eval_dataset: str = Field(
-        "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA",
-        description="Dataset reference for evaluation",
-    )
-    language: str = Field(
-        "ja", description="language for application (en or ja)"
-    )
-
-    eval_judge_model: str = Field(
-        "gpt-4-1106-preview",
-        env="EVAL_JUDGE_MODEL",
-        validation_alias="eval_judge_model",
-    )
-    wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
-    wandb_project: str = Field("wandbot-eval", env="WANDB_PROJECT")
+def get_config() -> EvalConfig:
+    return sp.parse(EvalConfig)

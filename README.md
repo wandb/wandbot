@@ -117,40 +117,99 @@ Executing these commands will launch the API, Slackbot, and Discord bot applicat
 
 ### Running the Evaluation pipeline
 
-Make sure to set the environments in your terminal.
+**Eval Config**
 
-```
-set -o allexport; source .env; set +o allexport
-```
+Modify the evaluation config file here: `wandbot/src/wandbot/evaluation/config.py`
 
-Launch the wandbot with 8 workers. This speeds up evaluation
-
-```
-WANDBOT_EVALUATION=1 gunicorn wandbot.api.app:app --bind 0.0.0.0:8000 --timeout=200 --workers=8 --worker-class uvicorn.workers.UvicornWorker
-```
-
-Set up for evaluation
-
-wandbot/src/wandbot/evaluation/config.py
-- `evaluation_strategy_name` : attribute name in Weave Evaluation dashboard
-- `eval_dataset` : 
+`evaluation_strategy_name` : attribute name in Weave Evaluation dashboard
+`eval_dataset` : 
     - [Latest English evaluation dataset](https://wandb.ai/wandbot/wandbot-eval/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval%2Fobjects%2Fwandbot_eval_data%2Fversions%2FeCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU%3F%26): "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
     - [Latest Japanese evaluation dataset](https://wandb.ai/wandbot/wandbot-eval-jp/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval-jp%2Fobjects%2Fwandbot_eval_data_jp%2Fversions%2FoCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA%3F%26): "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
-- `eval_judge_model` : model used for judge
-- `wandb_entity` : wandb entity name for record
-- `wandb_project` : wandb project name for record
+`eval_judge_model` : model used for judge
+`wandb_entity` : wandb entity name for record
+`wandb_project` : wandb project name for record
 
-Launch W&B Weave evaluation
+**Dependencies**
+
+Ensure wandbot is installed by installing the production depenencies, activate the virtual env that was created and then install the evaluation dependencies
+
 ```
+bash build.sh
+source wandbot_venv/bin/activate
+poetry install --only eval
+```
+
+**Environment variables**
+
+Make sure to set the environment variables (i.e. LLM provider keys etc) from the .env file in your terminal:
+
+```bash
+set -o allexport
+source .env
+set +o allexport
+```
+
+**Launch the wandbot app**
+
+Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_EVALUATION` env var triggers the full wandbot app initialization.
+
+```bash
+WANDBOT_EVALUATION=1 \
+    ./wandbot_venv/bin/gunicorn wandbot.api.app:app \
+    --preload \
+    --bind 0.0.0.0:8000 \
+    --timeout=200 \
+    --workers=8 \
+    --worker-class uvicorn.workers.UvicornWorker
+```
+
+You can test that the app is running correctly by making a request to the `chat/query` endpoint, you should receive a response payload back from wandbot after 30 - 90 seconds:
+
+```bash
+curl -X POST \
+   http://localhost:8000/chat/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question": "How do I log a W&B artifact?"}'
+```
+
+**Run the evaluation**
+
+Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're virtual envionment is active. By default, a sample will be evaluated 3 times in order to account for both the stochasticity of wandbot and our LLM judge. For debugging, pass the `--debug` flag to only evaluate on a small number of samples
+
+```
+source wandbot_venv/bin/activate
+
 python src/wandbot/evaluation/weave_eval/main.py
 ```
+
+Debugging:
+
+```
+python src/wandbot/evaluation/weave_eval/main.py  --debug
+```
+
+Evaluate on Japanese dataset:
+
+```
+python src/wandbot/evaluation/weave_eval/main.py  --lang ja
+```
+
+To only evaluate each sample once:
+
+```
+python src/wandbot/evaluation/weave_eval/main.py  --n_trials 1
+```
+
 
 ### Data Ingestion
 
 The data ingestion module pulls code and markdown from Weights & Biases repositories [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) ingests them into vectorstores for the retrieval augmented generation pipeline.
 To ingest the data run the following command from the root of the repository
+
 ```bash
-poetry run python -m src.wandbot.ingestion
+python -m wandbot.ingestion
 ```
+
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
+
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot-dev).

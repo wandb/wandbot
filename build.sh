@@ -37,10 +37,13 @@ rm -rf $VIRTUAL_ENV/lib/python*/site-packages/fastapi*
 uv pip install -r requirements.txt --no-cache
 
 # Re-install problematic package
-uv pip install --no-cache-dir --force-reinstall typing_extensions==4.11.0
+uv pip install --no-cache-dir --force-reinstall typing_extensions==4.12.2
 
 # Install app
-uv pip install -e .
+uv pip install . --no-deps
+
+# Check if the package is installed correctly
+python -c "import wandbot; print('Wandbot package installed successfully')"
 
 # Free up disk space
 pip cache purge

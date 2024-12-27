@@ -218,6 +218,9 @@ async def initialize():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Running preliminary setup...")
+    if os.getenv("WANDBOT_EVALUATION"):
+        logger.info("Initializing wandbot for evaluation mode...")
+        await initialize()
     yield
     logger.info("Shutting down")
 
