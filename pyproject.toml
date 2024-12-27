@@ -13,7 +13,6 @@ packages = [{include = "wandbot", from = "src"}]
 python = ">=3.11,<3.12"
 
 [tool.poetry.group.eval.dependencies]
-ragas = "^0.1.7"
 dataclasses-json = "^0.6.4"
 llama-index = "^0.10.30"
 gunicorn = "^23.0.0"
