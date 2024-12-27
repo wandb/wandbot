@@ -19,7 +19,7 @@ is_initializing = False
 async def initialize():
     global is_initialized, is_initializing
     logger.info(
-        f"STARTUP: initialize() function called, \nis_initialized: {is_initialized} is_initializing: {is_initializing}"
+        f"STARTUP: initialize() function called, is_initialized: {is_initialized} is_initializing: {is_initializing}"
     )
 
     if not is_initialized and not is_initializing:
@@ -44,7 +44,7 @@ async def initialize():
                 logger.info("STARTUP: 0/5, ✅ Weave initialized")
             except Exception as e:
                 logger.error(
-                    f"STARTUP: 0/5, ❌ Weave failed to initialize:\n{e}"
+                    f"STARTUP: 0/5, ❌ Weave failed to initialize:{e}"
                 )
                 raise
 
@@ -202,8 +202,8 @@ async def initialize():
             return {"startup_status": f"is_initialized: {is_initialized}"}
 
         except Exception as e:
-            logger.error(f"STARTUP: 💀 Initialization failed:\n{e}")
-            logger.error(f"STARTUP: 💀 Full error:\n{repr(e)}")
+            logger.error(f"STARTUP: 💀 Initialization failed: {e}")
+            logger.error(f"STARTUP: 💀 Full error: {repr(e)}")
             raise
 
     else:
