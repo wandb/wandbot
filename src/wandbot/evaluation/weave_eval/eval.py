@@ -8,14 +8,18 @@ from weave import Evaluation
 from weave import Model
 from llama_index.llms.openai import OpenAI
 
-from wandbot.evaluation.config import EvalConfig
 from wandbot.utils import get_logger
-
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,
 )
 from wandbot.evaluation.config import get_config
+
+from dotenv import load_dotenv
+
+dot_env_path = os.path.join(os.path.dirname(__file__), '../../../../.env')
+load_dotenv(dotenv_path=dot_env_path, override=True)
+print(os.getenv("COHERE_API_KEY"))
 
 logger = get_logger(__name__)
 
