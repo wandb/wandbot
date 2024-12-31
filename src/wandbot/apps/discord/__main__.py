@@ -160,12 +160,12 @@ async def on_message(message: discord.Message):
                 else:
                     rating = 0
 
-            # Send feedback to API
-            await api_client.create_feedback(
-                feedback_id=str(uuid.uuid4()),
-                question_answer_id=str(sent_message.id),
-                rating=rating,
-            )
+            # # Send feedback to API
+            # await api_client.create_feedback(
+            #     feedback_id=str(uuid.uuid4()),
+            #     question_answer_id=str(sent_message.id),
+            #     rating=rating,
+            # )
 
         await bot.process_commands(message)
 
