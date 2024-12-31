@@ -104,6 +104,9 @@ class EvaluatorModel(Model):
 async def get_answer_correctness(
     question: str, ground_truth: str, notes: str, model_output: dict
 ) -> dict:
+    if config.debug:
+        print("model_output keys:", model_output.keys())
+        print("\nmodel_output content:", model_output)
     result = await correctness_evaluator.aevaluate(
         query=question,
         response=model_output["generated_answer"],
