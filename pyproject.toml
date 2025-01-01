@@ -10,7 +10,7 @@ repository = "https://github.com/wandb/wandbot"
 packages = [{include = "wandbot", from = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.13"
+python = ">=3.12,<3.14"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

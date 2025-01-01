@@ -67,7 +67,7 @@ Japanese
 
 ## Installation
 
-The project is built with Python version `3.11` and utilizes `uv` for dependency management. Follow the steps below to install the necessary dependencies:
+The project is built with Python version `3.12` and utilizes `uv` for dependency management. Follow the steps below to install the necessary dependencies:
 
 ```bash
 bash build.sh
@@ -154,6 +154,18 @@ set +o allexport
 ```
 
 **Launch the wandbot app**
+You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag.
+
+`uvicorn`
+```bash
+ uvicorn wandbot.api.app:app 
+  --host="0.0.0.0" --port=8000 \
+  --workers 8 \
+  --timeout-keep-alive 75 \
+  --loop uvloop \
+  --http httptools \
+  --log-level debug
+```
 
 Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_EVALUATION` env var triggers the full wandbot app initialization.
 
@@ -176,9 +188,16 @@ curl -X POST \
   -d '{"question": "How do I log a W&B artifact?"}'
 ```
 
+**Debugging**
+For debugging purposes during evaluation you can run a single instance of the app using this command 
+```
+ uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 \
+--workers 1 --timeout-keep-alive 75 --loop uvloop --http httptools --log-level debug
+```
+
 **Run the evaluation**
 
-Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're virtual envionment is active. By default, a sample will be evaluated 3 times in order to account for both the stochasticity of wandbot and our LLM judge. For debugging, pass the `--debug` flag to only evaluate on a small number of samples
+Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're virtual envionment is active. By default, a sample will be evaluated 3 times in order to account for both the stochasticity of wandbot and our LLM judge. For debugging, pass the `--debug` flag to only evaluate on a small number of samples. To adjust the number of parallel evaluation calls weave makes use the `--n_weave_parallelism` flag when calling `eval.py` 
 
 ```
 source wandbot_venv/bin/activate

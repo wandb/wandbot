@@ -3,10 +3,11 @@ set -x  # Enable command echo
 set -e  # Exit on error
 
 # Debug disk usage
-# du -sh .
-# du -ah . | sort -rh | head -n 20
-# current_dir_usage=$(du -sm . | awk '{print $1}')
-# echo "Current directory usage: ${current_dir_usage}M"
+du -sh .
+top_usage=$(du -ah . | sort -rh | head -n 20)
+current_dir_usage=$(du -sm . | awk '{print $1}')
+echo -e "Current directory usage: ${current_dir_usage}M"
+echo -e "Top files/dirs usage: ${top_usage}\n"
 
 # Find libstdc++ to use 
 for dir in /nix/store/*-gcc-*/lib64 /nix/store/*-stdenv-*/lib /nix/store/*-libstdc++*/lib; do
@@ -20,7 +21,7 @@ done
 
 # Create virtualenv & set up
 rm -rf .venv
-python3.11 -m venv wandbot_venv --clear
+python3.12 -m venv wandbot_venv --clear
 export VIRTUAL_ENV=wandbot_venv
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
@@ -56,10 +57,10 @@ ls -la $LIBSTDCXX_DIR/libstdc++.so* || true
 ldd $VIRTUAL_ENV/lib/python*/site-packages/pandas/_libs/*.so || true
 
 # Debug disk usage
-# du -sh .
-# du -ah . | sort -rh | head -n 20
-# current_disk_usage=$(du -sm . | awk '{print $1}')
-# echo "Current disk usage: ${current_disk_usage}M"
-# increment=$((current_disk_usage - initial_disk_usage))
-# echo "Disk usage increment: ${increment}M"
-
+du -sh .
+top_usage=$(du -ah . | sort -rh | head -n 20)
+current_disk_usage=$(du -sm . | awk '{print $1}')
+echo -e "Current directory usage: ${current_dir_usage}M"
+echo -e "Top files/dirs usage: ${top_usage}\n"
+increment=$((current_disk_usage - initial_disk_usage))
+echo -e "Disk usage increment: ${increment}M\n"
