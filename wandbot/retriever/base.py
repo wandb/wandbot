@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.retriever.native_chroma import setup_native_chroma
+from wandbot.retriever.native_chroma import NativeChromaWrapper
+import chromadb
+from chromadb.utils import embedding_functions as chromadb_ef
 
 
 class VectorStore:
@@ -39,14 +41,26 @@ class VectorStore:
         persist_dir = Path(self.config.persist_dir)
         persist_dir.mkdir(parents=True, exist_ok=True)
 
-        # Setup native chromadb
-        self.vectorstore = setup_native_chroma(
-            persist_dir=str(persist_dir),
-            collection_name=self.config.collection_name,
-            embedding_model=self.config.embedding_model,
-            embedding_dimensions=self.config.embedding_dimensions,
-            api_key=self.config.openai_api_key
+        # Initialize chromadb client
+        client = chromadb.PersistentClient(path=str(persist_dir))
+        
+        # Initialize OpenAI embeddings
+        embedding_fn = chromadb_ef.OpenAIEmbeddingFunction(
+            api_key=self.config.openai_api_key,
+            model_name=self.config.embedding_model_name,
+            api_base="https://api.openai.com/v1",
+            model_kwargs={"dimensions": self.config.embedding_dimensions}
         )
+        
+        # Get or create collection
+        collection = client.get_or_create_collection(
+            name=self.config.collection_name,
+            embedding_function=embedding_fn,
+            metadata={"hnsw:space": "cosine"}  # Use cosine similarity
+        )
+        
+        # Create wrapper
+        self.vectorstore = NativeChromaWrapper(collection, embedding_fn)
 
     def as_retriever(self, *args, **kwargs):
         """Return vectorstore as retriever.
