@@ -11,6 +11,12 @@ packages = [{include = "wandbot", from = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
+chromadb = "^0.4.22"
+numpy = "^1.26.4"
+langchain-core = "^0.1.22"
+pydantic = "^2.6.1"
+pydantic-settings = "^2.1.0"
+openai = "^1.12.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
