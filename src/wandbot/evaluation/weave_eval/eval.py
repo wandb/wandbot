@@ -6,14 +6,13 @@ import asyncio
 import re
 import logging
 from weave import Evaluation
-from weave import Model
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from wandbot.utils import get_logger
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
-    WandbCorrectnessEvaluator,
+    WandBotCorrectnessEvaluator,
 )
 from wandbot.evaluation.config import get_config
 
@@ -21,7 +20,6 @@ from dotenv import load_dotenv
 
 dot_env_path = os.path.join(os.path.dirname(__file__), '../../../../.env')
 load_dotenv(dotenv_path=dot_env_path, override=True)
-print(os.getenv("COHERE_API_KEY"))
 
 logger = get_logger(__name__)
 
@@ -30,7 +28,7 @@ config = get_config()
 
 weave.init(f"{config.wandb_entity}/{config.wandb_project}")
 
-correctness_evaluator = WandbCorrectnessEvaluator(
+wandbot_correctness_evaluator = WandBotCorrectnessEvaluator(
     llm=OpenAI(config.eval_judge_model),
     eval_template=CORRECTNESS_EVAL_TEMPLATE,
 )
@@ -90,7 +88,7 @@ def parse_text_to_json(text):
 
 
 @weave.op
-async def get_eval_record(question: str, language: str = "en") -> dict:
+async def get_record(question: str, language: str = "en") -> dict:
     response = await get_answer(question, language=language)
     response = json.loads(response)
     
@@ -121,17 +119,16 @@ async def get_eval_record(question: str, language: str = "en") -> dict:
     }
 
 
-class EvaluatorModel(Model):
-    eval_judge_model: str = None
+class WandbotModel(weave.Model):
     language: str = "en"
 
     @weave.op
     async def predict(self, question: str) -> dict:
-        prediction = await get_eval_record(question, language=self.language)
+        prediction = await get_record(question, language=self.language)
         return prediction
 
 @weave.op
-async def get_answer_correctness(
+async def answer_correctness_scorer(
     question: str, ground_truth: str, notes: str, model_output: dict
 ) -> dict:
     if config.debug:
@@ -140,14 +137,21 @@ async def get_answer_correctness(
         else:
             logger.error("model_output is None")
     contexts = [c["content"] for c in model_output.get("retrieved_contexts", [])] if model_output.get("retrieved_contexts") else []
-    result = await correctness_evaluator.aevaluate(
+    result = await wandbot_correctness_evaluator.aevaluate(
         query=question,
         response=model_output["generated_answer"],
         reference=ground_truth,
         contexts=contexts,
         reference_notes=notes,
     )
-    return {"answer_correctness": result.dict()["passing"]}
+    res = result.dict()
+    return {
+        "answer_correct": res.get("passing", None),
+        "reasoning": res.get("feedback"),
+        "score": res.get("score"),
+        "invalid_result": res.get("invalid_result"),
+        "invalid_reasoning": res.get("invalid_result"),
+    }
 
 
 def main():
@@ -174,15 +178,12 @@ def main():
     ]
     logger.info("Number of evaluation samples: %s", len(question_rows))
 
-    eval_model = EvaluatorModel(
-        eval_judge_model=config.eval_judge_model,
-        language=config.lang
-    )
+    wandbot = WandbotModel(language=config.lang)
 
-    evaluation = Evaluation(
+    wandbot_evaluator = Evaluation(
         name=config.evaluation_name,
         dataset=question_rows, 
-        scorers=[get_answer_correctness],
+        scorers=[answer_correctness_scorer],
         trials=config.n_trials
     )
 
@@ -196,11 +197,10 @@ def main():
             "eval_judge_model": config.eval_judge_model,
             }
         ):
-        asyncio.run(evaluation.evaluate(
-            eval_model,
+        asyncio.run(wandbot_evaluator.evaluate(
+            wandbot,
             __weave={"display_name": config.experiment_name}
             ))
 
 if __name__ == "__main__":
     main()
-    

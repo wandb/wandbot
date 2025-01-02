@@ -83,7 +83,7 @@ USER_TEMPLATE = """
 CORRECTNESS_EVAL_TEMPLATE = make_eval_template(SYSTEM_TEMPLATE, USER_TEMPLATE)
 
 
-class WandbCorrectnessEvaluator(CorrectnessEvaluator):
+class WandBotCorrectnessEvaluator(CorrectnessEvaluator):
     async def aevaluate(
         self,
         query: Optional[str] = None,
