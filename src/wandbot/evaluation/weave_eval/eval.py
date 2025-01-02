@@ -5,6 +5,7 @@ import weave
 import asyncio
 import re
 import logging
+import requests
 from weave import Evaluation
 from llama_index.llms.openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -29,9 +30,39 @@ config = get_config()
 weave.init(f"{config.wandb_entity}/{config.wandb_project}")
 
 wandbot_correctness_evaluator = WandBotCorrectnessEvaluator(
-    llm=OpenAI(config.eval_judge_model),
+    llm=OpenAI(model=config.eval_judge_model, temperature=config.eval_judge_temperature),
     eval_template=CORRECTNESS_EVAL_TEMPLATE,
 )
+
+def get_git_info_requests():
+    """Try call the /git-info endpoint to log the current wandbot git state"""
+    try:
+        response = requests.get('http://0.0.0.0:8000/git-info')
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
+    
+def get_chat_config():
+    """Try call the /chat-config endpoint to get wandbot's chat config"""
+    try:
+        response = requests.get('http://0.0.0.0:8000/chat-config')
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
+    
+def get_vector_store_config():
+    """Try call the /vectore-store-config endpoint to get wandbot's chat config"""
+    try:
+        response = requests.get('http://0.0.0.0:8000/vector-store-config')
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
 
 # @weave.op
 # async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
@@ -158,6 +189,13 @@ def main():
     logger.info("Starting wandbot evaluation...")
     logger.info(f"Eval Config:\n{vars(config)}\m")
 
+    wandbot_git_info = get_git_info_requests()
+    logger.info(f"WandBot git info: {wandbot_git_info}")
+    wandbot_chat_config = get_chat_config()
+    logger.info(f"WandBot chat config: {wandbot_chat_config}")
+    wandbot_vectore_store_config = get_vector_store_config()
+    logger.info(f"WandBot vectore store config: {wandbot_vectore_store_config}")
+
     os.environ["WEAVE_PARALLELISM"] = str(config.n_weave_parallelism)
 
     dataset_ref = weave.ref(config.eval_dataset).get()
@@ -187,16 +225,24 @@ def main():
         trials=config.n_trials
     )
 
-    with weave.attributes(
-            {
+    eval_config = {
             "evaluation_strategy_name": config.experiment_name,
             "n_samples": len(question_rows),
             "n_trials": config.n_trials,
             "language": config.lang,
             "is_debug": config.debug,
             "eval_judge_model": config.eval_judge_model,
+            "eval_judge_temperature": config.eval_judge_temperature,
+    }
+
+    eval_attributes = {
+            "eval_config": eval_config,
+            "wandbot_chat_config": (wandbot_chat_config or {}),
+            "wandbot_vectore_store_config": (wandbot_vectore_store_config or {}),
+            "wandbot_git_info": (wandbot_git_info or {})
             }
-        ):
+
+    with weave.attributes(eval_attributes):
         asyncio.run(wandbot_evaluator.evaluate(
             wandbot,
             __weave={"display_name": config.experiment_name}

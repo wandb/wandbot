@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks
-from wandbot.utils import get_logger, log_disk_usage, log_top_disk_usage
+from fastapi import FastAPI, HTTPException
+from wandbot.utils import get_logger, log_disk_usage, log_top_disk_usage, get_git_info
 from wandbot.api.routers import chat as chat_router
 from wandbot.database.database import engine
 from wandbot.database.models import Base
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
@@ -257,6 +258,49 @@ async def disk_usage_route():
     """
     return log_disk_usage()
 
+
+@app.get("/git-info")
+async def git_info():
+    try:
+        info = get_git_info()
+        if all(v is None for v in info.values()):
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to retrieve git information. Ensure this is a git repository."
+            )
+        info["timestamp"] = datetime.utcnow().isoformat()
+        
+        return info
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving git information: {str(e)}"
+        )
+
+
+@app.get("/chat-config")
+async def git_info():
+    try:
+        safe_chat_config = {k: v for k, v in vars(chat_router.chat_components['chat_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+        return safe_chat_config
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving chat config: {str(e)}"
+        )
+
+@app.get("/vector-store-config")
+async def git_info():
+    try:
+        safe_vs_config = {k: v for k, v in vars(chat_router.chat_components['vector_store_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+        return safe_vs_config
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving vector store config: {str(e)}"
+        )
 
 @app.get("/status")
 async def status():

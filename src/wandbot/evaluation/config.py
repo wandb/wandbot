@@ -3,8 +3,9 @@ import simple_parsing as sp
 
 @dataclass
 class EvalConfig:
-    lang: str = "en"  # language for application (en or ja)
+    lang: str = "en"  # language for eval dataset to use (en or ja)
     eval_judge_model: str = "gpt-4-1106-preview"
+    eval_judge_temperature: float = 0.1
     experiment_name: str = "wandbot-eval"
     evaluation_name: str = "wandbot-eval"
     n_trials: int = 3
