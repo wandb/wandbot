@@ -15,6 +15,7 @@ from langchain_core.runnables import (
 )
 from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
+from pydantic import ValidationError
 
 from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger
@@ -281,8 +282,15 @@ class QueryEnhancer:
         return self._chain
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
-        query_enhancer_chain = self.prompt | model.with_structured_output(
+        base_query_enhancer = self.prompt | model.with_structured_output(
             EnhancedQuery
+        )
+        
+        # Add retry specifically for validation errors
+        query_enhancer_chain = base_query_enhancer.with_retry(
+            retry_if_exception_type=(ValidationError,),
+            wait_exponential_jitter=True,  # Add jitter to prevent thundering herd
+            stop_after_attempt=3  # Try up to 3 times
         )
 
         input_chain = RunnableParallel(
