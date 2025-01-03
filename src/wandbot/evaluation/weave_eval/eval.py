@@ -242,11 +242,11 @@ def main():
             "wandbot_git_info": (wandbot_git_info or {})
             }
 
+    logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials")
     with weave.attributes(eval_attributes):
         asyncio.run(wandbot_evaluator.evaluate(
-            wandbot,
-            __weave={"display_name": config.experiment_name}
-            ))
+            model=wandbot, __weave={"display_name": config.experiment_name}
+        ))
 
 if __name__ == "__main__":
     main()
