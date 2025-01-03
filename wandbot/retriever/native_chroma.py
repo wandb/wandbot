@@ -53,11 +53,14 @@ class NativeChromaWrapper:
             where=filter,
             include=['documents', 'metadatas', 'distances']
         )
-        
+
         return [
-            Document(page_content=doc, metadata=meta)
+            Document(
+                page_content=meta.get("source_content", doc),  # Try metadata first, fallback to doc
+                metadata=meta
+            )
             for doc, meta in zip(results['documents'][0], results['metadatas'][0])
-        ]
+    ]
     
     def max_marginal_relevance_search(
         self,
