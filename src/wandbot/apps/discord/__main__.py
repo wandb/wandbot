@@ -60,7 +60,7 @@ async def on_message(message: discord.Message):
                 or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
             ):
                 thread = await message.channel.create_thread(
-                    name=f"Thread", type=discord.ChannelType.public_thread
+                    name="Thread", type=discord.ChannelType.public_thread
                 )  # currently calling it "Thread" because W&B Support makes it sound too official.
                 is_following = False
         if thread is not None:
@@ -160,12 +160,12 @@ async def on_message(message: discord.Message):
                 else:
                     rating = 0
 
-            # Send feedback to API
-            await api_client.create_feedback(
-                feedback_id=str(uuid.uuid4()),
-                question_answer_id=str(sent_message.id),
-                rating=rating,
-            )
+            # # Send feedback to API
+            # await api_client.create_feedback(
+            #     feedback_id=str(uuid.uuid4()),
+            #     question_answer_id=str(sent_message.id),
+            #     rating=rating,
+            # )
 
         await bot.process_commands(message)
 

@@ -180,11 +180,11 @@ async def handle_reaction_added(event: dict) -> None:
         thread_ts = messages[0].get("thread_ts")
         if thread_ts:
             rating = parse_reaction(event["reaction"])
-            await api_client.create_feedback(
-                feedback_id=event["event_ts"],
-                question_answer_id=message_ts,
-                rating=rating,
-            )
+            # await api_client.create_feedback(
+            #     feedback_id=event["event_ts"],
+            #     question_answer_id=message_ts,
+            #     rating=rating,
+            # )
 
 
 async def main():

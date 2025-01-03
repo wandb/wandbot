@@ -16,21 +16,24 @@ from wandbot.retriever.utils import OpenAIEmbeddingsModel
 class VectorStore:
     embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel()
 
-    def __init__(
-        self,
-        config: VectorStoreConfig,
-    ):
+    def __init__(self, config: VectorStoreConfig):
         self.config = config
+        self._vectorstore = None  # Lazy initialization
         self.embeddings_model = {
             "embedding_model_name": self.config.embedding_model_name,
             "tokenizer_model_name": self.config.tokenizer_model_name,
             "embedding_dimensions": self.config.embedding_dimensions,
-        }  # type: ignore
-        self.vectorstore = Chroma(
-            embedding_function=self.embeddings_model,  # type: ignore
-            collection_name=self.config.collection_name,
-            persist_directory=str(self.config.persist_dir),
-        )
+        }
+
+    @property
+    def vectorstore(self):
+        if self._vectorstore is None:
+            self._vectorstore = Chroma(
+                embedding_function=self.embeddings_model,
+                collection_name=self.config.collection_name,
+                persist_directory=str(self.config.persist_dir),
+            )
+        return self._vectorstore
 
     @classmethod
     def from_config(cls, config: VectorStoreConfig):
@@ -42,8 +45,22 @@ class VectorStore:
         else:
             artifact = wandb.run.use_artifact(config.artifact_url)
         _ = artifact.download(root=str(config.persist_dir))
-
         return cls(config=config)
+
+    @classmethod
+    async def initialize(cls, config: VectorStoreConfig):
+        """Async initialization method"""
+        instance = cls(config=config)
+        if not config.persist_dir.exists():
+            if wandb.run is None:
+                api = wandb.Api()
+                artifact = api.artifact(config.artifact_url)
+            else:
+                artifact = wandb.run.use_artifact(config.artifact_url)
+            await wandb.run.loop.run_in_executor(
+                None, artifact.download, str(config.persist_dir)
+            )
+        return instance
 
     def as_retriever(self, search_type="mmr", search_kwargs=None):
         if search_kwargs is None:
@@ -73,6 +90,7 @@ class VectorStore:
 
 
 class SimpleRetrievalEngine:
+    top_k: int = 5
     cohere_rerank_chain = CohereRerankChain()
 
     def __init__(self, vector_store: VectorStore, rerank_models: dict):
@@ -83,7 +101,7 @@ class SimpleRetrievalEngine:
             embeddings=self.embeddings_model
         ).transform_documents
 
-    @weave.op()
+    @weave.op
     def __call__(
         self,
         question: str,

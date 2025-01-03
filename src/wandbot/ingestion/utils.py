@@ -72,7 +72,7 @@ def fetch_git_remote_hash(
         The remote hash of the git repository.
     """
     if repo_url is None:
-        logger.warning(f"No repo url was supplied. Not returning a repo hash")
+        logger.warning("No repo url was supplied. Not returning a repo hash")
         return None
     git_command = get_git_command(id_file)
     repo_url = giturlparse.parse(repo_url).urls.get("ssh")

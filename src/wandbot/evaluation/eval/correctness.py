@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, List
 
 import regex as re
 from llama_index.core.evaluation import CorrectnessEvaluator, EvaluationResult
@@ -83,12 +83,12 @@ USER_TEMPLATE = """
 CORRECTNESS_EVAL_TEMPLATE = make_eval_template(SYSTEM_TEMPLATE, USER_TEMPLATE)
 
 
-class WandbCorrectnessEvaluator(CorrectnessEvaluator):
+class WandBotCorrectnessEvaluator(CorrectnessEvaluator):
     async def aevaluate(
         self,
         query: Optional[str] = None,
         response: Optional[str] = None,
-        contexts: Optional[Sequence[str]] = None,
+        contexts: Optional[List[str]] = [],
         reference: Optional[str] = None,
         sleep_time_in_seconds: int = 0,
         **kwargs: Any,

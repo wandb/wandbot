@@ -12,8 +12,6 @@ Typical usage example:
   print(config.chat_model_name)
 """
 
-import pathlib
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,7 +21,7 @@ class ChatConfig(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
     index_artifact: str = Field(
-        "wandbot/wandbot-dev/wandbot_index:latest",
+        "wandbot/wandbot_public/wandbot_chroma_index:v0",
         env="WANDB_INDEX_ARTIFACT",
         validation_alias="wandb_index_artifact",
     )

@@ -121,25 +121,26 @@ class APIFeedbackResponse(Feedback):
 def feedback(
     request: APIFeedbackRequest, response: Response
 ) -> APIFeedbackResponse:
-    """Handles the feedback request and logs the feedback data.
+    pass
+    # """Handles the feedback request and logs the feedback data.
 
-    Args:
-        request: The feedback request object.
-        response: The response object.
+    # Args:
+    #     request: The feedback request object.
+    #     response: The response object.
 
-    Returns:
-        The feedback response object.
-    """
-    feedback_response = db_client.create_feedback(request)
-    if feedback_response is not None:
-        wandb.log(
-            {
-                "feedback": wandb.Table(
-                    columns=list(request.model_dump().keys()),
-                    data=[list(request.model_dump().values())],
-                )
-            }
-        )
-    else:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-    return feedback_response
+    # Returns:
+    #     The feedback response object.
+    # """
+    # feedback_response = db_client.create_feedback(request)
+    # if feedback_response is not None:
+    #     wandb.log(
+    #         {
+    #             "feedback": wandb.Table(
+    #                 columns=list(request.model_dump().keys()),
+    #                 data=[list(request.model_dump().values())],
+    #             )
+    #         }
+    #     )
+    # else:
+    #     response.status_code = status.HTTP_400_BAD_REQUEST
+    # return feedback_response

@@ -1,8 +1,9 @@
 import logging
 from typing import Any, Dict, List
+from copy import deepcopy
 
 import weave
-from langchain_cohere import CohereRerank
+# from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from pydantic import BaseModel
@@ -11,6 +12,9 @@ from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
 
+import cohere
+import os
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,8 +22,9 @@ class WebSearchResults(BaseModel):
     web_search_success: bool
     web_contexts: List
 
+co = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
 
-@weave.op()
+@weave.op
 def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     text_to_doc = {}
     fused_scores = {}
@@ -40,7 +45,7 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
     return ranked_results
 
 
-@weave.op()
+@weave.op
 def run_web_search(query, avoid=False) -> WebSearchResults:
     try:
         if avoid:
@@ -91,30 +96,65 @@ class FusionRetrieval:
         self.english_reranker_model = english_reranker_model
         self.multilingual_reranker_model = multilingual_reranker_model
 
-    @weave.op()
+    # @weave.op
+    # def rerank_results(
+    #     self,
+    #     queries: List[str],
+    #     context: List[Document],
+    #     top_k: int = 5,
+    #     language: str = "en",
+    # ):
+    #     if language == "en":
+    #         reranker = CohereRerank(
+    #             top_n=top_k, model=self.english_reranker_model
+    #         )
+    #     else:
+    #         reranker = CohereRerank(
+    #             top_n=top_k, model=self.multilingual_reranker_model
+    #         )
+
+    #     query = "\n".join(queries)
+    #     ranked_results = reranker.compress_documents(
+    #         documents=context, query=query
+    #     )
+    #     return ranked_results
+
+    @weave.op
     def rerank_results(
         self,
         queries: List[str],
         context: List[Document],
         top_k: int = 5,
         language: str = "en",
-    ):
-        if language == "en":
-            reranker = CohereRerank(
-                top_n=top_k, model=self.english_reranker_model
-            )
-        else:
-            reranker = CohereRerank(
-                top_n=top_k, model=self.multilingual_reranker_model
-            )
-
+    ) -> List[Document]:
+        
         query = "\n".join(queries)
-        ranked_results = reranker.compress_documents(
-            documents=context, query=query
+        documents = [doc.page_content for doc in context]
+        reranker_model_name = (
+            self.english_reranker_model if language == "en" 
+            else self.multilingual_reranker_model
         )
-        return ranked_results
+        
+        results = co.rerank(
+            query=query,
+            documents=documents,
+            top_n=top_k,
+            model=reranker_model_name
+        )
+        
+        reranked_docs = []
+        for hit in results.results:
+            original_doc = context[hit.index]
+            doc_copy = Document(
+                page_content=original_doc.page_content,
+                metadata=deepcopy(original_doc.metadata)
+            )
+            doc_copy.metadata["relevance_score"] = hit.relevance_score
+            reranked_docs.append(doc_copy)
+            
+        return reranked_docs
 
-    @weave.op()
+    @weave.op
     def retriever_batch(self, queries):
         """wrapped for weave tracking"""
         return self.retriever.batch(queries)
@@ -128,7 +168,9 @@ class FusionRetrieval:
                         x["all_queries"]
                     ),
                     search_results=lambda x: run_web_search(
-                        x["standalone_query"], x["avoid_query"]
+                        query=x["standalone_query"],
+                        avoid=True  # Always skip web search
+                        # x["avoid_query"]
                     ),
                 )
                 | RunnablePassthrough().assign(
@@ -154,6 +196,6 @@ class FusionRetrieval:
             )
         return self._chain
 
-    @weave.op()
+    @weave.op
     def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return self.chain.invoke(inputs)

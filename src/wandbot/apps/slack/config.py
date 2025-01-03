@@ -17,15 +17,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
-    f"Please note that **wandbot** will experience frequent updates.\n\n"
-    f"Please do not share any private or sensitive information in your query.\n\n"
-    f"Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
+    "Please note that **wandbot** will experience frequent updates.\n\n"
+    "Please do not share any private or sensitive information in your query.\n\n"
+    "Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
 )
 
 EN_OUTRO_MESSAGE = (
-    f"🤖 If you still need help please try re-phrase your question, "
-    f"or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n"
-    f" Was this response helpful? Please react below to let us know"
+    "🤖 If you still need help please try re-phrase your question, "
+    "or alternatively reach out to the Weights & Biases Support Team at support@wandb.com \n\n"
+    " Was this response helpful? Please react below to let us know"
 )
 
 EN_ERROR_MESSAGE = (

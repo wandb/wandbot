@@ -28,7 +28,6 @@ from typing import List
 
 import weave
 
-import wandb
 from wandbot.chat.config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
@@ -57,12 +56,12 @@ class Chat:
         """
         self.vector_store = vector_store
         self.config = config
-        self.run = wandb.init(
-            project=self.config.wandb_project,
-            entity=self.config.wandb_entity,
-            job_type="chat",
-        )
-        self.run._label(repo="wandbot")
+        # self.run = wandb.init(
+        #     project=self.config.wandb_project,
+        #     entity=self.config.wandb_entity,
+        #     job_type="chat",
+        # )
+        # self.run._label(repo="wandbot")
 
         self.rag_pipeline = RAGPipeline(
             vector_store=vector_store,
@@ -86,8 +85,8 @@ class Chat:
         result = self.rag_pipeline(question, history)
 
         return result
-    
-    @weave.op()
+
+    @weave.op
     def _translate_ja_to_en(self, text: str) -> str:
         """
         Translates Japanese text to English using OpenAI's GPT-4.
@@ -104,25 +103,22 @@ class Chat:
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a professional translator. \n\n\
-                    Translate the user's question about Weights & Biases into English according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Keep code unchanged.\n\
-                    - Only return the English translation without any additional explanation"
+                    "content": "You are a professional translator. \n\n\
+Translate the user's question about Weights & Biases into English according to the specified rules. \n\
+Rule of translation. \n\
+- Maintain the original nuance\n\
+- Keep code unchanged.\n\
+- Only return the English translation without any additional explanation",
                 },
-                {
-                    "role": "user",
-                    "content": text
-                }
+                {"role": "user", "content": text},
             ],
             temperature=0,
             max_tokens=1000,
-            top_p=1
+            top_p=1,
         )
         return response.choices[0].message.content
-    
-    @weave.op()
+
+    @weave.op
     def _translate_en_to_ja(self, text: str) -> str:
         """
         Translates English text to Japanese using OpenAI's GPT-4.
@@ -135,32 +131,29 @@ class Chat:
         """
         client = OpenAI()
         response = client.chat.completions.create(
-                        model="gpt-4o-2024-08-06",
+            model="gpt-4o-2024-08-06",
             messages=[
                 {
                     "role": "system",
-                    "content": f"You are a professional translator. \n\n\
-                    Translate the user's text into Japanese according to the specified rules. \n\
-                    Rule of translation. \n\
-                    - Maintain the original nuance\n\
-                    - Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
-                    - Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
-                    - Include specific terms in English or Katakana where appropriate\n\
-                    - Keep code unchanged.\n\
-                    - Only return the Japanese translation without any additional explanation"
+                    "content": "You are a professional translator. \n\n\
+Translate the user's text into Japanese according to the specified rules. \n\
+Rule of translation. \n\
+- Maintain the original nuance\n\
+- Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
+- Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
+- Include specific terms in English or Katakana where appropriate\n\
+- Keep code unchanged.\n\
+- Only return the Japanese translation without any additional explanation",
                 },
-                {
-                    "role": "user",
-                    "content": text
-                }
+                {"role": "user", "content": text},
             ],
             temperature=0,
             max_tokens=1000,
-            top_p=1
+            top_p=1,
         )
         return response.choices[0].message.content
 
-    @weave.op()
+    @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
 
@@ -173,15 +166,17 @@ class Chat:
         original_language = chat_request.language
         try:
             if original_language == "ja":
-                translated_question = self._translate_ja_to_en(chat_request.question)
+                translated_question = self._translate_ja_to_en(
+                    chat_request.question
+                )
                 chat_request.language = "en"
                 chat_request = ChatRequest(
                     question=translated_question,
                     chat_history=chat_request.chat_history,
                     application=chat_request.application,
-                    language="en"
+                    language="en",
                 )
-                
+
             result = self._get_answer(
                 chat_request.question, chat_request.chat_history or []
             )
@@ -189,19 +184,12 @@ class Chat:
             result_dict = result.model_dump()
 
             if original_language == "ja":
-                result_dict["answer"] = self._translate_en_to_ja(result_dict["answer"])
+                result_dict["answer"] = self._translate_en_to_ja(
+                    result_dict["answer"]
+                )
 
-            usage_stats = {
-                "total_tokens": result.total_tokens,
-                "prompt_tokens": result.prompt_tokens,
-                "completion_tokens": result.completion_tokens,
-                "web_search_success": result.api_call_statuses[
-                    "web_search_success"
-                ],
-            }
             result_dict.update({"application": chat_request.application})
-            self.run.log(usage_stats)
-            
+
             return ChatResponse(**result_dict)
         except Exception as e:
             with Timer() as timer:

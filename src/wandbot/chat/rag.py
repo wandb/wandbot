@@ -76,7 +76,7 @@ class RAGPipeline:
             fallback_temperature=response_synthesizer_fallback_temperature,
         )
 
-    @weave.op()
+    @weave.op
     def __call__(
         self, question: str, chat_history: List[Tuple[str, str]] | None = None
     ) -> RAGPipelineOutput:

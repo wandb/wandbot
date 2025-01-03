@@ -33,6 +33,11 @@ class APIRetrievalRequest(BaseModel):
 
 
 @router.post(
+    "",
+    response_model=APIRetrievalResponse,
+    status_code=status.HTTP_200_OK,
+)
+@router.post(
     "/",
     response_model=APIRetrievalResponse,
     status_code=status.HTTP_200_OK,
