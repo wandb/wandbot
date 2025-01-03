@@ -82,19 +82,23 @@ Before running the Q&A bot, ensure the following environment variables are set:
 ```bash
 OPENAI_API_KEY
 COHERE_API_KEY
+WANDB_API_KEY
+WANDBOT_API_URL="http://localhost:8000"
+WANDB_TRACING_ENABLED="true"
+WANDB_PROJECT="wandbot-dev"
+WANDB_ENTITY= <your W&B entity>
+```
+
+If you're running the slack or discord apps you'll also need the following keys/tokens set as env vars:
+
+```
 SLACK_EN_APP_TOKEN
 SLACK_EN_BOT_TOKEN
 SLACK_EN_SIGNING_SECRET
 SLACK_JA_APP_TOKEN
 SLACK_JA_BOT_TOKEN
 SLACK_JA_SIGNING_SECRET
-WANDB_API_KEY
 DISCORD_BOT_TOKEN
-COHERE_API_KEY
-WANDBOT_API_URL="http://localhost:8000"
-WANDB_TRACING_ENABLED="true"
-WANDB_PROJECT="wandbot-dev"
-WANDB_ENTITY="wandbot"
 ```
 
 Then build the app to install all dependencies in a virtual env.
@@ -154,12 +158,14 @@ set +o allexport
 ```
 
 **Launch the wandbot app**
-You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag.
+You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_EVALUATION` env var triggers the full wandbot app initialization.
 
 `uvicorn`
 ```bash
- uvicorn wandbot.api.app:app 
-  --host="0.0.0.0" --port=8000 \
+ WANDBOT_EVALUATION=1 \
+  uvicorn wandbot.api.app:app 
+  --host="0.0.0.0" \
+  --port=8000 \
   --workers 8 \
   --timeout-keep-alive 75 \
   --loop uvloop \
@@ -167,7 +173,7 @@ You can either use `uvicorn` or `gunicorn` to launch N workers to be able to ser
   --log-level debug
 ```
 
-Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_EVALUATION` env var triggers the full wandbot app initialization.
+gunicorn:
 
 ```bash
 WANDBOT_EVALUATION=1 \
@@ -179,7 +185,7 @@ WANDBOT_EVALUATION=1 \
     --worker-class uvicorn.workers.UvicornWorker
 ```
 
-You can test that the app is running correctly by making a request to the `chat/query` endpoint, you should receive a response payload back from wandbot after 30 - 90 seconds:
+Testing: You can test that the app is running correctly by making a request to the `chat/query` endpoint, you should receive a response payload back from wandbot after 30 - 90 seconds:
 
 ```bash
 curl -X POST \
@@ -205,10 +211,10 @@ source wandbot_venv/bin/activate
 python src/wandbot/evaluation/weave_eval/eval.py
 ```
 
-Debugging:
+Debugging, only running evals on 1 sample and for 1 trial:
 
 ```
-python src/wandbot/evaluation/weave_eval/eval.py  --debug
+python src/wandbot/evaluation/weave_eval/eval.py  --debug --n_debug_samples=1 --n_trials=1
 ```
 
 Evaluate on Japanese dataset:
