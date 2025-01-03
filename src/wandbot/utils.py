@@ -335,11 +335,11 @@ def log_disk_usage(dir: str = ".") -> Dict:
         }
         
         # Log the information
-        logger.info(f"DISK USAGE: 💾 Total Disk Size: {total_gb} GB")
-        logger.info(f"DISK USAGE: 📊 Used Space: {used_gb} GB")
-        logger.info(f"DISK USAGE: ✨ Free Space: {free_gb} GB")
-        logger.info(f"DISK USAGE: 📂 Current Directory Size: {current_dir_gb} GB")
-        logger.info(f"DISK USAGE: 💯 Disk Usage Percentage: {usage_percentage}%")
+        logger.info(f"DISK USAGE: Total Disk Size: {total_gb} GB")
+        logger.info(f"DISK USAGE: Used Space: {used_gb} GB")
+        logger.info(f"DISK USAGE: Free Space: {free_gb} GB")
+        logger.info(f"DISK USAGE: Current Directory Size: {current_dir_gb} GB")
+        logger.info(f"DISK USAGE: Disk Usage Percentage: {usage_percentage}%")
         
         return disk_info
         
