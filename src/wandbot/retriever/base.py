@@ -2,7 +2,7 @@ from operator import itemgetter
 from typing import List
 
 import weave
-from langchain_chroma import Chroma
+from wandbot.retriever.native_chroma import NativeChromaWrapper
 from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
@@ -28,7 +28,7 @@ class VectorStore:
     @property
     def vectorstore(self):
         if self._vectorstore is None:
-            self._vectorstore = Chroma(
+            self._vectorstore = NativeChromaWrapper(
                 embedding_function=self.embeddings_model,
                 collection_name=self.config.collection_name,
                 persist_directory=str(self.config.persist_dir),
