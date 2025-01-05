@@ -161,7 +161,7 @@ def maximal_marginal_relevance(
     
     return idxs
 
-class NativeChromaWrapper:
+class ChromaWrapper:
     """Native ChromaDB wrapper that matches langchain-chroma's interface exactly.
     
     This class provides a drop-in replacement for langchain-chroma's Chroma class,

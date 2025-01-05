@@ -5,6 +5,8 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Same distance metrics and relevance scoring
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
+
+Some code taken from 
 """
 
 import os
@@ -106,7 +108,7 @@ def maximal_marginal_relevance(
     return idxs
 
 
-class NativeChromaWrapper:
+class ChromaWrapper:
     """Native ChromaDB wrapper that matches langchain-chroma's interface exactly.
     
     This class provides a drop-in replacement for langchain-chroma's Chroma class,
