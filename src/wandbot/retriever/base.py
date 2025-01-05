@@ -8,6 +8,8 @@ from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 import wandb
+import chromadb
+from chromadb.utils import embedding_functions as chromadb_ef
 from wandbot.ingestion.config import VectorStoreConfig
 from wandbot.retriever.reranking import CohereRerankChain
 from wandbot.retriever.utils import OpenAIEmbeddingsModel
@@ -28,10 +30,16 @@ class VectorStore:
     @property
     def vectorstore(self):
         if self._vectorstore is None:
+            # Create ChromaDB client and collection first
+            client = chromadb.PersistentClient(path=str(self.config.persist_dir))
+            collection = client.get_or_create_collection(
+                name=self.config.collection_name,
+                embedding_function=chromadb_ef.DefaultEmbeddingFunction(),
+            )
+            # Pass the collection to ChromaWrapper
             self._vectorstore = ChromaWrapper(
+                collection=collection,
                 embedding_function=self.embeddings_model,
-                collection_name=self.config.collection_name,
-                persist_directory=str(self.config.persist_dir),
             )
         return self._vectorstore
 

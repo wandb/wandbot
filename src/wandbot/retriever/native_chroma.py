@@ -5,8 +5,6 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Same distance metrics and relevance scoring
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
-
-Some code taken from 
 """
 
 import os
