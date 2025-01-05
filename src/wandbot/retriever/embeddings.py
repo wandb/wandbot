@@ -85,3 +85,6 @@ class EmbeddingModel():
                 return response.embeddings.float
             except Exception as e:
                 raise e
+    
+    def __call__(self, inputs:List[str] = None) -> List[List[float]]:
+        return self.embed(inputs)
