@@ -108,7 +108,7 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     ),
     (
         "human",
-        "<!--start-context-information-->\n\n{context_str}<!--end-context-information-->\n<!--start-question-->**Question**: {query_str}\n<!--end-question-->\n<!--final-answer-in-markdown-->\n\n",
+        "<!--start-context-information-->\n\n{context_str}<!--end-context-information-->\n<!--start-question-->\n**Question**:\n{query_str}\n<!--end-question-->\n<!--final-answer-in-markdown-->\n\n",
     ),
 ]
 

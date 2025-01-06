@@ -38,10 +38,10 @@ DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(
 
 # Query Metadata
 
-Language: {language}
+Language: 
+{language}
 
 Intents: 
-
 {intents}
 
 Sub-queries to consider answering: 

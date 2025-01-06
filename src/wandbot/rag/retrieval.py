@@ -124,7 +124,7 @@ class FusionRetrieval:
         language: str = "en",
     ) -> List[Document]:
         
-        query = "\n".join(queries)
+        query = "\n".join(queries)  # Join queries into a single string
         documents = [doc.page_content for doc in context]
         reranker_model_name = (
             self.english_reranker_model if language == "en" 
