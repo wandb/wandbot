@@ -291,12 +291,12 @@ class QueryEnhancer:
         base_query_enhancer = self.prompt | model.with_structured_output(
             EnhancedQuery
         )
-        
+
         # Add retry specifically for validation errors
         query_enhancer_chain = base_query_enhancer.with_retry(
-            retry_if_exception_type=(ValidationError,),
+            retry_if_exception_type=ValidationError,
             wait_exponential_jitter=True,  # Add jitter to prevent thundering herd
-            stop_after_attempt=3  # Try up to 3 times
+            stop_after_attempt=6,
         )
 
         input_chain = RunnableParallel(
