@@ -8,6 +8,10 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
+from wandbot.configs.app_config import AppConfig
+
+app_config = AppConfig()
+
 dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
 load_dotenv(dotenv_path, override=True)
 
@@ -40,7 +44,7 @@ async def initialize():
                 import weave
 
                 weave.init(
-                    f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
+                    f"{app_config.wandb_entity}/{app_config.wandb_project}"
                 )
                 # Undo autopatch for langchain for now as its very verbose
                 from weave.integrations.langchain.langchain import langchain_patcher

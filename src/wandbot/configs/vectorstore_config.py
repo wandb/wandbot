@@ -6,11 +6,7 @@ class VectorStoreConfig(BaseSettings):
     # Vector Store
     collection_name: str = "vectorstore"
     persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    artifact_url: str = Field(
-        "wandbot/wandbot-dev/chroma_index:v31",
-        env="WANDB_INDEX_ARTIFACT",
-        validation_alias="wandb_index_artifact",
-    )
+    artifact_url: str = "wandbot/wandbot-dev/chroma_index:v31"
     distance: str = "l2"  # used in retrieval from vectordb 
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
     # Embeddings settings

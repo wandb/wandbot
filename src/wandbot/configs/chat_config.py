@@ -17,13 +17,6 @@ from pydantic_settings import BaseSettings
 
 
 class ChatConfig(BaseSettings):
-    index_artifact: str = Field(
-        "wandbot/wandbot_public/wandbot_chroma_index:v0",
-        env="WANDB_INDEX_ARTIFACT",
-        validation_alias="wandb_index_artifact",
-    )
-    wandb_project: str | None = Field("wandbot_public", env="WANDB_PROJECT")
-    wandb_entity: str | None = Field("wandbot", env="WANDB_ENTITY")
     # Retrieval settings
     top_k: int = 15
     search_type: str = "mmr"

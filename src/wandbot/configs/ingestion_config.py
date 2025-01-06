@@ -23,11 +23,12 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
+class IngestionConfig(BaseSettings):
+    wandb_project: str = Field("wandbot-dev", env="WANDB_PROJECT")
+    wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
 
 class DataSource(BaseSettings):
-    cache_dir: pathlib.Path = Field(
-        "data/cache/raw_data", env="WANDBOT_CACHE_DIR"
-    )
+    cache_dir: pathlib.Path = Field("data/cache/raw_data")
     ignore_cache: bool = False
     remote_path: str = ""
     repo_path: str = ""
