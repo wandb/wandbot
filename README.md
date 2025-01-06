@@ -162,15 +162,14 @@ You can either use `uvicorn` or `gunicorn` to launch N workers to be able to ser
 
 `uvicorn`
 ```bash
- WANDBOT_FULL_INIT=1 \
-  uvicorn wandbot.api.app:app 
-  --host="0.0.0.0" \
-  --port=8000 \
-  --workers 8 \
-  --timeout-keep-alive 75 \
-  --loop uvloop \
-  --http httptools \
-  --log-level debug
+WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
+--host 0.0.0.0 \
+--port 8000 \
+--workers 8 \
+--timeout-keep-alive 75 \
+--loop uvloop \
+--http httptools \
+--log-level debug
 ```
 
 gunicorn:
