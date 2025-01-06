@@ -31,7 +31,7 @@ from nbconvert import MarkdownExporter
 from nbformat.validator import normalize
 
 import wandb
-from wandbot.ingestion.config import (
+from wandbot.configs.ingestion_config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
     DocodileJapaneseStoreConfig,

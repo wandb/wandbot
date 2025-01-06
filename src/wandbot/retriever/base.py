@@ -1,85 +1,77 @@
 from operator import itemgetter
-from typing import List
+from typing import List, Sequence, Any
 
 import weave
-from wandbot.retriever.native_chroma import ChromaWrapper
-from langchain_community.document_transformers import EmbeddingsRedundantFilter
+from wandbot.retriever.chroma import ChromaWrapper
+# from langchain_community.document_transformers import EmbeddingsRedundantFilter
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 import wandb
 import chromadb
-from chromadb.utils import embedding_functions as chromadb_ef
-from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.retriever.reranking import CohereRerankChain
-from wandbot.retriever.utils import OpenAIEmbeddingsModel
+import chromadb.utils.embedding_functions as chroma_embedding_functions
+from chromadb import Documents as ChromaDocuments
+from chromadb import Embeddings as ChromaEmbeddings
 
+from wandbot.configs.vectorstore_config import VectorStoreConfig
+from wandbot.retriever.reranking import CohereRerankChain
+from wandbot.retriever.utils import EmbeddingsRedundantFilter
+
+from wandbot.configs.vectorstore_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
+from wandbot.retriever.utils import cosine_similarity
+from wandbot.configs.chat_config import ChatConfig
 
 class VectorStore:
-    embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel()
-
-    def __init__(self, config: VectorStoreConfig):
-        self.config = config
-        self._vectorstore = None  # Lazy initialization
-        self.embeddings_model = {
-            "embedding_model_name": self.config.embedding_model_name,
-            "tokenizer_model_name": self.config.tokenizer_model_name,
-            "embedding_dimensions": self.config.embedding_dimensions,
-        }
-
-    @property
-    def vectorstore(self):
-        if self._vectorstore is None:
-            # Create ChromaDB client and collection first
-            client = chromadb.PersistentClient(path=str(self.config.persist_dir))
-            collection = client.get_or_create_collection(
-                name=self.config.collection_name,
-                embedding_function=chromadb_ef.DefaultEmbeddingFunction(),
+    
+    def __init__(self, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
+        self.vector_store_config = vector_store_config
+        self.chat_config = chat_config
+        try:
+            self.document_embedding_function = EmbeddingModel(
+                provider = self.vector_store_config.embeddings_provider,
+                model_name = self.vector_store_config.embeddings_model_name,
+                dimensions = self.vector_store_config.embeddings_dimensions,
+                input_type = self.vector_store_config.embeddings_document_input_type
             )
-            # Pass the collection to ChromaWrapper
-            self._vectorstore = ChromaWrapper(
-                collection=collection,
-                embedding_function=self.embeddings_model,
+            self.query_embedding_function = EmbeddingModel(
+                provider = self.vector_store_config.embeddings_provider,
+                model_name = self.vector_store_config.embeddings_model_name,
+                dimensions = self.vector_store_config.embeddings_dimensions,
+                input_type = self.vector_store_config.embeddings_query_input_type
             )
-        return self._vectorstore
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize embedding models: {str(e)}") from e
+        
+        try:
+            self.vectorstore_client = chromadb.PersistentClient(path=str(self.vector_store_config.persist_dir))
+            self.vectorstore_collection = self.vectorstore_client.get_or_create_collection(
+                name=self.vector_store_config.collection_name,
+                embedding_function=self.document_embedding_function,
+            )
+            self.vectorstore = ChromaWrapper(
+                collection=self.vectorstore_collection,
+                embedding_function=self.query_embedding_function,
+                vector_store_config=self.vector_store_config,
+                chat_config=self.chat_config
+            )   
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize vector store: {str(e)}") from e
 
     @classmethod
-    def from_config(cls, config: VectorStoreConfig):
-        if config.persist_dir.exists():
-            return cls(config=config)
-        if wandb.run is None:
-            api = wandb.Api()
-            artifact = api.artifact(config.artifact_url)
-        else:
-            artifact = wandb.run.use_artifact(config.artifact_url)
-        _ = artifact.download(root=str(config.persist_dir))
-        return cls(config=config)
+    def from_config(cls, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
+        if vector_store_config.persist_dir.exists():
+            return cls(vector_store_config=vector_store_config, chat_config=chat_config)
+        api = wandb.Api()
+        _ = api.artifact(vector_store_config.artifact_url)  # Download vectordb index from W&B
+        return cls(vector_store_config=vector_store_config, chat_config=chat_config)
 
-    @classmethod
-    async def initialize(cls, config: VectorStoreConfig):
-        """Async initialization method"""
-        instance = cls(config=config)
-        if not config.persist_dir.exists():
-            if wandb.run is None:
-                api = wandb.Api()
-                artifact = api.artifact(config.artifact_url)
-            else:
-                artifact = wandb.run.use_artifact(config.artifact_url)
-            await wandb.run.loop.run_in_executor(
-                None, artifact.download, str(config.persist_dir)
-            )
-        return instance
-
-    def as_retriever(self, search_type="mmr", search_kwargs=None):
-        if search_kwargs is None:
-            search_kwargs = {"k": 5}
+    def as_retriever(self, search_kwargs: dict, search_type:str ="mmr"):
         return self.vectorstore.as_retriever(
             search_type=search_type, search_kwargs=search_kwargs
         )
 
-    def as_parent_retriever(self, search_type="mmr", search_kwargs=None):
-        if search_kwargs is None:
-            search_kwargs = {"k": 5}
+    def as_parent_retriever(self, search_kwargs: dict, search_type:str ="mmr"):
         retriever = self.vectorstore.as_retriever(
             search_type=search_type, search_kwargs=search_kwargs
         )
@@ -98,63 +90,91 @@ class VectorStore:
 
 
 class SimpleRetrievalEngine:
-    top_k: int = 5
     cohere_rerank_chain = CohereRerankChain()
 
-    def __init__(self, vector_store: VectorStore, rerank_models: dict):
+    def __init__(self, vector_store: VectorStore, chat_config: ChatConfig, rerank_models: dict):
         self.vector_store = vector_store
+        self.chat_config = chat_config
         self.cohere_rerank_chain = rerank_models  # type: ignore
-        self.embeddings_model = self.vector_store.embeddings_model
         self.redundant_filter = EmbeddingsRedundantFilter(
-            embeddings=self.embeddings_model
+            embedding_function = self.vector_store.document_embedding_function,
+            similarity_fn = cosine_similarity,
+            redundant_similarity_threshold = self.chat_config.redundant_similarity_threshold,
         ).transform_documents
+
+    @weave.op
+    def retrieve_and_rerank(self, retriever, question: str, language: str | None = "en"):
+        """
+        Retrieve relevant documents and rerank them.
+        
+        Args:
+            question: The query string
+            language: Language filter for documents
+            top_k: Number of documents to return
+        """
+        # Get initial docs from retriever
+        retrieved_docs = retriever(question)
+        
+        # Filter out very similar documents
+        filtered_docs = self.redundant_filter(retrieved_docs)
+        
+        # Apply reranking
+        reranked_results = self.cohere_rerank_chain({
+            "question": question,
+            "language": language,
+            "top_k": self.chat_config.top_k,
+            "context": filtered_docs
+        })
+        return reranked_results
 
     @weave.op
     def __call__(
         self,
         question: str,
-        language: str | None = None,
-        top_k: int = 5,
-        search_type="mmr",
+        top_k: int = None,
+        language: str | None = "en",
+        search_type: str = "mmr",
         sources: List[str] = None,
     ):
+        if top_k is None:
+            top_k = self.chat_config.top_k
+
+        if search_type is None:
+            search_type = self.chat_config.search_type
+
         filters = {}
         source_filter = None
         language_filter = None
+
+        # Filter by sources
         if sources is not None:
             source_filter = {"source_type": {"$in": sources}}
+        
+        # Filter by language
         if language is not None:
             language_filter = {"language": language}
+        
         if source_filter and language_filter:
             filters = {"$and": [source_filter, language_filter]}
         elif source_filter:
             filters = source_filter
         elif language_filter:
             filters = language_filter
+        
         if filters:
-            search_kwargs = {"k": top_k * 4, "filter": filters}
+            search_kwargs = {"filter": filters}
         else:
-            search_kwargs = {"k": top_k * 4}
+            search_kwargs = {}
 
         retriever = self.vector_store.as_parent_retriever(
             search_type=search_type, search_kwargs=search_kwargs
         )
 
-        retrieval_chain = (
-            RunnableParallel(
-                question=itemgetter("question"),
-                language=itemgetter("language"),
-                context=(
-                    itemgetter("question") | retriever | self.redundant_filter
-                ),
-            )
-            | self.cohere_rerank_chain
-        )
-        results = retrieval_chain.invoke(
-            {"question": question, "language": language, "top_k": top_k}
-        )
+        reranked_results = self.retrieve_and_rerank(question, retriever, language)
+
+        # Format output
         outputs = []
-        for result in results:
+        for result in reranked_results:
             result_dict = {
                 "text": result.page_content,
                 "score": result.metadata["relevance_score"],
@@ -162,10 +182,9 @@ class SimpleRetrievalEngine:
             metadata_dict = {
                 k: v
                 for k, v in result.metadata.items()
-                if k
-                not in ["relevance_score", "source_content", "id", "parent_id"]
+                if k not in ["relevance_score", "source_content", "id", "parent_id"]
             }
             result_dict["metadata"] = metadata_dict
             outputs.append(result_dict)
-
+        
         return outputs

@@ -2,56 +2,73 @@ import os
 import asyncio
 import weave
 import warnings
-from typing import List
+from typing import List, Union
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from wandbot.configs.vectorstore_config import VectorStoreConfig
+
+vectorstore_config = VectorStoreConfig()
+
 class EmbeddingModel():
+    """
+    Current providers: `openai` and `cohere`
+    """
     def __init__(self, 
-                    provider:str = "openai", 
-                    model_name:str = "text-embedding-3-small",
+                    provider:str, 
+                    model_name:str,
                     input_type:str = None,
-                    dimensions:int=512,
+                    dimensions:int = None,
                     n_parallel_api_calls:int = 50,
                 ):
         self.provider = provider.lower()
+        self.model_name = model_name
         
+        # Set api client
         if self.provider == "openai":
             from openai import AsyncOpenAI
             self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.provider == "cohere":
             import cohere
             self.client = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
+            self._loop = None
 
-        self.model_name = model_name
+        self.input_type = input_type 
         if self.provider == "cohere" and self.input_type is None:
             warnings.warn()
             raise ValueError("input_type must be specified for Cohere embeddings, set `input_type` to \
  either 'search_query' or 'search_document' depending on whether it is the query or document being embedded.")
-        self.input_type = input_type 
+        
         self.dimensions = dimensions 
+        if self.provider == "openai" and self.dimensions is None:
+            warnings.warn()
+            raise ValueError("`dimensions` needs to be specified when using OpenAI embeddings models")
+        
         self.n_parallel_api_calls = n_parallel_api_calls
-        self._loop = None
-
-    async def _cleanup(self):
-        """Cleanup method to properly close the client"""
-        if self.provider == "openai":
-            await self.client.close()
-
+    
     @weave.op
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=120),
         reraise=True
     )
-    def embed(self, inputs: List[str]) -> List[List[float]]:
+    def embed(self, input: Union[str, List[str]]) -> List[List[float]]:
         """Takes a list of texts and output a list of embeddings lists"""
+        if isinstance(input, str):
+            inputs = [input]
+        else:
+            inputs = input
+        
         if self.provider == "openai":
-            async def run_embeddings():
+            # Create a new client for each request to avoid lifecycle issues
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            
+            async def run_openai_embeddings():
                 try:
                     semaphore = asyncio.Semaphore(self.n_parallel_api_calls)
-                    async def get_single_embedding(text):
+                    async def get_single_openai_embedding(text):
                         async with semaphore:
-                            response = await self.client.embeddings.create(
+                            response = await client.embeddings.create(
                                 input=text,
                                 model=self.model_name,
                                 encoding_format="float",
@@ -59,20 +76,15 @@ class EmbeddingModel():
                             )
                             return response.data[0].embedding
 
-                    tasks = [get_single_embedding(text) for text in inputs]
-                    results = await asyncio.gather(*tasks)
-                    await self._cleanup()
-                    return results
-                except Exception as e:
-                    await self._cleanup()
-                    raise e
+                    return await asyncio.gather(*[get_single_openai_embedding(text) for text in inputs])
+                finally:
+                    await client.close()
 
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Use a new event loop for each request
             try:
-                return loop.run_until_complete(run_embeddings())
-            finally:
-                loop.close()
+                return asyncio.run(run_openai_embeddings())
+            except Exception as e:
+                raise e
         
         elif self.provider == "cohere":
             try:
@@ -86,5 +98,6 @@ class EmbeddingModel():
             except Exception as e:
                 raise e
     
-    def __call__(self, inputs:List[str] = None) -> List[List[float]]:
-        return self.embed(inputs)
+    @weave.op
+    def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
+        return self.embed(input)

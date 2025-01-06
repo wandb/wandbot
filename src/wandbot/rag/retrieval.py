@@ -1,9 +1,8 @@
+import os
 import logging
 from typing import Any, Dict, List
 from copy import deepcopy
 
-import weave
-# from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from pydantic import BaseModel
@@ -13,10 +12,14 @@ from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import YouSearch, YouSearchConfig
 
 import cohere
-import os
+import weave
+from weave.trace.autopatch import autopatch
+from weave.integrations.langchain.langchain import langchain_patcher
 
 logger = logging.getLogger(__name__)
 
+autopatch()
+langchain_patcher.undo_patch()
 
 class WebSearchResults(BaseModel):
     web_search_success: bool
@@ -25,7 +28,23 @@ class WebSearchResults(BaseModel):
 co = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
 
 @weave.op
-def reciprocal_rank_fusion(results: list[list[Document]], k=60):
+def reciprocal_rank_fusion(results: list[list[Document]], smoothing_constant=60):
+    """Combine multiple ranked lists using Reciprocal Rank Fusion.
+    
+    Implements the RRF algorithm from Cormack et al. (2009) to fuse multiple 
+    ranked lists into a single ranked list. Documents appearing in multiple
+    lists have their reciprocal rank scores summed.
+    
+    Args:
+        results: List of ranked document lists to combine
+        smoothing_constant: Constant that controls scoring impact (default: 60). 
+            It smooths out the differences between ranks by adding a constant to 
+            the denominator in the formula 1/(rank + k). This prevents very high 
+            ranks (especially rank 1) from completely dominating the fusion results.
+    
+    Returns:
+        List[Document]: Combined and reranked list of documents
+    """
     text_to_doc = {}
     fused_scores = {}
     for docs in results:
@@ -35,7 +54,7 @@ def reciprocal_rank_fusion(results: list[list[Document]], k=60):
             text_to_doc[doc_content] = doc
             if doc_content not in fused_scores:
                 fused_scores[doc_content] = 0.0
-            fused_scores[doc_content] += 1 / (rank + k)
+            fused_scores[doc_content] += 1 / (rank + smoothing_constant)
 
     ranked_results = dict(
         sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
@@ -79,10 +98,10 @@ class FusionRetrieval:
     def __init__(
         self,
         vector_store: VectorStore,
-        top_k: int = 5,
-        search_type: str = "mmr",
-        english_reranker_model: str = "rerank-english-v2.0",
-        multilingual_reranker_model: str = "rerank-multilingual-v2.0",
+        top_k: int,
+        search_type: str,
+        english_reranker_model: str,
+        multilingual_reranker_model: str,
     ):
         self.vectorstore = vector_store
         self.top_k = top_k
@@ -96,35 +115,12 @@ class FusionRetrieval:
         self.english_reranker_model = english_reranker_model
         self.multilingual_reranker_model = multilingual_reranker_model
 
-    # @weave.op
-    # def rerank_results(
-    #     self,
-    #     queries: List[str],
-    #     context: List[Document],
-    #     top_k: int = 5,
-    #     language: str = "en",
-    # ):
-    #     if language == "en":
-    #         reranker = CohereRerank(
-    #             top_n=top_k, model=self.english_reranker_model
-    #         )
-    #     else:
-    #         reranker = CohereRerank(
-    #             top_n=top_k, model=self.multilingual_reranker_model
-    #         )
-
-    #     query = "\n".join(queries)
-    #     ranked_results = reranker.compress_documents(
-    #         documents=context, query=query
-    #     )
-    #     return ranked_results
-
     @weave.op
     def rerank_results(
         self,
         queries: List[str],
         context: List[Document],
-        top_k: int = 5,
+        top_k: int,
         language: str = "en",
     ) -> List[Document]:
         

@@ -158,11 +158,11 @@ set +o allexport
 ```
 
 **Launch the wandbot app**
-You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_EVALUATION` env var triggers the full wandbot app initialization.
+You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_FULL_INIT` env var triggers the full wandbot app initialization.
 
 `uvicorn`
 ```bash
- WANDBOT_EVALUATION=1 \
+ WANDBOT_FULL_INIT=1 \
   uvicorn wandbot.api.app:app 
   --host="0.0.0.0" \
   --port=8000 \
@@ -176,7 +176,7 @@ You can either use `uvicorn` or `gunicorn` to launch N workers to be able to ser
 gunicorn:
 
 ```bash
-WANDBOT_EVALUATION=1 \
+WANDBOT_FULL_INIT=1 \
     ./wandbot_venv/bin/gunicorn wandbot.api.app:app \
     --preload \
     --bind 0.0.0.0:8000 \

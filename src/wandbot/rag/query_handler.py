@@ -17,10 +17,16 @@ from langchain_openai import ChatOpenAI
 from pydantic.v1 import BaseModel, Field
 from pydantic import ValidationError
 
+from wandbot.configs.chat_config import ChatConfig
 from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger
 
+from weave.integrations.langchain.langchain import langchain_patcher
+langchain_patcher.undo_patch()
+
 logger = get_logger(__name__)
+
+chat_config = ChatConfig()
 
 BOT_NAME_PATTERN = re.compile(r"<@U[A-Z0-9]+>|@[a-zA-Z0-9]+")
 
@@ -242,7 +248,7 @@ class EnhancedQuery(BaseModel):
 
 
 ENHANCER_SYSTEM_PROMPT = (
-    "You are a weights & biases support manager tasked with enhancing support questions from users"
+    "You are a weights & biases support manager tasked with enhancing support questions from users. "
     "You are given a conversation and a follow-up query. "
     "You goal to enhance the user query and render it using the tool provided."
     "\n\nChat History: \n\n"
@@ -258,17 +264,17 @@ ENHANCER_PROMPT_MESSAGES = [
 
 class QueryEnhancer:
     model: ChatModel = ChatModel()
-    fallback_model: ChatModel = ChatModel(max_retries=6)
+    fallback_model: ChatModel = ChatModel(max_retries=3)
 
     def __init__(
         self,
-        model: str = "gpt-4-0125-preview",
-        temperature: float = 0.1,
-        fallback_model: str = "gpt-4-0125-preview",
-        fallback_temperature: float = 0.1,
+        model_name: str,
+        temperature: float,
+        fallback_model_name: str,
+        fallback_temperature: float,
     ):
-        self.model = {"model_name": model, "temperature": temperature}  # type: ignore
-        self.fallback_model = {"model_name": fallback_model, "temperature": fallback_temperature}  # type: ignore
+        self.model = {"model_name": model_name, "temperature": temperature}  # type: ignore
+        self.fallback_model = {"model_name": fallback_model_name, "temperature": fallback_temperature}  # type: ignore
         self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
         self._chain = None
 

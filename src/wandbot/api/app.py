@@ -42,6 +42,9 @@ async def initialize():
                 weave.init(
                     f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
                 )
+                # Undo autopatch for langchain for now as its very verbose
+                from weave.integrations.langchain.langchain import langchain_patcher
+                langchain_patcher.undo_patch()
                 logger.info("STARTUP: 0/5, ✅ Weave initialized")
             except Exception as e:
                 logger.error(
@@ -79,9 +82,8 @@ async def initialize():
             # 2/5: Init Vector store config
             try:
                 logger.info("STARTUP: 2/5, 💿 Initializing vector store")
-                from wandbot.retriever import VectorStore
-                from wandbot.ingestion.config import VectorStoreConfig
-
+                
+                from wandbot.configs.vectorstore_config import VectorStoreConfig
                 vector_store_config = VectorStoreConfig()
                 chat_router.chat_components[
                     "vector_store_config"
@@ -92,7 +94,11 @@ async def initialize():
                     f"STARTUP: 2/5, Vector store config: {safe_vs_config}"
                 )
 
-                vector_store = VectorStore.from_config(vector_store_config)
+                from wandbot.retriever import VectorStore
+                vector_store = VectorStore.from_config(
+                    vector_store_config=chat_router.chat_components["vector_store_config"],
+                    chat_config=chat_router.chat_components["chat_config"]
+                )
                 chat_router.chat_components["vector_store"] = vector_store
                 logger.info(
                     "STARTUP: 2/5 ✅, 💿 Vector store created successfully."
@@ -143,28 +149,29 @@ async def initialize():
 
             
             # 4/5: Init Retriever
-            try:
-                logger.info(
-                    "STARTUP 4/5: ⚙️ Starting Retriever engine initialization"
-                )
-                from wandbot.api.routers import retrieve as retrieve_router
+            # try:
+            #     logger.info(
+            #         "STARTUP 4/5: ⚙️ Starting Retriever engine initialization"
+            #     )
+            #     from wandbot.api.routers import retrieve as retrieve_router
 
-                retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-                    vector_store=vector_store,
-                    rerank_models={
-                        "english_reranker_model": chat_config.english_reranker_model,
-                        "multilingual_reranker_model": chat_config.multilingual_reranker_model,
-                    },
-                )
-                logger.info("STARTUP 4/5: ✅ ⚙️ Retriever engine initialized")
-                app.include_router(retrieve_router.router)
-                logger.info("STARTUP 4/5: ✅ ⚙️ Added retrieve router to app.")
-            except Exception as e:
-                logger.error(
-                    "STARTUP: 4/5 ❌, ⚙️ Retriever instance initializaion failed."
-                )
-                logger.error(f"STARTUP: 4/5 ❌, Error: {e}")
-                raise
+            #     retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            #         vector_store=vector_store,
+            #         rerank_models={
+            #             "english_reranker_model": chat_config.english_reranker_model,
+            #             "multilingual_reranker_model": chat_config.multilingual_reranker_model,
+            #         },
+            #         chat_config=chat_router.chat_components["chat_config"],
+            #     )
+            #     logger.info("STARTUP 4/5: ✅ ⚙️ Retriever engine initialized")
+            #     app.include_router(retrieve_router.router)
+            #     logger.info("STARTUP 4/5: ✅ ⚙️ Added retrieve router to app.")
+            # except Exception as e:
+            #     logger.error(
+            #         "STARTUP: 4/5 ❌, ⚙️ Retriever instance initializaion failed."
+            #     )
+            #     logger.error(f"STARTUP: 4/5 ❌, Error: {e}")
+            #     raise
 
             # Check disk usage
             disk_info = log_disk_usage()
@@ -219,7 +226,7 @@ async def initialize():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Running preliminary setup...")
-    if os.getenv("WANDBOT_EVALUATION"):
+    if os.getenv("WANDBOT_FULL_INIT"):
         logger.info("Initializing wandbot for evaluation mode...")
         await initialize()
     yield

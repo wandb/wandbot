@@ -6,13 +6,14 @@ from langchain_community.callbacks import get_openai_callback
 from pydantic import BaseModel
 
 from wandbot.rag.query_handler import QueryEnhancer
+from wandbot.configs.chat_config import ChatConfig
 from wandbot.rag.response_synthesis import ResponseSynthesizer
 from wandbot.rag.retrieval import FusionRetrieval
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
 
 logger = get_logger(__name__)
-
+chat_config = ChatConfig()
 
 def get_stats_dict_from_token_callback(token_callback):
     return {
@@ -48,32 +49,33 @@ class RAGPipelineOutput(BaseModel):
 
 
 class RAGPipeline:
+    """
+    search_type can be "mmr", "similarity_score_threshold" or if set to None, similarity search is used
+    """
     def __init__(
         self,
         vector_store: VectorStore,
-        top_k: int = 15,
-        search_type: str = "mmr",
-        english_reranker_model: str = "rerank-english-v2.0",
-        multilingual_reranker_model: str = "rerank-multilingual-v2.0",
-        response_synthesizer_model: str = "gpt-4-0125-preview",
-        response_synthesizer_temperature: float = 0.1,
-        response_synthesizer_fallback_model: str = "gpt-4-0125-preview",
-        response_synthesizer_fallback_temperature: float = 0.1,
+        chat_config: ChatConfig,
     ):
         self.vector_store = vector_store
-        self.query_enhancer = QueryEnhancer()
+        self.query_enhancer = QueryEnhancer(
+            model_name = chat_config.query_enhancer_model,
+            temperature = chat_config.query_enhancer_temperature,
+            fallback_model_name = chat_config.query_enhancer_fallback_model,
+            fallback_temperature = chat_config.query_enhancer_fallback_temperature,
+        )
         self.retrieval = FusionRetrieval(
             vector_store=vector_store,
-            top_k=top_k,
-            search_type=search_type,
-            english_reranker_model=english_reranker_model,
-            multilingual_reranker_model=multilingual_reranker_model,
+            top_k=chat_config.top_k,
+            search_type=chat_config.search_type,
+            english_reranker_model=chat_config.english_reranker_model,
+            multilingual_reranker_model=chat_config.multilingual_reranker_model,
         )
         self.response_synthesizer = ResponseSynthesizer(
-            model=response_synthesizer_model,
-            temperature=response_synthesizer_temperature,
-            fallback_model=response_synthesizer_fallback_model,
-            fallback_temperature=response_synthesizer_fallback_temperature,
+            model=chat_config.response_synthesizer_model,
+            temperature=chat_config.response_synthesizer_temperature,
+            fallback_model=chat_config.response_synthesizer_fallback_model,
+            fallback_temperature=chat_config.response_synthesizer_fallback_temperature,
         )
 
     @weave.op

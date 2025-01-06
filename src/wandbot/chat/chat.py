@@ -28,24 +28,19 @@ from typing import List
 
 import weave
 
-from wandbot.chat.config import ChatConfig
+from wandbot.configs.chat_config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger
-
-from openai import OpenAI
+from wandbot.chat.utils import translate_ja_to_en, translate_en_to_ja
 
 logger = get_logger(__name__)
 
-
 class Chat:
-    """Class for handling chat interactions.
-
-    Attributes:
-        config: An instance of ChatConfig containing configuration settings.
-        run: An instance of wandb.Run for logging experiment information.
+    """
+    Class for handling chat interactions and setting up the RAG pipeline, LLMs, etc.
     """
 
     def __init__(self, vector_store: VectorStore, config: ChatConfig):
@@ -55,23 +50,10 @@ class Chat:
             config: An instance of ChatConfig containing configuration settings.
         """
         self.vector_store = vector_store
-        self.config = config
-        # self.run = wandb.init(
-        #     project=self.config.wandb_project,
-        #     entity=self.config.wandb_entity,
-        #     job_type="chat",
-        # )
-        # self.run._label(repo="wandbot")
-
+        self.chat_config = config
         self.rag_pipeline = RAGPipeline(
             vector_store=vector_store,
-            top_k=self.config.top_k,
-            english_reranker_model=self.config.english_reranker_model,
-            multilingual_reranker_model=self.config.multilingual_reranker_model,
-            response_synthesizer_model=self.config.response_synthesizer_model,
-            response_synthesizer_temperature=self.config.response_synthesizer_temperature,
-            response_synthesizer_fallback_model=self.config.response_synthesizer_fallback_model,
-            response_synthesizer_fallback_temperature=self.config.response_synthesizer_fallback_temperature,
+            chat_config=config,
         )
 
     def _get_answer(
@@ -87,73 +69,6 @@ class Chat:
         return result
 
     @weave.op
-    def _translate_ja_to_en(self, text: str) -> str:
-        """
-        Translates Japanese text to English using OpenAI's GPT-4.
-
-        Args:
-            text: The Japanese text to be translated.
-
-        Returns:
-            The translated text in English.
-        """
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional translator. \n\n\
-Translate the user's question about Weights & Biases into English according to the specified rules. \n\
-Rule of translation. \n\
-- Maintain the original nuance\n\
-- Keep code unchanged.\n\
-- Only return the English translation without any additional explanation",
-                },
-                {"role": "user", "content": text},
-            ],
-            temperature=0,
-            max_tokens=1000,
-            top_p=1,
-        )
-        return response.choices[0].message.content
-
-    @weave.op
-    def _translate_en_to_ja(self, text: str) -> str:
-        """
-        Translates English text to Japanese using OpenAI's GPT-4.
-
-        Args:
-            text: The English text to be translated.
-
-        Returns:
-            The translated text in Japanese.
-        """
-        client = OpenAI()
-        response = client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional translator. \n\n\
-Translate the user's text into Japanese according to the specified rules. \n\
-Rule of translation. \n\
-- Maintain the original nuance\n\
-- Use 'run' in English where appropriate, as it's a term used in Wandb.\n\
-- Translate the terms 'reference artifacts' and 'lineage' into Katakana. \n\
-- Include specific terms in English or Katakana where appropriate\n\
-- Keep code unchanged.\n\
-- Only return the Japanese translation without any additional explanation",
-                },
-                {"role": "user", "content": text},
-            ],
-            temperature=0,
-            max_tokens=1000,
-            top_p=1,
-        )
-        return response.choices[0].message.content
-
-    @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         """Handles the chat request and returns the chat response.
 
@@ -166,8 +81,9 @@ Rule of translation. \n\
         original_language = chat_request.language
         try:
             if original_language == "ja":
-                translated_question = self._translate_ja_to_en(
-                    chat_request.question
+                translated_question = translate_ja_to_en(
+                    chat_request.question,
+                    self.chat_config.ja_translation_model_name
                 )
                 chat_request.language = "en"
                 chat_request = ChatRequest(
@@ -184,8 +100,9 @@ Rule of translation. \n\
             result_dict = result.model_dump()
 
             if original_language == "ja":
-                result_dict["answer"] = self._translate_en_to_ja(
-                    result_dict["answer"]
+                result_dict["answer"] = translate_en_to_ja(
+                    result_dict["answer"],
+                    self.chat_config.ja_translation_model_name
                 )
 
             result_dict.update({"application": chat_request.application})
