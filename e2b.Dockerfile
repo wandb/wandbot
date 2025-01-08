@@ -18,7 +18,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone into workspace directory
+# Clone into workspace directory, pass a new value for CACHE_BUST in the docker --build-args
+# to invalidate the cache from here and trigger a fresh git pull and build from here
+ARG CACHE_BUST=1  
 RUN git clone https://github.com/wandb/wandbot.git /workspace/wandbot && \
     cd /workspace/wandbot && \
     git checkout make_wandbot_great_again
