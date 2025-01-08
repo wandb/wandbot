@@ -341,7 +341,7 @@ async def status():
         if components.get("chat")
         else None,
         "vector_store_config": {
-            "persist_dir": str(config.persist_dir) if config else None,
+            "index_dir": str(config.index_dir) if config else None,
             "collection_name": config.collection_name if config else None,
         }
         if config

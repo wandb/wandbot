@@ -44,7 +44,7 @@ class VectorStore:
             raise RuntimeError(f"Failed to initialize embedding models: {str(e)}") from e
         
         try:
-            self.vectorstore_client = chromadb.PersistentClient(path=str(self.vector_store_config.persist_dir))
+            self.vectorstore_client = chromadb.PersistentClient(path=str(self.vector_store_config.index_dir))
             self.vectorstore_collection = self.vectorstore_client.get_or_create_collection(
                 name=self.vector_store_config.collection_name,
                 embedding_function=self.document_embedding_function,
@@ -60,10 +60,11 @@ class VectorStore:
 
     @classmethod
     def from_config(cls, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
-        if vector_store_config.persist_dir.exists():
+        if vector_store_config.index_dir.exists():
             return cls(vector_store_config=vector_store_config, chat_config=chat_config)
         api = wandb.Api()
-        _ = api.artifact(vector_store_config.artifact_url)  # Download vectordb index from W&B
+        art = api.artifact(vector_store_config.artifact_url)  # Download vectordb index from W&B
+        _ = art.download(vector_store_config.index_dir)
         return cls(vector_store_config=vector_store_config, chat_config=chat_config)
 
     def as_retriever(self, search_kwargs: dict, search_type:str ="mmr"):

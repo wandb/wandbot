@@ -277,7 +277,7 @@ class VectorStoreConfig(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
     collection_name: str = "vectorstore"
-    persist_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
+    index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
     embedding_model_name: str = "text-embedding-3-small"
     tokenizer_model_name: str = "text-embedding-ada-002"
     embedding_dimensions: int = 512
