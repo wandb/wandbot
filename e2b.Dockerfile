@@ -18,12 +18,14 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone into workspace directory, pass a new value for CACHE_BUST in the docker --build-args
+# Clone into workspace directory
+# Pass a new value for CACHE_BUST in the docker --build-args
 # to invalidate the cache from here and trigger a fresh git pull and build from here
+ARG WANDBOT_COMMIT
 ARG CACHE_BUST=1  
 RUN git clone https://github.com/wandb/wandbot.git /workspace/wandbot && \
     cd /workspace/wandbot && \
-    git checkout make_wandbot_great_again
+    git checkout $WANDBOT_COMMIT
 
 RUN pip install uv
 
@@ -36,24 +38,15 @@ RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && uv pip install .
 RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && uv pip install poetry
 RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && poetry install
 
-# Download vector index
-# Declare the build arg first & set as env var
-# ARG WANDB_API_KEY
-# ENV WANDB_API_KEY=$WANDB_API_KEY
-
-# COPY download_vectordb_index.py /workspace/download_vectordb_index.py
-# RUN cd /workspace/wandbot && \
-#     . wandbot_venv/bin/activate && \
-#     python /workspace/download_vectordb_index.py
-
 # Copy the index files to wandbot index_dir as defined in the vectorstore config
 RUN cd /workspace/wandbot && \
     . wandbot_venv/bin/activate && \
-    export INDEX_DIR=$(python -c "from wandbot.configs.vectorstore_config import VectorStoreConfig;\
-    index_dir = VectorStoreConfig().index_dir;\
-    print(index_dir, end='')") && \
-    mkdir -p $INDEX_DIR && \
-    cp -r temp_index/* $INDEX_DIR/
+    export INDEX_DIR=$(python -c """from wandbot.configs.vectorstore_config import VectorStoreConfig;\
+index_dir = VectorStoreConfig().index_dir;\
+print(index_dir, end='')""") && \
+    mkdir -p $INDEX_DIR
+
+COPY temp_index /workspace/wandbot/$INDEX_DIR
 
 # Ensure we're in the wandbot directory when container starts
 WORKDIR /workspace/wandbot
