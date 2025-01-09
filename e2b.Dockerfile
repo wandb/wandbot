@@ -47,7 +47,8 @@ RUN cd /home/user/wandbot && \
 index_dir = VectorStoreConfig().index_dir; \
 print(index_dir, end="")') && \
     mkdir -p $INDEX_DIR && \
-    cp -r /home/user/temp_index/* $INDEX_DIR/
+    cp -r /home/user/temp_index/* $INDEX_DIR/ && \
+    rm -rf /home/user/temp_index
 
 # Ensure we're in the wandbot directory when container starts
 WORKDIR /home/user
