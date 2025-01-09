@@ -231,7 +231,7 @@ async def initialize():
 async def lifespan(app: FastAPI):
     logger.info("Running preliminary setup...")
     if os.getenv("WANDBOT_FULL_INIT"):
-        logger.info("Initializing wandbot for evaluation mode...")
+        logger.info("Running full wandbot initialization...")
         await initialize()
     yield
     logger.info("Shutting down")
@@ -270,49 +270,37 @@ async def disk_usage_route():
     return log_disk_usage()
 
 
-@app.get("/git-info")
-async def git_info():
+@app.get("/configs")
+async def configs():
     try:
-        info = get_git_info()
-        if all(v is None for v in info.values()):
+        safe_chat_config = {k: v for k, v in vars(chat_router.chat_components['chat_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+    
+        safe_vs_config = {k: v for k, v in vars(chat_router.chat_components['vector_store_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+    
+        git_info = get_git_info()
+        if all(v is None for v in git_info.values()):
             raise HTTPException(
                 status_code=500,
                 detail="Unable to retrieve git information. Ensure this is a git repository."
             )
-        info["timestamp"] = datetime.utcnow().isoformat()
-        
-        return info
+        git_info["timestamp"] = datetime.now().isoformat()
+
+        return {
+            "chat_config": safe_chat_config, 
+            "vectorstore_config": safe_vs_config,
+            "git_info": git_info
+        }
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error retrieving git information: {str(e)}"
+            detail=f"Error retrieving configs: {str(e)}"
         )
 
 
-@app.get("/chat-config")
-async def git_info():
-    try:
-        safe_chat_config = {k: v for k, v in vars(chat_router.chat_components['chat_config']).items() 
-                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
-        return safe_chat_config
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving chat config: {str(e)}"
-        )
-
-@app.get("/vector-store-config")
-async def git_info():
-    try:
-        safe_vs_config = {k: v for k, v in vars(chat_router.chat_components['vector_store_config']).items() 
-                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
-        return safe_vs_config
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving vector store config: {str(e)}"
-        )
-
+@app.get("/")
 @app.get("/status")
 async def status():
     global is_initialized, is_initializing
@@ -321,40 +309,24 @@ async def status():
     except ImportError:
         retrieve_router = None
 
-    components = chat_router.chat_components
-    config = components.get("vector_store_config")
+    chat_components = chat_router.chat_components
 
     c_ls = {}
-    for key in components.keys():
-        c_ls[key] = str(type(components[key]))
+    for key in chat_components.keys():
+        c_ls[key] = str(type(chat_components[key]))
 
     return {
         "initialized": is_initialized,
         "initializing": is_initializing,
-        "chat_ready": bool(components.get("chat")),
+        "chat_ready": bool(chat_components.get("chat")),
         "retriever_ready": hasattr(retrieve_router, "retriever")
         if retrieve_router
         else False,
-        "vector_store_ready": bool(components.get("vector_store")),
+        "vector_store_ready": bool(chat_components.get("vector_store")),
         "components": c_ls,
-        "chat_type": str(type(components.get("chat")))
-        if components.get("chat")
+        "chat_type": str(type(chat_components.get("chat")))
+        if chat_components.get("chat")
         else None,
-        "vector_store_config": {
-            "index_dir": str(config.index_dir) if config else None,
-            "collection_name": config.collection_name if config else None,
-        }
-        if config
-        else None,
-    }
-
-
-@app.get("/")
-async def root():
-    global is_initializing, is_initialized
-    return {
-        "is_initializing": is_initializing,
-        "is_initialized": is_initialized,
     }
 
 

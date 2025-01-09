@@ -14,6 +14,11 @@ dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
 load_dotenv(dotenv_path)
 
 
+class WebSearchResults(BaseModel):
+    web_search_success: bool
+    web_contexts: List
+
+
 class YouSearchResults(BaseModel):
     web_answer: str = Field("", description="response from you.com RAG model")
     web_context: List[Dict[str, Any]] = Field(

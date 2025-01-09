@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from wandbot.rag.utils import get_web_contexts
 from wandbot.retriever.base import VectorStore
-from wandbot.retriever.web_search import YouSearch, YouSearchConfig
+from wandbot.retriever.web_search import YouSearch, YouSearchConfig, WebSearchResults
 
 import cohere
 import weave
@@ -20,10 +20,6 @@ logger = logging.getLogger(__name__)
 
 autopatch()
 langchain_patcher.undo_patch()
-
-class WebSearchResults(BaseModel):
-    web_search_success: bool
-    web_contexts: List
 
 co = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
 
