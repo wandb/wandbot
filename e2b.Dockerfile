@@ -2,7 +2,7 @@
 FROM e2bdev/code-interpreter:latest
 
 # Set working directory
-WORKDIR /workspace
+WORKDIR /home/user
 
 # Install Python 3.12 and set it as default
 RUN apt-get update && apt-get install -y \
@@ -23,32 +23,33 @@ RUN apt-get update && apt-get install -y \
 # to invalidate the cache from here and trigger a fresh git pull and build from here
 ARG WANDBOT_COMMIT
 ARG CACHE_BUST=1  
-RUN git clone https://github.com/wandb/wandbot.git /workspace/wandbot && \
-    cd /workspace/wandbot && \
+RUN git clone https://github.com/wandb/wandbot.git /home/user/wandbot && \
+    cd /home/user/wandbot && \
     git checkout $WANDBOT_COMMIT
 
 RUN pip install uv
 
 # Set LD_LIBRARY_PATH before running build.sh
-RUN cd /workspace/wandbot && \
+RUN cd /home/user/wandbot && \
     export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH && \
     (bash build.sh || true)
 
-RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && uv pip install .
-RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && uv pip install poetry
-RUN cd /workspace/wandbot && . wandbot_venv/bin/activate && poetry install
+RUN cd /home/user/wandbot && . wandbot_venv/bin/activate && uv pip install .
+RUN cd /home/user/wandbot && . wandbot_venv/bin/activate && uv pip install poetry
+RUN cd /home/user/wandbot && . wandbot_venv/bin/activate && poetry install
 
-# Copy the index files to wandbot index_dir as defined in the vectorstore config
-RUN cd /workspace/wandbot && \
+# Copy in the vector index
+COPY temp_index/* /home/user/temp_index/
+
+RUN cd /home/user/wandbot && \
     . wandbot_venv/bin/activate && \
-    export INDEX_DIR=$(python -c """from wandbot.configs.vectorstore_config import VectorStoreConfig;\
-index_dir = VectorStoreConfig().index_dir;\
-print(index_dir, end='')""") && \
-    mkdir -p $INDEX_DIR
-
-COPY temp_index /workspace/wandbot/$INDEX_DIR
+    export INDEX_DIR=$(python -c 'from wandbot.configs.vectorstore_config import VectorStoreConfig; \
+index_dir = VectorStoreConfig().index_dir; \
+print(index_dir, end="")') && \
+    mkdir -p $INDEX_DIR && \
+    cp -r /home/user/temp_index/* $INDEX_DIR/
 
 # Ensure we're in the wandbot directory when container starts
-WORKDIR /workspace/wandbot
+WORKDIR /home/user
 
 

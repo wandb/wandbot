@@ -28,6 +28,7 @@ wandb.login(key=api_key)
 api = wandb.Api()
 art = api.artifact(config.artifact_url)  # Download vectordb index from W&B
 print(f"Downloading index to {config.index_dir}")
+os.makedirs(config.index_dir, exist_ok=True)
 save_dir = art.download(config.index_dir)
 
 print(f"Downloaded index to {save_dir}") 
