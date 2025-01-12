@@ -15,7 +15,7 @@ from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandBotCorrectnessEvaluator,
 )
-from wandbot.evaluation.config import get_eval_config
+from wandbot.evaluation.eval_config import get_eval_config
 from tenacity import wait_random, after_log
 
 from dotenv import load_dotenv
