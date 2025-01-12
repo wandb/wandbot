@@ -12,7 +12,6 @@ Typical usage example:
   print(config.chat_model_name)
 """
 
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 

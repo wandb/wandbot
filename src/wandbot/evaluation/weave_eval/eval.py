@@ -15,7 +15,8 @@ from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandBotCorrectnessEvaluator,
 )
-from wandbot.evaluation.config import get_config
+from wandbot.evaluation.config import get_eval_config
+from tenacity import wait_random, after_log
 
 from dotenv import load_dotenv
 
@@ -24,8 +25,8 @@ load_dotenv(dotenv_path=dot_env_path, override=True)
 
 logger = get_logger(__name__)
 
-# config = EvalConfig()
-config = get_config()
+config = get_eval_config()
+WANDBOT_URL = config.wandbot_url or "http://0.0.0.0:8000"
 
 weave.init(f"{config.wandb_entity}/{config.wandb_project}")
 
@@ -34,35 +35,17 @@ wandbot_correctness_evaluator = WandBotCorrectnessEvaluator(
     eval_template=CORRECTNESS_EVAL_TEMPLATE,
 )
 
-def get_git_info_requests():
-    """Try call the /git-info endpoint to log the current wandbot git state"""
+    
+def get_wandbot_configs():
+    """Get wandbot's configs and repo git info"""
     try:
-        response = requests.get('http://0.0.0.0:8000/git-info')
+        response = requests.get('http://0.0.0.0:8000/configs')
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
         print(f"Error making request: {e}")
         return None
     
-def get_chat_config():
-    """Try call the /chat-config endpoint to get wandbot's chat config"""
-    try:
-        response = requests.get('http://0.0.0.0:8000/chat-config')
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        print(f"Error making request: {e}")
-        return None
-    
-def get_vector_store_config():
-    """Try call the /vectore-store-config endpoint to get wandbot's chat config"""
-    try:
-        response = requests.get('http://0.0.0.0:8000/vector-store-config')
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        print(f"Error making request: {e}")
-        return None
 
 # @weave.op
 # async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
@@ -76,8 +59,6 @@ def get_vector_store_config():
 #     except Exception as e:
 #         logger.error(f"Error getting answer: {str(e)}")
 #         return json.dumps({}) 
-
-from tenacity import wait_random, after_log
 
 @weave.op
 async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
@@ -93,7 +74,7 @@ async def get_answer(question: str, application: str = "api-eval", language: str
     async def _make_request():
         async with httpx.AsyncClient(timeout=900.0) as client:
             response = await client.post(
-                "http://0.0.0.0:8000/chat/query",
+                f"{WANDBOT_URL}/chat/query",
                 json={"question": question, "application": application, "language": language}
             )
             response.raise_for_status()
@@ -187,14 +168,13 @@ async def answer_correctness_scorer(
 
 def main():
     logger.info("Starting wandbot evaluation...")
-    logger.info(f"Eval Config:\n{vars(config)}\m")
+    logger.info(f"Eval Config:\n{vars(config)}\n")
 
-    wandbot_git_info = get_git_info_requests()
-    logger.info(f"WandBot git info: {wandbot_git_info}")
-    wandbot_chat_config = get_chat_config()
-    logger.info(f"WandBot chat config: {wandbot_chat_config}")
-    wandbot_vectore_store_config = get_vector_store_config()
-    logger.info(f"WandBot vectore store config: {wandbot_vectore_store_config}")
+    wandbot_info = get_wandbot_configs()
+    if wandbot_info: 
+        logger.info(f"WandBot configs and git info:\n{wandbot_info}\n")
+    else:
+        logger.warning("Failed to get WandBot configs")
 
     os.environ["WEAVE_PARALLELISM"] = str(config.n_weave_parallelism)
 
@@ -237,9 +217,9 @@ def main():
 
     eval_attributes = {
             "eval_config": eval_config,
-            "wandbot_chat_config": (wandbot_chat_config or {}),
-            "wandbot_vectore_store_config": (wandbot_vectore_store_config or {}),
-            "wandbot_git_info": (wandbot_git_info or {})
+            "wandbot_chat_config": (wandbot_info["chat_config"] or {}),
+            "wandbot_vectore_store_config": (wandbot_info["vector_store_config"] or {}),
+            "wandbot_git_info": (wandbot_info["git_info"] or {})
             }
 
     logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials")

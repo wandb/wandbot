@@ -1,4 +1,5 @@
 dataclasses-json >= 0.6.4
-llama-index = >= 0.10.30
+llama-index >= 0.10.30
 simple-parsing >= 0.1.6
 gunicorn >= 23.0.0
+ragas == 0.1.7

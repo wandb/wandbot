@@ -10,6 +10,7 @@ class EvalConfig:
     evaluation_name: str = "wandbot-eval"
     n_trials: int = 3
     n_weave_parallelism: int = 20
+    wandbot_url: str = "http://0.0.0.0:8000"
     wandb_entity: str = "wandbot"
     wandb_project: str = "wandbot-eval"
     debug: bool = False
@@ -22,5 +23,5 @@ class EvalConfig:
         return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
 
 
-def get_config() -> EvalConfig:
+def get_eval_config() -> EvalConfig:
     return sp.parse(EvalConfig)

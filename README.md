@@ -140,7 +140,7 @@ Ensure wandbot is installed by installing the production depenencies, activate t
 ```
 bash build.sh
 source wandbot_venv/bin/activate
-pip install -r eval_requirements.txt
+uv pip install -r eval_requirements.txt
 poetry install
 ```
 
