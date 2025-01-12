@@ -19,7 +19,9 @@ from pydantic_settings import BaseSettings
 class ChatConfig(BaseSettings):
     # Retrieval settings
     top_k: int = 15
+    top_k_per_query: int = 15
     search_type: str = "mmr"
+    do_web_search: bool = False
     redundant_similarity_threshold: float = 0.95  # used to remove very similar retrieved documents
     similarity_score_threshold: float = 0.0  # Used in similarity score threshold retrieval, similarity search used
     # Retrieval settings: MMR settings

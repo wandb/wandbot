@@ -22,7 +22,7 @@ from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
-from wandbot.configs.vectorstore_config import VectorStoreConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

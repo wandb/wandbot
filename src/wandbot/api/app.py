@@ -87,7 +87,7 @@ async def initialize():
             try:
                 logger.info("STARTUP: 2/5, 💿 Initializing vector store")
                 
-                from wandbot.configs.vectorstore_config import VectorStoreConfig
+                from wandbot.configs.vector_store_config import VectorStoreConfig
                 vector_store_config = VectorStoreConfig()
                 chat_router.chat_components[
                     "vector_store_config"
@@ -289,7 +289,7 @@ async def configs():
 
         return {
             "chat_config": safe_chat_config, 
-            "vectorstore_config": safe_vs_config,
+            "vector_store_config": safe_vs_config,
             "git_info": git_info
         }
 

@@ -4,6 +4,9 @@ from langchain_core.documents import BaseDocumentTransformer, Document
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import TypeAlias
 import weave
+from wandbot.utils import get_logger
+
+logger = get_logger(__name__)
 
 Matrix: TypeAlias = Union[List[List[float]], List[np.ndarray], np.ndarray]
 
@@ -93,6 +96,47 @@ def maximal_marginal_relevance(
         selected = np.append(selected, [embedding_list[idx_to_add]], axis=0)
     
     return idxs
+
+@weave.op
+def reciprocal_rank_fusion(results: list[list[Document]], smoothing_constant=60):
+    """Combine multiple ranked lists using Reciprocal Rank Fusion.
+    
+    Implements the RRF algorithm from Cormack et al. (2009) to fuse multiple 
+    ranked lists into a single ranked list. Documents appearing in multiple
+    lists have their reciprocal rank scores summed.
+    
+    Args:
+        results: List of ranked document lists to combine
+        smoothing_constant: Constant that controls scoring impact (default: 60). 
+            It smooths out the differences between ranks by adding a constant to 
+            the denominator in the formula 1/(rank + k). This prevents very high 
+            ranks (especially rank 1) from completely dominating the fusion results.
+    
+    Returns:
+        List[Document]: Combined and reranked list of documents
+    """
+    assert len(results) > 0, "No document lists passed to reciprocal rank fusion"
+    assert any(len(docs) > 0 for docs in results), "All document lists passed to reciprocal_rank_fusion are empty"
+
+    text_to_doc = {}
+    fused_scores = {}
+    for docs in results:
+        # Assumes the docs are returned in sorted order of relevance
+        for rank, doc in enumerate(docs):
+            doc_content = doc.page_content
+            text_to_doc[doc_content] = doc
+            if doc_content not in fused_scores:
+                fused_scores[doc_content] = 0.0
+            fused_scores[doc_content] += 1 / (rank + smoothing_constant)
+    logger.debug(f"Final fused scores count: {len(fused_scores)}")
+    
+    ranked_results = dict(
+        sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
+    )
+    ranked_results = [text_to_doc[text] for text in ranked_results.keys()]
+    logger.debug(f"Final reciprocal ranked results count: {len(ranked_results)}")
+    return ranked_results
+
 
 @weave.op
 def _filter_similar_embeddings(

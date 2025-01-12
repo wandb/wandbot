@@ -27,13 +27,13 @@ Typical usage example:
 from typing import List
 
 import weave
-
+import asyncio
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
-from wandbot.utils import Timer, get_logger
+from wandbot.utils import Timer, get_logger, run_sync
 from wandbot.chat.utils import translate_ja_to_en, translate_en_to_ja
 
 logger = get_logger(__name__)
@@ -56,28 +56,20 @@ class Chat:
             chat_config=config,
         )
 
-    def _get_answer(
+    @weave.op
+    async def _aget_answer(
         self, question: str, chat_history: List[QuestionAnswer]
     ) -> RAGPipelineOutput:
         history = []
         for item in chat_history:
             history.append(("user", item.question))
             history.append(("assistant", item.answer))
-
-        result = self.rag_pipeline(question, history)
-
+        result = await self.rag_pipeline.__acall__(question, history)
         return result
 
     @weave.op
-    def __call__(self, chat_request: ChatRequest) -> ChatResponse:
-        """Handles the chat request and returns the chat response.
-
-        Args:
-            chat_request: An instance of ChatRequest representing the chat request.
-
-        Returns:
-            An instance of `ChatResponse` representing the chat response.
-        """
+    async def __acall__(self, chat_request: ChatRequest) -> ChatResponse:
+        """Async method for chat interactions."""
         original_language = chat_request.language
         try:
             if original_language == "ja":
@@ -93,7 +85,7 @@ class Chat:
                     language="en",
                 )
 
-            result = self._get_answer(
+            result = await self._aget_answer(
                 chat_request.question, chat_request.chat_history or []
             )
 
@@ -130,3 +122,7 @@ class Chat:
             )
 
             return ChatResponse(**result)
+
+    @weave.op
+    def __call__(self, chat_request: ChatRequest) -> ChatResponse:
+        return run_sync(self.__acall__(chat_request))

@@ -6,16 +6,21 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
 """
+import asyncio
 import weave
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 from langchain_core.documents import Document
-from langchain_core.runnables import RunnableLambda
 import numpy as np
 
+import chromadb
+from chromadb.config import Settings
+
 from wandbot.retriever.utils import maximal_marginal_relevance
+from wandbot.utils import get_logger
 
+logger = get_logger(__name__)
 
-class ChromaWrapper:
+class ChromaVectorStore:
     """Native ChromaDB wrapper that matches langchain-chroma's interface exactly.
     
     This class provides a drop-in replacement for langchain-chroma's Chroma class,
@@ -25,7 +30,7 @@ class ChromaWrapper:
     - Matching query parameters and filtering
     """
     
-    def __init__(self, collection, embedding_function, vector_store_config, chat_config, override_relevance_score_fn: Optional[Callable] = None):
+    def __init__(self, embedding_function, vector_store_config, chat_config, override_relevance_score_fn: Optional[Callable] = None):
         """Initialize the wrapper.
         
         Args:
@@ -33,95 +38,185 @@ class ChromaWrapper:
             embedding_function: Function to generate embeddings
             override_relevance_score_fn: Optional function to override relevance scoring
         """
-        self.collection = collection
         self.embedding_function = embedding_function
         self.vector_store_config = vector_store_config
         self.chat_config = chat_config
         self.override_relevance_score_fn = override_relevance_score_fn
+        self.chroma_vectorstore_client = chromadb.PersistentClient(
+            path=str(self.vector_store_config.index_dir),
+            settings=Settings(anonymized_telemetry=False))
+        self.collection = self.chroma_vectorstore_client.get_or_create_collection(
+            name=self.vector_store_config.collection_name,
+            embedding_function=self.embedding_function,
+            )
     
+    @weave.op
+    def query(self, 
+              query_texts: Optional[List[str]] = None, 
+              query_embeddings: Optional[List[float]] = None,
+              n_results: int = 1, 
+              filter: Optional[Dict[str, Any]] = None, 
+              where_document: Optional[Dict[str, Any]] = None,
+              include: List[str] = ['documents', 'metadatas', 'distances']
+              ) -> Dict[str, List[Any]]:
+        
+        res = self.collection.query(
+            query_texts=query_texts,
+            query_embeddings=query_embeddings,
+            n_results=n_results,
+            where=filter,
+            where_document=where_document,
+            include=include
+        )
+        logger.debug(f"VECTORSTORE: {len(res)} vector store `.query` results.")
+        return res
+    
+    @weave.op
+    def embed_query(self, query_texts):
+        return self.embedding_function(query_texts)
+
     @weave.op
     def similarity_search(
         self,
-        query: str,
+        query_texts:List[str],
+        top_k: int,
+        return_embeddings: bool = False,
         filter: Optional[Dict[str, Any]] = None,
         where_document: Optional[Dict[str, Any]] = None
-    ) -> List[Document]:
+    ) -> List[List[tuple[Document, float]]]:
         """Perform similarity search.
         
         Args:
-            query: Query text
-            k: Number of results to return (default: 4)
+            query_texts: List of query texts
+            top_k: Number of results to return
+            return_embeddings: Whether to return embeddings
             filter: Optional metadata filter
             where_document: Optional document content filter
             
         Returns:
-            List of Documents
+            List of lists of (Document, score)
         """
-        docs_and_scores = self.similarity_search_with_score(
-            query=query,
-            k=self.chat_config.top_k,
+        
+        return_components = ['documents', 'metadatas', 'distances']
+        if return_embeddings:
+            return_components.append("embeddings")
+
+        query_embeddings =self.embed_query(query_texts)
+        retrieved_results = self.query(
+            query_embeddings=query_embeddings,
+            n_results=top_k,
             filter=filter,
-            where_document=where_document
+            where_document=where_document,
+            include=return_components
         )
-        return [doc for doc, _ in docs_and_scores]
+
+        logger.debug(f"{len(retrieved_results['documents'])} sets of results returned from similarity search call.")
+
+        all_documents = []
+        for i in range(len(retrieved_results['documents'])):
+            docs = self._process_retrieved_results(
+                retrieved_results['documents'][i], 
+                retrieved_results['metadatas'][i], 
+                retrieved_results['distances'][i]
+            )
+            all_documents.append(docs)
+        
+        return all_documents
 
     @weave.op
-    def similarity_search_with_score(
+    def max_marginal_relevance_search(
         self,
-        query: str,
+        query_texts: List[str],
+        top_k: int,
+        fetch_k: int,
+        lambda_mult: float,
         filter: Optional[Dict[str, Any]] = None,
         where_document: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[Document, float]]:
-        """Run similarity search with relevance scores.
-        
-        Args:
-            query: Query text
-            k: Number of results to return (default: 4)
-            filter: Optional metadata filter
-            where_document: Optional document content filter
-            
-        Returns:
-            List of (Document, score) tuples, where score is the relevance score
+    ) -> List[List[tuple[Document, float]]]:
         """
-        # Get query results
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=self.chat_config.top_k,
-            where=filter,
+        Perform MMR search using exact langchain-chroma implementation.
+        
+        Returns:
+            List of lists of (Document, score)
+        """
+        
+        query_embeddings = self.embedding_function(query_texts)
+        retrieved_results = self.query(
+            query_embeddings=query_embeddings,
+            n_results=fetch_k,
+            filter=filter,
             where_document=where_document,
             include=['documents', 'metadatas', 'distances', 'embeddings']
         )
-        
-        # Convert embeddings to numpy for MMR if needed
-        if 'embeddings' in results:
-            results['embeddings'] = [
-                self._convert_to_numpy(emb) for emb in results['embeddings']
-            ]
-        
-        # Get relevance score function based on distance metric
-        relevance_score_fn = self._select_relevance_score_fn()
-        
-        # Convert to Documents with scores
-        docs_and_scores = []
-        for doc, meta, dist in zip(
-            results['documents'][0],
-            results['metadatas'][0],
-            results['distances'][0]
+        logger.debug(f"VECTORSTORE:{len(retrieved_results['documents'])} sets of results returned from MMR search call.")
+    
+        async def run_mmr_batch(
+            query_embedding: List[float],
+            doc_embeddings: List[float],
+            docs: List[str],
+            metadatas: List[Dict[str, Any]],
+            distances: List[float],
+            top_k: int,
+            lambda_mult: float
         ):
-            # Add relevance score to metadata
+            # Perform MMR reranking using langchain's implementation
+            mmr_idxs = maximal_marginal_relevance(
+                query_embedding=self._convert_to_numpy(query_embedding),
+                embedding_list=doc_embeddings,
+                lambda_mult=lambda_mult,
+                top_k=top_k
+            )
+
+            # return a list of Documents with metadata and scores
+            return self._process_retrieved_results(
+                *zip(*[(docs[i], metadatas[i] or {}, distances[i]) for i in mmr_idxs])
+            )
+
+        # Get or create event loop without closing it
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        tasks = [run_mmr_batch(
+            query_embed,
+            doc_embed,
+            docs,
+            metadatas,
+            distances,
+            top_k,
+            lambda_mult
+        ) for query_embed, doc_embed, docs, metadatas, distances in zip(
+            query_embeddings,
+            retrieved_results["embeddings"],
+            retrieved_results["documents"],
+            retrieved_results["metadatas"],
+            retrieved_results["distances"]
+        )]
+        
+        results = loop.run_until_complete(asyncio.gather(*tasks))
+        
+        return results
+
+    def _process_retrieved_results(
+        self,
+        documents: List[str],
+        metadatas: List[Dict],
+        distances: List[float]
+    ) -> List[tuple[Document, float]]:
+        """Convert retrieved results to Documents with scores."""
+        relevance_score_fn = self._select_relevance_score_fn()
+        processed_docs = []
+        
+        for doc, meta, dist in zip(documents, metadatas, distances):
             meta = meta or {}
             score = relevance_score_fn(dist)
             meta["relevance_score"] = score
-            
-            # Get source content if available
             content = meta.get("source_content", doc)
-            
-            docs_and_scores.append(
-                (Document(page_content=content, metadata=meta), score)
-            )
-        
-        return docs_and_scores
-    
+            processed_docs.append((Document(page_content=content, metadata=meta), score))
+        return processed_docs
+
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         """Select the appropriate relevance score function based on distance metric.
         
@@ -151,110 +246,6 @@ class ChromaWrapper:
                 f" for distance metric of type: {distance}."
                 "Consider providing relevance_score_fn to Chroma constructor."
             )
-
-    @weave.op
-    def max_marginal_relevance_search(
-        self,
-        query: str,
-        filter: Optional[Dict[str, Any]] = None,
-        where_document: Optional[Dict[str, Any]] = None
-    ) -> List[Document]:
-        """Perform MMR search using exact langchain-chroma implementation.
-        
-        Args:
-            query: Query text
-            filter: Optional metadata filter
-            where_document: Optional document content filter
-            
-        Returns:
-            List of Documents
-        """
-        
-        # First get initial candidates
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=self.chat_config.fetch_k,
-            where=filter,
-            where_document=where_document,
-            include=['documents', 'metadatas', 'distances', 'embeddings']
-        )
-        
-        query_embedding = self._convert_to_numpy(self.embedding_function([query])[0])
-        doc_embeddings = results['embeddings'][0]
-        
-        # Perform MMR reranking using langchain's implementation
-        mmr_idxs = maximal_marginal_relevance(
-            query_embedding=query_embedding,
-            embedding_list=doc_embeddings,
-            lambda_mult=self.chat_config.mmr_lambda_mult,
-            top_k=self.chat_config.top_k
-        )
-        
-        # Get relevance score function based on distance metric
-        relevance_score_fn = self._select_relevance_score_fn()
-        
-        # Convert to Documents with metadata
-        documents = []
-        for idx in mmr_idxs:
-            doc = results['documents'][0][idx]
-            meta = results['metadatas'][0][idx] or {}
-            dist = results['distances'][0][idx]
-            
-            # Add relevance score to metadata using appropriate scoring function
-            meta["relevance_score"] = relevance_score_fn(dist)
-            
-            # Get source content if available
-            content = meta.get("source_content", doc)
-            
-            documents.append(Document(page_content=content, metadata=meta))
-        
-        return documents
-    
-    def as_retriever(
-        self,
-        search_kwargs: dict,
-        search_type: str = "mmr",
-    ):
-        """Return a retriever interface matching langchain-chroma exactly.
-        
-        Args:
-            search_type: Type of search ("similarity", "mmr", or "similarity_score_threshold")
-            search_kwargs: Search parameters
-                filter: Filter by metadata
-                where_document: Filter by document content
-                score_threshold: Minimum relevance score for similarity_score_threshold
-            
-        Returns:
-            Retriever callable
-        """
-
-        @weave.op
-        def retrieve(query: str) -> List[Document]:
-            filter_dict = search_kwargs.get("filter", None)
-            where_document = search_kwargs.get("where_document", None)
-            
-            if search_type == "mmr":
-                return self.max_marginal_relevance_search(
-                    query=query,
-                    filter=filter_dict,
-                    where_document=where_document
-                )
-            elif search_type == "similarity_score_threshold":
-                similarity_score_threshold = self.chat_config.similarity_score_threshold
-                results = self.similarity_search_with_score(
-                    query=query,
-                    filter=filter_dict,
-                    where_document=where_document
-                )
-                return [doc for doc, score in results if score >= similarity_score_threshold]
-            else:  # Default to similarity
-                return self.similarity_search(
-                    query=query,
-                    filter=filter_dict,
-                    where_document=where_document
-                )
-        
-        return RunnableLambda(retrieve)
 
     def _convert_to_numpy(self, embeddings):
         """Convert embeddings to numpy arrays if they aren't already"""

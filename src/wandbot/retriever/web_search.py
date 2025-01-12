@@ -1,6 +1,9 @@
+import asyncio
 import os
 from typing import Any, Dict, List
 
+import weave
+from langchain_core.documents import Document
 import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -171,3 +174,58 @@ class YouSearch:
             return self._rag(question)
         else:
             return self._retrieve(question)
+
+def get_web_contexts(web_results: YouSearchResults):
+    output_documents = []
+    if not web_results:
+        return []
+    return (
+        output_documents
+        + [
+            Document(
+                page_content=document["context"], metadata=document["metadata"]
+            )
+            for document in web_results.web_context
+        ]
+        if web_results.web_context
+        else []
+    )
+
+@weave.op
+def run_web_search(query: str, top_k: int, avoid=False) -> WebSearchResults:
+    try:
+        if avoid:
+            logger.debug(f"Skipping web search, avoid: {avoid}")
+            return WebSearchResults(
+                web_search_success=False,
+                web_contexts=[],
+            )
+        
+        # Run web search
+        yousearch = YouSearch(YouSearchConfig())
+        web_results = yousearch(query)
+        if web_results.success:
+            web_contexts = get_web_contexts(web_results)[:top_k]
+        else:
+            logger.debug(
+                f"Issue running web search, web_results: {web_results}"
+            )
+            web_contexts = []
+        return WebSearchResults(
+            web_search_success=web_results.success,
+            web_contexts=web_contexts,
+        )
+    except Exception as e:
+        logger.error(f"Error running web search: {e}")
+        return WebSearchResults(
+            web_search_success=False,
+            web_contexts=[],
+        )
+    
+async def _async_run_web_search(query: str, top_k: int, avoid: bool) -> WebSearchResults:
+    return await asyncio.to_thread(
+        run_web_search,
+        query=query,
+        top_k=top_k,
+        avoid=avoid
+    )

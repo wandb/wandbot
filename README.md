@@ -80,8 +80,10 @@ COHERE_API_KEY
 WANDB_API_KEY
 WANDBOT_API_URL="http://localhost:8000"
 WANDB_TRACING_ENABLED="true"
+LOG_LEVEL=INFO
 WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY= <your W&B entity>
+
 ```
 
 If you're running the slack or discord apps you'll also need the following keys/tokens set as env vars:

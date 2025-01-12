@@ -35,7 +35,7 @@ async def query(request: APIQueryRequest) -> APIQueryResponse:
 
     try:
         chat_instance = chat_components["chat"]
-        result = chat_instance(
+        result = await chat_instance.__acall__(
             ChatRequest(
                 question=request.question,
                 chat_history=request.chat_history,

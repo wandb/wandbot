@@ -14,7 +14,7 @@ from langchain_core.runnables import (
     RunnablePassthrough,
 )
 from langchain_openai import ChatOpenAI
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from pydantic import ValidationError
 
 from wandbot.configs.chat_config import ChatConfig

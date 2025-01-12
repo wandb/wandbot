@@ -270,20 +270,3 @@ class FCReportsStoreConfig(DataStoreConfig):
         values.data_source = data_source
 
         return values
-
-
-class VectorStoreConfig(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="allow"
-    )
-    collection_name: str = "vectorstore"
-    index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    embedding_model_name: str = "text-embedding-3-small"
-    tokenizer_model_name: str = "text-embedding-ada-002"
-    embedding_dimensions: int = 512
-    batch_size: int = 256
-    artifact_url: str = Field(
-        "wandbot/wandbot-dev/chroma_index:latest",
-        env="WANDB_INDEX_ARTIFACT",
-        validation_alias="wandb_index_artifact",
-    )

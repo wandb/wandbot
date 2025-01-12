@@ -55,9 +55,21 @@ def get_logger(name: str) -> logging.Logger:
     Returns:
         A logger instance with the specified name.
     """
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL
+    }
+    
+    # Get log level from environment or default to INFO
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    level = level_map.get(log_level, logging.INFO)  # Default to INFO if invalid level
+
     logging.basicConfig(
         format="%(asctime)s : %(levelname)s : %(message)s",
-        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "INFO")),
+        level=level,
     )
     logger = logging.getLogger(name)
     return logger
@@ -444,3 +456,34 @@ def get_git_info() -> Dict[str, Optional[str]]:
             info["commits_behind"] = behind
     
     return info
+
+def run_sync(coro: Coroutine) -> Any:
+    """
+    Safely run an async coroutine in a synchronous context.
+    If no event loop is running, we create one. 
+    Otherwise, we schedule the coroutine on the existing loop.
+
+    Args:
+        coro: The coroutine to run synchronously
+
+    Returns:
+        The result of the coroutine execution
+
+    Example:
+        In practice, from inside a FastAPI endpoint that is already async,
+        you'd typically do:
+           await chat_instance.__acall__(request)
+        But if you have a pure sync path, you can do:
+           result = run_sync(chat_instance.__acall__(request))
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # If we get here, it means there's already a running loop. 
+        # We'll schedule the coroutine thread-safely:
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
+    except RuntimeError:
+        # No running loop, so create our own
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)

@@ -90,20 +90,3 @@ def process_input_for_retrieval(retrieval_input):
     elif not isinstance(retrieval_input, str):
         retrieval_input = str(retrieval_input)
     return retrieval_input
-
-
-def get_web_contexts(web_results: YouSearchResults):
-    output_documents = []
-    if not web_results:
-        return []
-    return (
-        output_documents
-        + [
-            Document(
-                page_content=document["context"], metadata=document["metadata"]
-            )
-            for document in web_results.web_context
-        ]
-        if web_results.web_context
-        else []
-    )
