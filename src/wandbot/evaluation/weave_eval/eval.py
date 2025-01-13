@@ -47,19 +47,6 @@ def get_wandbot_configs():
         return None
     
 
-# @weave.op
-# async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
-#     url = "http://0.0.0.0:8000/chat/query"
-#     payload = {"question": question, "application": application, "language": language}
-#     try:
-#         async with httpx.AsyncClient(timeout=900.0) as client:
-#             response = await client.post(url, json=payload)
-#             response.raise_for_status() 
-#             return json.dumps(response.json())
-#     except Exception as e:
-#         logger.error(f"Error getting answer: {str(e)}")
-#         return json.dumps({}) 
-
 @weave.op
 async def get_answer(question: str, application: str = "api-eval", language: str = "en") -> str:
     @retry(

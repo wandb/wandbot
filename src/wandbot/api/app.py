@@ -290,7 +290,8 @@ async def configs():
         return {
             "chat_config": safe_chat_config, 
             "vector_store_config": safe_vs_config,
-            "git_info": git_info
+            "git_info": git_info,
+            "app_config": app_config
         }
 
     except Exception as e:
