@@ -9,6 +9,10 @@ temp_index/
 # C extensions
 *.so
 
+test_*.py
+test_*.ipynb
+temp_*
+
 # Distribution / packaging
 .Python
 build/
