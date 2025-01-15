@@ -247,18 +247,48 @@ class EnhancedQuery(BaseModel):
         }
 
 
-ENHANCER_SYSTEM_PROMPT = (
-    "You are a weights & biases support manager tasked with enhancing support questions from users. "
-    "You are given a conversation and a follow-up query. "
-    "You goal to enhance the user query and render it using the tool provided."
-    "\n\nChat History: \n\n"
-    "{chat_history}"
-)
+# ENHANCER_SYSTEM_PROMPT = (
+#     "You are a weights & biases support manager tasked with enhancing support questions from users. "
+#     "You are given a conversation and a follow-up query. "
+#     "You goal to enhance the user query and render it using the tool provided."
+#     "\n\nChat History: \n\n"
+#     "{chat_history}"
+# )
+
+
+ENHANCER_SYSTEM_PROMPT = """
+# Task
+Given a query from a user, you are tasked with generating an expanded list of additional \
+queries that will help in retrieving information relevant to the user's query.
+
+The point of this is to help retrieve relevant information from both our keyword search \
+and semantic search vector data base. We want to improve recall across potentially relevant \
+content such as our documentation, blogs, FAQs and code snippets in our vector database.
+
+Try and generate a broad diversity of queries while still staying focused on the \
+original intent and technical focus of the query.
+"""
+
+
+USER_PROMPT ="""# User Query\
+Given this user query, please generate relevant, related queries to improve recall \
+for our keyword and vector search services:
+
+## User Query
+{query}
+
+!!! Tip: Make sure to answer in the correct format."""
+
+# ENHANCER_PROMPT_MESSAGES = [
+#     ("system", ENHANCER_SYSTEM_PROMPT),
+#     ("human", "Question: {query}"),
+#     ("human", "!!! Tip: Make sure to answer in the correct format"),
+# ]
+
 
 ENHANCER_PROMPT_MESSAGES = [
     ("system", ENHANCER_SYSTEM_PROMPT),
-    ("human", "Question: {query}"),
-    ("human", "!!! Tip: Make sure to answer in the correct format"),
+    ("human", USER_PROMPT)
 ]
 
 
