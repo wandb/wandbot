@@ -7,7 +7,7 @@ import weave
 import pandas as pd
 from weave import Dataset
 
-from wandbot.evaluation.config import EvalConfig
+from wandbot.evaluation.eval_config import EvalConfig
 
 config = EvalConfig()
 

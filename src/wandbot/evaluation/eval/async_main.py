@@ -12,7 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 from tqdm import tqdm
 
 import wandb
-from wandbot.evaluation.config import EvalConfig
+from wandbot.evaluation.eval_config import EvalConfig
 from wandbot.evaluation.eval.correctness import (
     CORRECTNESS_EVAL_TEMPLATE,
     WandbCorrectnessEvaluator,

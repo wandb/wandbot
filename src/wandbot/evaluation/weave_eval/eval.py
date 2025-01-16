@@ -87,8 +87,8 @@ def parse_text_to_json(text):
 
 
 @weave.op
-async def get_record(question: str, language: str = "en") -> dict:
-    response = await get_answer(question, language=language)
+async def get_record(question: str, application: str = "api-eval", language: str = "en") -> dict:
+    response = await get_answer(question, application, language=language)
     response = json.loads(response)
     
     # Return default values if response is empty or missing fields
@@ -120,10 +120,11 @@ async def get_record(question: str, language: str = "en") -> dict:
 
 class WandbotModel(weave.Model):
     language: str = "en"
+    application: str = "api-eval"
 
     @weave.op
     async def predict(self, question: str) -> dict:
-        prediction = await get_record(question, language=self.language)
+        prediction = await get_record(question, application=self.application, language=self.language)
         return prediction
 
 @weave.op
@@ -183,7 +184,7 @@ def main():
     ]
     logger.info("Number of evaluation samples: %s", len(question_rows))
 
-    wandbot = WandbotModel(language=config.lang)
+    wandbot = WandbotModel(language=config.lang, application=config.experiment_name)
 
     wandbot_evaluator = Evaluation(
         name=config.evaluation_name,
