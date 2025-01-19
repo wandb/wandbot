@@ -207,7 +207,8 @@ def main():
             "eval_config": eval_config,
             "wandbot_chat_config": (wandbot_info["chat_config"] or {}),
             "wandbot_vectore_store_config": (wandbot_info["vector_store_config"] or {}),
-            "wandbot_git_info": (wandbot_info["git_info"] or {})
+            "wandbot_git_info": (wandbot_info["git_info"] or {}),
+            "wandbot_app_config": (wandbot_info["app_config"] or {})
             }
 
     logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials")
