@@ -119,10 +119,10 @@ class ResponseSynthesizer:
 
     def __init__(
         self,
-        model: str = "gpt-4-0125-preview",
-        temperature: float = 0.1,
-        fallback_model: str = "gpt-4-0125-preview",
-        fallback_temperature: float = 0.1,
+        model: str,
+        temperature: float,
+        fallback_model: str,
+        fallback_temperature: float,
     ):
         self.model = {"model_name": model, "temperature": temperature}  # type: ignore
         self.fallback_model = {"model_name": fallback_model, "temperature": fallback_temperature}  # type: ignore

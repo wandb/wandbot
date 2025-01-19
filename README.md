@@ -146,13 +146,7 @@ poetry install
 
 **Environment variables**
 
-Make sure to set the environment variables (i.e. LLM provider keys etc) from the .env file in your terminal:
-
-```bash
-set -o allexport
-source .env
-set +o allexport
-```
+Make sure to set the environment variables (i.e. LLM provider keys etc) from the `.env` file.
 
 **Launch the wandbot app**
 You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_FULL_INIT` env var triggers the full wandbot app initialization.
@@ -169,7 +163,7 @@ WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
 --log-level debug
 ```
 
-gunicorn:
+alternatively you can also run wandbot with `gunicorn`:
 
 ```bash
 WANDBOT_FULL_INIT=1 \
@@ -191,10 +185,7 @@ curl -X POST \
 ```
 
 **Debugging**
-For debugging purposes during evaluation you can run a single instance of the app using this command 
-```
- uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 \
---workers 1 --timeout-keep-alive 75 --loop uvloop --http httptools --log-level debug
+For debugging purposes during evaluation you can run a single instance of the app by chaning the `uvicorn` command above to use `--workers 1` 
 ```
 
 **Run the evaluation**
