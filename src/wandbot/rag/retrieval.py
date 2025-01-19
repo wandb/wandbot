@@ -96,6 +96,10 @@ class FusionRetrievalEngine:
             language=language
         )
 
+    @weave.op
+    def dedupe_retrieved_results(self, results: List[Document]) -> List[Document]:
+        return list({doc.metadata["id"]: doc for doc in results}.values())
+
     async def _run_retrieval_common(self, inputs: Dict[str, Any], use_async: bool) -> Dict[str, Any]:
         """Single function containing the entire retrieval logic."""
         try:
@@ -120,19 +124,24 @@ class FusionRetrievalEngine:
             logger.debug(f"RETRIEVAL-ENGINE: Retrieved {len(web_search_results.web_contexts)} web contexts.")
             
             fused_context = docs_context + web_search_results.web_contexts
+
+            # Dedupe results
+            len_fused_context = len(fused_context)
+            fused_context_deduped = self.dedupe_retrieved_results(fused_context)
+            logger.info(f"RETRIEVAL-ENGINE: Deduped {len_fused_context - len(fused_context_deduped)} duplicate documents.")
             
             # Rerank results
             if use_async:
                 context = await self._async_rerank_results(
                     query=inputs["standalone_query"],
-                    context=fused_context,
+                    context=fused_context_deduped,
                     top_k=self.top_k,
                     language=inputs["language"]
                 )
             else:
                 context = self.rerank_results(
                     query=inputs["standalone_query"],
-                    context=fused_context,
+                    context=fused_context_deduped,
                     top_k=self.top_k,
                     language=inputs["language"]
                 )
@@ -142,7 +151,7 @@ class FusionRetrievalEngine:
             return {
                 "docs_context": docs_context,
                 "search_results": web_search_results,
-                "full_context": fused_context,
+                "full_context": fused_context_deduped,
                 "context": context,
                 "web_search_success": web_search_results.web_search_success,
                 "standalone_query": inputs["standalone_query"],
