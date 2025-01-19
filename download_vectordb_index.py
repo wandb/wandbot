@@ -1,6 +1,6 @@
 import os
 import wandb
-from wandbot.configs.vectorstore_config import VectorStoreConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
 
 from dataclasses import dataclass
 import simple_parsing as sp

@@ -36,7 +36,7 @@ RUN poetry install
 # Copy in the vector index
 COPY temp_index/* /home/user/temp_index/
 
-RUN export INDEX_DIR=$(python -c 'from wandbot.configs.vectorstore_config import VectorStoreConfig; \
+RUN export INDEX_DIR=$(python -c 'from wandbot.configs.vector_store_config import VectorStoreConfig; \
 index_dir = VectorStoreConfig().index_dir; \
 print(index_dir, end="")') && \
     mkdir -p $INDEX_DIR && \
