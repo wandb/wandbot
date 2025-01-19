@@ -33,10 +33,11 @@ async def initialize():
             logger.info("STARTUP: ⏳ Beginning initialization")
 
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            initial_disk_used = disk_info['used_mb']
-            logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                initial_disk_used = disk_info['used_mb']
+                logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
 
             # 0/5: Initalise Weave
             try:
@@ -57,10 +58,11 @@ async def initialize():
                 raise
 
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_0 = disk_info['used_mb']
-            logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_0 = disk_info['used_mb']
+                logger.info(f"STARTUP: 0/5, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
             
             # 1/5: Init Chat config
             try:
@@ -78,10 +80,11 @@ async def initialize():
                 raise
 
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_1 = disk_info['used_mb']
-            logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_1 = disk_info['used_mb']
+                logger.info(f"STARTUP: 1/5, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
 
             # 2/5: Init Vector store config
             try:
@@ -118,10 +121,11 @@ async def initialize():
                 raise
             
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_2 = disk_info['used_mb']
-            logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_2 = disk_info['used_mb']
+                logger.info(f"STARTUP: 2/5, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
             
             # 3/5: Init Chat
             try:
@@ -146,10 +150,11 @@ async def initialize():
                 raise
             
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_3 = disk_info['used_mb']
-            logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_3 = disk_info['used_mb']
+                logger.info(f"STARTUP: 3/5, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
 
             
             # 4/5: Init Retriever
@@ -178,10 +183,11 @@ async def initialize():
             #     raise
 
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_4 = disk_info['used_mb']
-            logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_4 = disk_info['used_mb']
+                logger.info(f"STARTUP: 4/5, 💾 Disk usage increment after 4: {round(disk_used_4 - disk_used_3, 1)} MB")
 
             # 5/5: Init Database
             try:
@@ -202,15 +208,17 @@ async def initialize():
             os.system("wandb artifact cache cleanup 0.01GB --remove-temp")
             
             # Check disk usage
-            disk_info = log_disk_usage()
-            log_top_disk_usage()
-            disk_used_5 = disk_info['used_mb']
-            logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_5 = disk_info['used_mb']
+                logger.info(f"STARTUP: 5/5, 💾 Disk usage increment after 5: {round(disk_used_5 - disk_used_4, 1)} MB")
 
             is_initialized = True
             is_initializing = False
             logger.info("STARTUP: ✅ Initialization complete 🎉")
-            logger.info(f"STARTUP: 💾 Total disk usage increment during intialization: {round(disk_used_5 - initial_disk_used, 1)} MB")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                logger.info(f"STARTUP: 💾 Total disk usage increment during intialization: {round(disk_used_5 - initial_disk_used, 1)} MB")
             return {"startup_status": f"is_initialized: {is_initialized}"}
 
         except Exception as e:
