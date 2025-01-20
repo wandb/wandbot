@@ -14,6 +14,6 @@ class VectorStoreConfig(BaseSettings):
     embeddings_dimensions: int = 512  # needed when using OpenAI embeddings
     embeddings_query_input_type: str = "search_query"  # needed when using Cohere embeddings
     embeddings_document_input_type: str = "search_document"  # needed when using Cohere embeddings
-    embeddings_encoding_format: Literal["float", "base64"] = "float"
+    embeddings_encoding_format: Literal["float", "base64"] = "base64"
     # Ingestions
     batch_size: int = 256  # used during ingestion when adding docs to vectorstore

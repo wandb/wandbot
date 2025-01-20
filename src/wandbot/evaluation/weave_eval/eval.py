@@ -144,7 +144,7 @@ async def answer_correctness_scorer(
         contexts=contexts,
         reference_notes=notes,
     )
-    res = result.dict()
+    res = result.model_dump()
     return {
         "answer_correct": res.get("passing", None),
         "reasoning": res.get("feedback"),
