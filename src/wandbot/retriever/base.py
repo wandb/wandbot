@@ -5,7 +5,6 @@ from wandbot.retriever.chroma import ChromaVectorStore
 from langchain_core.documents import Document
 import wandb
 
-from wandbot.retriever.utils import EmbeddingsRedundantFilter
 from wandbot.models.embedding import EmbeddingModel
 from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.configs.chat_config import ChatConfig
