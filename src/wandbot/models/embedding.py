@@ -8,6 +8,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.utils import get_logger
 
+import base64
+import numpy as np
+
 logger = get_logger(__name__)
 
 vector_store_config = VectorStoreConfig()
@@ -22,6 +25,7 @@ class EmbeddingModel():
                     input_type:str = None,
                     dimensions:int = None,
                     n_parallel_api_calls:int = 50,
+                    encoding_format:str = "float",
                 ):
         self.provider = provider.lower()
         self.model_name = model_name
@@ -55,7 +59,7 @@ class EmbeddingModel():
             raise ValueError("`dimensions` needs to be specified when using OpenAI embeddings models")
         
         self.n_parallel_api_calls = n_parallel_api_calls
-    
+        self.encoding_format = encoding_format
     @weave.op
     @retry(
         stop=stop_after_attempt(3),
@@ -83,10 +87,15 @@ class EmbeddingModel():
                                 response = await client.embeddings.create(
                                     input=text,
                                     model=self.model_name,
-                                    encoding_format="float",
+                                    encoding_format=self.encoding_format,
                                     dimensions=self.dimensions
                                 )
-                                return response.data[0].embedding
+                                if self.encoding_format == "base64":
+                                    decoded_embeddings = base64.b64decode(response.data[0].embedding)
+                                    embeddings = np.frombuffer(decoded_embeddings, dtype=np.float32).tolist()
+                                    return embeddings
+                                else:
+                                    return response.data[0].embedding
 
                         return await asyncio.gather(*[get_single_openai_embedding(text) for text in inputs])
                     finally:

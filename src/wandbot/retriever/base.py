@@ -25,7 +25,8 @@ class VectorStore:
                 provider = self.vector_store_config.embeddings_provider,
                 model_name = self.vector_store_config.embeddings_model_name,
                 dimensions = self.vector_store_config.embeddings_dimensions,
-                input_type = self.vector_store_config.embeddings_query_input_type
+                input_type = self.vector_store_config.embeddings_query_input_type,
+                encoding_format = self.vector_store_config.embeddings_encoding_format
             )
         except Exception as e:
             raise RuntimeError(f"Failed to initialize embedding model:\n{str(e)}\n") from e
