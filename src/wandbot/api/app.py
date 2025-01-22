@@ -24,7 +24,7 @@ is_initializing = False
 async def initialize():
     global is_initialized, is_initializing
     logger.info(
-        f"STARTUP: initialize() function called, is_initialized: {is_initialized} is_initializing: {is_initializing}"
+        f"STARTUP: initialize() function called - is_initialized: {is_initialized}, is_initializing: {is_initializing}"
     )
 
     if not is_initialized and not is_initializing:
