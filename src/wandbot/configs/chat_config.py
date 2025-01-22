@@ -22,9 +22,8 @@ class ChatConfig(BaseSettings):
     search_type: Literal["mmr", "similarity"] = "mmr"
     do_web_search: bool = False
     redundant_similarity_threshold: float = 0.95  # used to remove very similar retrieved documents
-    similarity_score_threshold: float = 0.0  # Used in similarity score threshold retrieval, similarity search used
     # Retrieval settings: MMR settings
-    fetch_k: int = 20  # Used in mmr retrieval. Typically set as top_k * 4
+    fetch_k: int = 60  # Used in mmr retrieval. Typically set as top_k * 4
     mmr_lambda_mult: float = 0.5  # used in mmr retrieval
     # Reranker models
     rereanker_provider: str = "cohere"
