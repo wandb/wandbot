@@ -68,7 +68,8 @@ class ChromaVectorStore:
             where_document=where_document,
             include=include
         )
-        logger.debug(f"VECTORSTORE: {len(res)} vector store `.query` results.")
+        logger.debug(f"VECTORSTORE: {len(query_texts) if query_texts is not None else len(query_embeddings)} queries, {len(res)} vector store `.query` results \
+of lengths: {[len(r) for r in res['documents']]}")
         return res
     
     @weave.op
@@ -83,7 +84,7 @@ class ChromaVectorStore:
         return_embeddings: bool = False,
         filter: Optional[Dict[str, Any]] = None,
         where_document: Optional[Dict[str, Any]] = None
-    ) -> List[List[tuple[Document, float]]]:
+    ) -> Dict[str, List[Document]]:
         """Perform similarity search.
         
         Args:
@@ -94,7 +95,7 @@ class ChromaVectorStore:
             where_document: Optional document content filter
             
         Returns:
-            List of lists of (Document, score)
+            List of Dicts
         """
         
         return_components = ['documents', 'metadatas', 'distances']
@@ -110,7 +111,11 @@ class ChromaVectorStore:
             include=return_components
         )
 
-        logger.debug(f"{len(retrieved_results['documents'])} sets of results returned from similarity search call.")
+        logger.debug(f"SIMILARITY-SEARCH: {len(retrieved_results['documents'])} sets of results returned from similarity search call.")
+        logger.debug(f"SIMILARITY-SEARCH: First query text:\n{query_texts[0]}\n")
+        logger.debug(f"SIMILARITY-SEARCH: First returned documents:\n{retrieved_results['documents'][0]}\n")
+        logger.debug(f"SIMILARITY-SEARCH: First returned document metadatas:\n{retrieved_results['metadatas'][0]}\n")
+        logger.debug(f"SIMILARITY-SEARCH: First returned document distances:\n{retrieved_results['distances'][0]}\n")
 
         all_documents = []
         for i in range(len(retrieved_results['documents'])):
@@ -120,8 +125,13 @@ class ChromaVectorStore:
                 retrieved_results['distances'][i]
             )
             all_documents.append(docs)
+
+        # Link query to result, mostly for logging visibility
+        results_dict = {}
+        for i, result in enumerate(all_documents):
+            results_dict[query_texts[i]] = result
         
-        return all_documents
+        return results_dict
 
     @weave.op
     def max_marginal_relevance_search(
@@ -132,15 +142,25 @@ class ChromaVectorStore:
         lambda_mult: float,
         filter: Optional[Dict[str, Any]] = None,
         where_document: Optional[Dict[str, Any]] = None
-    ) -> List[List[tuple[Document, float]]]:
+    ) -> Dict[str, List[Document]]:
         """
         Perform MMR search using exact langchain-chroma implementation.
         
         Returns:
-            List of lists of (Document, score)
+            Dict of lists
         """
         
         query_embeddings = self.embedding_function(query_texts)
+        # DEBUG
+        print(f"len query embeds: {len(query_embeddings)}")
+        print(f"len first query embed: {len(query_embeddings[0])}")
+        print(f"Query texts: {query_texts}")
+        # for i, q in enumerate(query_texts):
+        #     if q == "concurrent writes":
+        #         print(f"cc Query embedding: {query_embeddings[i][:50]}")
+        #         print("*"*100)
+        #         break
+
         retrieved_results = self.query(
             query_embeddings=query_embeddings,
             n_results=fetch_k,
@@ -148,8 +168,25 @@ class ChromaVectorStore:
             where_document=where_document,
             include=['documents', 'metadatas', 'distances', 'embeddings']
         )
-        logger.debug(f"VECTORSTORE:{len(retrieved_results['documents'])} sets of results returned from MMR search call.")
-    
+
+        # DEBUG
+        @weave.op
+        def debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings):
+            for i, q in enumerate(query_texts):
+                if q == "concurrent writes":
+                    print(f"Unranked fetch_k {fetch_k} ids for {q}:")
+                    for doc in retrieved_results["metadatas"][i]:
+                        print(doc['id'])
+                    print("*"*100)
+                    print(f"Query Embeddings:\n{query_embeddings[i][:10]}")
+                    break
+            return query_texts, retrieved_results, query_embeddings
+        _ = debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings)
+        # END DEBUG
+        
+        logger.debug(f"VECTORSTORE: {len(retrieved_results['documents'])} sets of results returned from MMR search call.")
+        logger.debug(f"VECTORSTORE: First query's document IDs: {[meta.get('id') for meta in retrieved_results['metadatas'][0]]}")
+        
         async def run_mmr_batch(
             query_embedding: List[float],
             doc_embeddings: List[float],
@@ -167,10 +204,37 @@ class ChromaVectorStore:
                 top_k=top_k
             )
 
-            # return a list of Documents with metadata and scores
-            return self._process_retrieved_results(
+            # DEBUG
+            #print(f"Query embedding: {query_embedding[:50]}")
+            res = self._process_retrieved_results(
                 *zip(*[(docs[i], metadatas[i] or {}, distances[i]) for i in mmr_idxs])
             )
+            # print("MRR IDs for query.")
+            # for doc in res:
+            #     print(doc.metadata['id'])
+            # print("*"*100)
+
+            # # return a list of Documents with metadata and scores
+            # return self._process_retrieved_results(
+            #     *zip(*[(docs[i], metadatas[i] or {}, distances[i]) for i in mmr_idxs])
+            # )
+            return res
+
+        # DEBUG
+        from wandbot.models.embedding import EmbeddingModel
+
+        v1_3_embedding_model = EmbeddingModel(
+            provider="openai",
+            model_name="text-embedding-3-small",
+            dimensions=512,
+            input_type="search_query",
+            encoding_format="base64"
+        )
+        v1_3_embeddings = v1_3_embedding_model.embed(query_texts)
+        # print(f"Query embedding: {v1_3_embeddings[0][:50]}")
+        # print("*"*100)
+
+        # END DEBUG
 
         # Get or create event loop without closing it
         try:
@@ -179,7 +243,15 @@ class ChromaVectorStore:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        tasks = [run_mmr_batch(
+        # DEBUG
+        from wandbot.retriever.tmp_mmr import debug_run_mmr_batch
+        print("Prep to run debug_run_mmr_batch")
+        print("*"*100)
+        
+
+        tasks = [debug_run_mmr_batch(
+        # END DEBUG
+        # tasks = [run_mmr_batch(
             query_embed,
             doc_embed,
             docs,
@@ -188,23 +260,48 @@ class ChromaVectorStore:
             top_k,
             lambda_mult
         ) for query_embed, doc_embed, docs, metadatas, distances in zip(
-            query_embeddings,
+            # query_embeddings, # DEBUG
+            v1_3_embeddings,
             retrieved_results["embeddings"],
             retrieved_results["documents"],
             retrieved_results["metadatas"],
-            retrieved_results["distances"]
+            retrieved_results["distances"],
         )]
         
         results = loop.run_until_complete(asyncio.gather(*tasks))
         
-        return results
+        
+        # DEBUG
+        print(f"Constructing results_dict")
+        ## END DEBUG
+
+        # Link query to result, mostly for logging visibility
+        results_dict = {}
+        for i, result in enumerate(results):
+            results_dict[query_texts[i]] = result
+
+        # DEBUG
+        def debug_log_mmr_results(results_dict):
+            for query, results in results_dict.items():
+                if query == "concurrent writes":
+                    print(f"concurrent writes found at index: {i}")    
+                    print(f"MRR IDs for query: {query}")
+                    for doc in results:
+                        print(doc.metadata['id'])
+                    print("*"*100)
+                    break
+            return results_dict
+        
+        _ = debug_log_mmr_results(results_dict)
+        
+        return results_dict
 
     def _process_retrieved_results(
         self,
         documents: List[str],
         metadatas: List[Dict],
         distances: List[float]
-    ) -> List[tuple[Document, float]]:
+    ) -> List[Document]:
         """Convert retrieved results to Documents with scores."""
         relevance_score_fn = self._select_relevance_score_fn()
         processed_docs = []
@@ -214,7 +311,7 @@ class ChromaVectorStore:
             score = relevance_score_fn(dist)
             meta["relevance_score"] = score
             content = meta.get("source_content", doc)
-            processed_docs.append((Document(page_content=content, metadata=meta), score))
+            processed_docs.append(Document(page_content=content, metadata=meta, id=meta.get("id")))
         return processed_docs
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
