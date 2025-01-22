@@ -17,7 +17,7 @@ from typing import List, Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 from wandbot.utils import get_logger
 

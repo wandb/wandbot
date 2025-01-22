@@ -105,23 +105,38 @@ class FusionRetrievalEngine:
         try:
             if use_async:
                 docs_context, web_search_results = await asyncio.gather(
-                    self.vectorstore._async_retrieve(inputs["all_queries"]),
+                    self.vectorstore._async_retrieve(
+                        query_texts=inputs["all_queries"],
+                        search_type=self.search_type,
+                    ),
                     _async_run_web_search(
-                        inputs["standalone_query"],
+                        query=inputs["standalone_query"],
                         top_k=self.top_k,
                         avoid=not self.do_web_search
                     )
                 )
             else:
-                docs_context = self.vectorstore.retrieve(inputs["all_queries"])
+                docs_context = self.vectorstore.retrieve(
+                    query_texts=inputs["all_queries"],
+                    search_type=self.search_type,
+                )
                 web_search_results = run_sync(_async_run_web_search(
-                    inputs["standalone_query"],
+                    query=inputs["standalone_query"],
                     top_k=self.top_k,
                     avoid=not self.do_web_search
                 ))
 
-            logger.debug(f"RETRIEVAL-ENGINE: Retrieved {len(docs_context)} documents from vector store.")
-            logger.debug(f"RETRIEVAL-ENGINE: Retrieved {len(web_search_results.web_contexts)} web contexts.")
+            def flatten_retrieved_results(results: Dict[str, Any]) -> List[Document]:
+                docs = [results[k] for k in results.keys()]
+                if isinstance(docs, list) and all(isinstance(d, list) for d in docs):
+                    docs = [item for sublist in docs for item in sublist]  # flattens to List[Tuple[Document, float]]
+                return docs
+            
+            docs_context = flatten_retrieved_results(docs_context)
+
+            logger.debug(f"RETRIEVAL-ENGINE: First retrieved document from vector store:\n{docs_context[0]}\n")
+            logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(docs_context)} documents from vector store.")
+            logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(web_search_results.web_contexts)} web contexts.")
             
             fused_context = docs_context + web_search_results.web_contexts
 

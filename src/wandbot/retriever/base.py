@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 import asyncio
 import weave
 from wandbot.retriever.chroma import ChromaVectorStore
@@ -50,12 +50,12 @@ class VectorStore:
             return cls(vector_store_config=vector_store_config, chat_config=chat_config)
 
     @weave.op
-    def retrieve(self, query_texts: List[str], search_kwargs: dict = None, return_scores: bool = False) -> List[Document]:
+    def retrieve(self, query_texts: List[str], search_type: str = "mmr", search_kwargs: dict = None) -> Dict[str, List[Document]]:
         """`retrieve` method returns a list of documents per query in query_texts."""
         search_kwargs = search_kwargs or {}
 
-        if self.chat_config.search_type == "mmr":
-            docs = self.chroma_vectorstore.max_marginal_relevance_search(
+        if search_type == "mmr":
+            results = self.chroma_vectorstore.max_marginal_relevance_search(
                 query_texts=query_texts,
                 top_k=self.chat_config.top_k_per_query,
                 fetch_k=self.chat_config.fetch_k,
@@ -64,26 +64,19 @@ class VectorStore:
                 where_document=search_kwargs.get("where_document")
             )
         else: 
-            docs = self.chroma_vectorstore.similarity_search(
+            results = self.chroma_vectorstore.similarity_search(
                 query_texts=query_texts,
                 top_k=self.chat_config.top_k_per_query,
                 filter=search_kwargs.get("filter"),
                 where_document=search_kwargs.get("where_document")
             )
 
-        # Handle flattening for (Document, score) tuples
-        if isinstance(docs, list) and all(isinstance(d, list) for d in docs):
-            flattened = [item for sublist in docs for item in sublist]  # flattens to List[Tuple[Document, float]]
-            docs = flattened if return_scores else [doc for doc, _ in flattened]
-
-        logger.info(f"VECTORSTORE: Retrieved {len(docs)} documents")
-        logger.debug(f"VECTORSTORE: First retrieved document:\n{docs[0]}\n")
-        return docs
+        return results
     
-    async def _async_retrieve(self, query_texts: List[str], search_kwargs: dict = None, return_scores: bool = False) -> List[Document]:
+    async def _async_retrieve(self, query_texts: List[str], search_type: str = "mmr", search_kwargs: dict = None) -> List[Document]:
         return await asyncio.to_thread(
             self.retrieve,
             query_texts=query_texts,
+            search_type=search_type,
             search_kwargs=search_kwargs,
-            return_scores=return_scores
         )

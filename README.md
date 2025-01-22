@@ -171,7 +171,7 @@ WANDBOT_FULL_INIT=1 \
     --preload \
     --bind 0.0.0.0:8000 \
     --timeout=200 \
-    --workers=8 \
+    --workers=20 \
     --worker-class uvicorn.workers.UvicornWorker
 ```
 
