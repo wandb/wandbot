@@ -41,12 +41,12 @@ class VectorStore:
 
     @classmethod
     def from_config(cls, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
-        if vector_store_config.index_dir.exists():
+        if vector_store_config.vectordb_index_dir.exists():
             return cls(vector_store_config=vector_store_config, chat_config=chat_config)
         else:
             api = wandb.Api()
-            art = api.artifact(vector_store_config.artifact_url)  # Download vectordb index from W&B
-            _ = art.download(vector_store_config.index_dir)
+            art = api.artifact(vector_store_config.vectordb_index_artifact_url)  # Download vectordb index from W&B
+            _ = art.download(vector_store_config.vectordb_index_dir)
             return cls(vector_store_config=vector_store_config, chat_config=chat_config)
 
     @weave.op

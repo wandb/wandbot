@@ -64,7 +64,7 @@ def load(
         model=config.embedding_model_name,
         dimensions=config.embedding_dimensions,
     )
-    vectorstore_dir = config.index_dir
+    vectorstore_dir = config.vectordb_index_dir
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
 
     document_files: List[pathlib.Path] = list(
@@ -78,9 +78,9 @@ def load(
                 transformed_documents.append(Document(**json.loads(line)))
 
     chroma = Chroma(
-        collection_name=config.collection_name,
+        vectordb_collection_name=config.vectordb_collection_name,
         embedding_function=embedding_fn,
-        index_directory=str(config.index_dir),
+        index_directory=str(config.vectordb_index_dir),
     )
     for batch_idx in trange(0, len(transformed_documents), config.batch_size):
         batch = transformed_documents[batch_idx : batch_idx + config.batch_size]
@@ -92,7 +92,7 @@ def load(
     )
 
     result_artifact.add_dir(
-        local_path=str(config.index_dir),
+        local_path=str(config.vectordb_index_dir),
     )
     run.log_artifact(result_artifact, aliases=["chroma_index", "latest"])
 

@@ -43,10 +43,10 @@ class ChromaVectorStore:
         self.chat_config = chat_config
         self.override_relevance_score_fn = override_relevance_score_fn
         self.chroma_vectorstore_client = chromadb.PersistentClient(
-            path=str(self.vector_store_config.index_dir),
+            path=str(self.vector_store_config.vectordb_index_dir),
             settings=Settings(anonymized_telemetry=False))
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
-            name=self.vector_store_config.collection_name,
+            name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_function,
             )
     
