@@ -114,3 +114,7 @@ class EmbeddingModel:
 
     def embed(self, input: Union[str, List[str]] = None) -> List[List[float]]:
         return self.model.embed(input)
+
+    def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
+        """Required interface for Chroma's EmbeddingFunction"""
+        return self.embed(input)
