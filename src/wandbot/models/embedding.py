@@ -49,10 +49,11 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                         input=text, model=self.model_name,
                         encoding_format=self.encoding_format,
                         dimensions=self.dimensions)
-                    if self.encoding_format == "base64":
-                        decoded_embeddings = base64.b64decode(response.data[0].embedding)
+                    embedding = response.data[0].embedding
+                    if self.encoding_format == "base64" and isinstance(embedding, str):
+                        decoded_embeddings = base64.b64decode(embedding)
                         return np.frombuffer(decoded_embeddings, dtype=np.float32).tolist()
-                    return response.data[0].embedding
+                    return embedding
             return await asyncio.gather(*[get_single_openai_embedding(text) for text in inputs])
         finally:
             await client.close()
