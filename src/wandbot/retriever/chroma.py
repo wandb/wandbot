@@ -152,9 +152,9 @@ of lengths: {[len(r) for r in res['documents']]}")
         
         query_embeddings = self.embedding_function(query_texts)
         # DEBUG
-        print(f"len query embeds: {len(query_embeddings)}")
-        print(f"len first query embed: {len(query_embeddings[0])}")
-        print(f"Query texts: {query_texts}")
+        # print(f"len query embeds: {len(query_embeddings)}")
+        # print(f"len first query embed: {len(query_embeddings[0])}")
+        # print(f"Query texts: {query_texts}")
         # for i, q in enumerate(query_texts):
         #     if q == "concurrent writes":
         #         print(f"cc Query embedding: {query_embeddings[i][:50]}")
@@ -245,8 +245,8 @@ of lengths: {[len(r) for r in res['documents']]}")
 
         # DEBUG
         from wandbot.retriever.tmp_mmr import debug_run_mmr_batch
-        print("Prep to run debug_run_mmr_batch")
-        print("*"*100)
+        # print("Prep to run debug_run_mmr_batch")
+        # print("*"*100)
         
 
         tasks = [debug_run_mmr_batch(

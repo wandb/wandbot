@@ -6,12 +6,12 @@ import weave
 
 
 def _results_to_docs(results: Any) -> List[Document]:
-    print("Running _results_to_docs")
+    # print("Running _results_to_docs")
     return [doc for doc, _ in _results_to_docs_and_scores(results)]
 
 
 def _results_to_docs_and_scores(results: Any) -> List[Tuple[Document, float]]:
-    print("Running _results_to_docs_and_scores")
+    # print("Running _results_to_docs_and_scores")
     return [
         # TODO: Chroma can do batch querying,
         # we shouldn't hard code to the 1st result
@@ -160,17 +160,17 @@ def debug_maximal_marginal_relevance(
     Returns:
         List of indices of embeddings selected by maximal marginal relevance.
     """
-    print('Calculating MMR')
+    # print('Calculating MMR')
     if min(k, len(embedding_list)) <= 0:
         return []
-    print(f"len embedding_list: {len(embedding_list)}")
-    print("Running similarity_to_query")
+    # print(f"len embedding_list: {len(embedding_list)}")
+    # print("Running similarity_to_query")
     similarity_to_query = debug_cosine_similarity(query_embedding, embedding_list)[0]
-    print("Finished similarity_to_query")
+    # print("Finished similarity_to_query")
     most_similar = int(np.argmax(similarity_to_query))
     idxs = [most_similar]
     selected = np.array([embedding_list[most_similar]])
-    print("Running while loop")
+    # print("Running while loop")
     
     while len(idxs) < min(k, len(embedding_list)):
         best_score = -np.inf
@@ -238,7 +238,7 @@ def debug_max_marginal_relevance_search_by_vector(
     #     include=["metadatas", "documents", "distances", "embeddings"],
     #     )
     # results["embeddings"][0]
-    print("Running max_marginal_relevance_search_by_vector")
+    # print("Running max_marginal_relevance_search_by_vector")
     query_embedding = np.array(embedding, dtype=np.float32)
     if query_embedding.ndim == 1:
         query_embedding = np.expand_dims(query_embedding, axis=0)
@@ -250,25 +250,25 @@ def debug_max_marginal_relevance_search_by_vector(
         k=k,
         lambda_mult=lambda_mult,
     )
-    print(f"MRR selected: {mmr_selected}")
-    print("*"*100)
+    # print(f"MRR selected: {mmr_selected}")
+    # print("*"*100)
 
     # candidates = _results_to_docs(results)
     # print(f"results: {results}")
-    print(f"len results['documents']: {len(results['documents'])}")
-    print(f"len results['documents'][0]: {len(results['documents'][0])}")
+    # print(f"len results['documents']: {len(results['documents'])}")
+    # print(f"len results['documents'][0]: {len(results['documents'][0])}")
     # print(f" first doc: {results['documents'][0]}")
     # print(f" first meta: {results['metadatas'][0]}")
     # print(f" first dist: {results['distances'][0]}")
     candidates = [Document(page_content=doc, metadata=meta, distance=dist) for doc, meta, dist in zip(results["documents"][0], results["metadatas"][0], results["distances"][0])]
-    print(f"candidates generated, len candidates: {len(candidates)}")
+    # print(f"candidates generated, len candidates: {len(candidates)}")
     selected_results = [r for i, r in enumerate(candidates) if i in mmr_selected]
-    print(f"selected_results generated, len selected_results: {len(selected_results)}")
+    # print(f"selected_results generated, len selected_results: {len(selected_results)}")
     return selected_results
 
 @weave.op
 async def debug_run_mmr_batch(query_embed, doc_embed, docs, metadatas, distances, top_k, lambda_mult):
-    print(f"Running debug_run_mmr_batch, {len(docs)} received")
+    # print(f"Running debug_run_mmr_batch, {len(docs)} received")
     retrieved_results = {
         "documents": docs,
         "metadatas": metadatas,
@@ -309,7 +309,7 @@ async def debug_run_mmr_batch(query_embed, doc_embed, docs, metadatas, distances
         fetch_k=20,
         lambda_mult=0.5
     )
-    print(f"len(hybrid_lc_mmr_results): {len(hybrid_lc_mmr_results)}")
+    # print(f"len(hybrid_lc_mmr_results): {len(hybrid_lc_mmr_results)}")
     ids_ls = []
     for doc in hybrid_lc_mmr_results:
         # print(doc.metadata['id'])
@@ -384,5 +384,5 @@ async def debug_run_mmr_batch(query_embed, doc_embed, docs, metadatas, distances
     #     fetch_k=20,
     #     lambda_mult=0.5
     # )   
-    print("returning from debug_run_mmr_batch")
+    # print("returning from debug_run_mmr_batch")
     return hybrid_lc_mmr_results
