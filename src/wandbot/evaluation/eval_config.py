@@ -5,6 +5,7 @@ from typing import Literal
 class EvalConfig:
     # language for eval dataset to use (en or ja)
     lang: Literal["en", "ja"] = "en"
+    eval_judge_provider: Literal["anthropic", "openai"] = "openai"
     eval_judge_model: str = "gpt-4-1106-preview"
     eval_judge_temperature: float = 0.1
     experiment_name: str = "wandbot-eval"

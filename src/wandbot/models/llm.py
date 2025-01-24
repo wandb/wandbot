@@ -3,7 +3,7 @@ import json
 import asyncio
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
-import inspect
+import weave
 
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
@@ -58,12 +58,14 @@ class BaseLLMModel:
     def __init__(self, 
                  model_name: str,
                  temperature: float = 0,
+                 response_model: Optional[BaseModel] = None,
                  n_parallel_api_calls: int = 50,
                  max_retries: int = 3,
                  timeout: int = 30,
                  **kwargs):
         self.model_name = model_name
         self.temperature = temperature
+        self.response_model = response_model
         self.n_parallel_api_calls = n_parallel_api_calls
         self.max_retries = max_retries
         self.timeout = timeout
@@ -71,7 +73,6 @@ class BaseLLMModel:
 
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    response_model: Optional[BaseModel] = None,
                     **kwargs) -> str:
         raise NotImplementedError("Subclasses must implement create method")
 
@@ -89,48 +90,45 @@ class AsyncOpenAILLMModel(BaseLLMModel):
             timeout=self.timeout
         )
 
+    @weave.op
     async def create(self, 
-                    messages: List[Dict[str, Any]], 
-                    response_model: Optional[BaseModel] = None,
-                    **kwargs) -> Union[str, BaseModel]:
+                    messages: List[Dict[str, Any]]) -> Union[str, BaseModel]:
         async with self.semaphore:
-            if "temperature" in kwargs and kwargs["temperature"] == 0:
-                kwargs["temperature"] = 0.1
+
+            api_params = {
+                "model": self.model_name,
+                "temperature": self.temperature,
+                "response_model": self.response_model,
+                "messages": messages,
+            }
+            if api_params["temperature"] == 0:
+                api_params["temperature"] = 0.1
+
+            if self.model_name.startswith("o"):
+                api_params.pop("temperature", None)
             
-            if response_model:
+            if api_params["response_model"]:
                 # For models that don't support the Structure Outputs api:
                 if any(self.model_name.startswith(prefix) for prefix in self.JSON_MODELS):
                     if not self.model_name.startswith("o1-mini"):  # o1-mini doesn't support response_format either
-                        kwargs["response_format"] = {"type": "json_object"}
+                        api_params["response_format"] = {"type": "json_object"}
                     
-                    messages += add_json_response_model_to_messages(response_model)
-                    response = await self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=messages,
-                        **kwargs
-                    )
+                    api_params["messages"] += add_json_response_model_to_messages(api_params["response_model"])
+                    api_params.pop("response_model", None)
+                    response = await self.client.chat.completions.create(**api_params)
                     json_str = response.choices[0].message.content
                     json_str = clean_json_string(json_str)
-                    return response_model.model_validate_json(json_str)
+                    return api_params["response_model"].model_validate_json(json_str)
                 # Else use the Structure Outputs api
                 else:
-                    for msg in messages:
+                    for msg in api_params["messages"]:
                         if msg["role"] == "system":
                             msg["role"] = "developer"
                     
-                    response = await self.client.beta.chat.completions.parse(
-                        model=self.model_name,
-                        messages=messages,
-                        response_format=response_model,
-                        **kwargs
-                    )
+                    response = await self.client.beta.chat.completions.parse(**api_params)
                     return response.choices[0].message.parsed
             else:
-                response = await self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    **kwargs
-                )
+                response = await self.client.chat.completions.create(**api_params)
                 return response.choices[0].message.content
 
 class AsyncAnthropicLLMModel(BaseLLMModel):
@@ -142,35 +140,35 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
             timeout=self.timeout
         )
 
+    @weave.op
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    response_model: Optional[BaseModel] = None,
-                    max_tokens: int = 4000,
-                    **kwargs) -> Union[str, BaseModel]:
+                    max_tokens: int = 4000) -> Union[str, BaseModel]:
         async with self.semaphore:            
             system_msg, chat_messages = extract_system_and_messages(messages)
             api_params = {
                 "model": self.model_name,
+                "temperature": self.temperature,
+                "response_model": self.response_model,
                 "messages": chat_messages,
                 "max_tokens": max_tokens
             }
+            if api_params["temperature"] == 0:
+                api_params["temperature"] = 0.1
+
             if system_msg:
                 api_params["system"] = system_msg
 
-            if response_model:
-                messages += add_json_response_model_to_messages(response_model)
+            if api_params["response_model"]:
+                api_params["messages"] += add_json_response_model_to_messages(api_params["response_model"])
+                api_params.pop("response_model", None)
 
-            kwargs = {k: v for k, v in kwargs.items() if v is not None}
-            if "temperature" in kwargs and kwargs["temperature"] == 0:
-                kwargs["temperature"] = 0.1
-
-            api_params.update(kwargs)
             response = await self.client.messages.create(**api_params)
             content = response.content[0].text
 
-            if response_model:
+            if api_params["response_model"]:
                 json_str = clean_json_string(content)
-                return response_model.model_validate_json(json_str)
+                return api_params["response_model"].model_validate_json(json_str)
             return content
 
 

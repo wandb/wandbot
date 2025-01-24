@@ -93,7 +93,6 @@ class WandBotCorrectnessEvaluator:
         model_name: str = "gpt-4-1106-preview",
         provider: str = "openai",
         temperature: float = 0.1,
-        score_threshold: float = 2.0,
         system_template: Optional[str] = None,
         max_concurrent_requests: int = 20,
         **kwargs
@@ -104,7 +103,6 @@ class WandBotCorrectnessEvaluator:
             model_name: Name of the model to use
             provider: Provider of the model (e.g., "openai" or "anthropic")
             temperature: Temperature for model sampling
-            score_threshold: Score threshold for passing evaluation
             system_template: Optional custom system template to use for evaluation
             max_concurrent_requests: Maximum number of concurrent requests
             **kwargs: Additional keyword arguments for LLMModel
@@ -113,21 +111,20 @@ class WandBotCorrectnessEvaluator:
             provider=provider,
             model_name=model_name,
             temperature=temperature,
+            response_model=CorrectnessEvaluationResult,
             n_parallel_api_calls=max_concurrent_requests,
             **kwargs
         )
-        self.score_threshold = score_threshold
         self.system_template = system_template or SYSTEM_TEMPLATE
-        self.response_model = CorrectnessEvaluationResult
 
-    async def _get_completion(self, system_prompt: str, user_prompt: str) -> str:
+    async def _get_completion(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
         """Get completion from the model."""
-        return await self.llm.generate(
+        return await self.llm.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            response_model=self.response_model
+            temperature=temperature,
         )
 
     async def safe_parse_eval_response(

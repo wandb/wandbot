@@ -174,9 +174,11 @@ class WandbotCorrectnessScorer(weave.Scorer):
         super().__init__(config=config)
         self.debug = config.debug
         self.correctness_evaluator = WandBotCorrectnessEvaluator(
-            client=AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_retries=config.max_evaluator_retries, timeout=config.evaluator_timeout),
-            model=config.eval_judge_model,
+            provider=config.eval_judge_provider,
+            model_name=config.eval_judge_model,
             temperature=config.eval_judge_temperature,
+            max_retries=config.max_evaluator_retries,
+            timeout=config.evaluator_timeout,
         )
     
     @weave.op
