@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 import simple_parsing as sp
-
+from typing import Literal
 @dataclass
 class EvalConfig:
-    lang: str = "en"  # language for eval dataset to use (en or ja)
+    # language for eval dataset to use (en or ja)
+    lang: Literal["en", "ja"] = "en"
     eval_judge_model: str = "gpt-4-1106-preview"
     eval_judge_temperature: float = 0.1
     experiment_name: str = "wandbot-eval"
@@ -15,13 +16,14 @@ class EvalConfig:
     wandb_project: str = "wandbot-eval"
     debug: bool = False
     n_debug_samples: int = 3
+    max_evaluator_retries: int = 3
+    evaluator_timeout: int = 60
 
     @property
     def eval_dataset(self) -> str:
         if self.lang == "ja":
             return "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
         return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
-
 
 def get_eval_config() -> EvalConfig:
     return sp.parse(EvalConfig)

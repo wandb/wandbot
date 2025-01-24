@@ -1,31 +1,27 @@
-from langchain_openai import OpenAI
-from llama_index.core import ChatPromptTemplate
-from llama_index.core.llms import ChatMessage, MessageRole
-from ragas.llms.json_load import json_loader
+import json
+import logging
+from typing import Tuple
 
+logger = logging.getLogger(__name__)
 
-def make_eval_template(system_template, user_template):
-    return ChatPromptTemplate(
-        message_templates=[
-            ChatMessage(role=MessageRole.SYSTEM, content=system_template),
-            ChatMessage(role=MessageRole.USER, content=user_template),
-        ]
-    )
-
-
-async def safe_parse_eval_response(eval_response, passing_decision):
+async def safe_parse_eval_response(eval_response: str, expected_decision: str) -> Tuple[bool, str, float]:
+    """Safely parse the evaluation response."""
     try:
-        eval_response_dict = await json_loader.safe_load(
-            eval_response, llm=OpenAI()
-        )
-        score = eval_response_dict.get("score")
-        reasoning = eval_response_dict.get("reason")
-        decision = eval_response_dict.get("decision") == passing_decision
-
-    except Exception as e:
-        print(e)
-        print(eval_response)
-        score = 0
-        reasoning = "Unable to parse response"
-        decision = False
-    return decision, reasoning, score
+        # Try to find the JSON object in the response
+        start = eval_response.find("{")
+        end = eval_response.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError("No JSON object found in response")
+            
+        json_str = eval_response[start:end]
+        result = json.loads(json_str)
+        
+        # Extract values
+        passing = result["decision"].lower() == expected_decision.lower()
+        reasoning = result["reason"]
+        score = float(result["score"])
+        
+        return passing, reasoning, score
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Failed to parse evaluation response: {str(e)}\nResponse: {eval_response}")
+        return False, f"Failed to parse evaluation response: {str(e)}", 1.0
