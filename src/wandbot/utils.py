@@ -43,6 +43,10 @@ from langchain_core.documents import Document
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from rich.logging import RichHandler
+from rich.console import Console
+from rich.theme import Theme
+
 import wandb
 
 
@@ -55,6 +59,7 @@ def get_logger(name: str) -> logging.Logger:
     Returns:
         A logger instance with the specified name.
     """
+
     level_map = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -67,9 +72,28 @@ def get_logger(name: str) -> logging.Logger:
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = level_map.get(log_level, logging.INFO)  # Default to INFO if invalid level
 
+    # Configure rich console with custom theme
+    theme = Theme({
+        "info": "cyan",
+        "warning": "yellow",
+        "error": "red",
+        "critical": "red bold",
+        "debug": "grey50"
+    })
+    console = Console(theme=theme)
+
     logging.basicConfig(
-        format="%(asctime)s : %(levelname)s : %(message)s",
         level=level,
+        format="WANDBOT | %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            markup=True,
+            show_time=True,
+            show_path=False,
+            omit_repeated_times=True
+        )]
     )
     logger = logging.getLogger(name)
     return logger
