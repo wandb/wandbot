@@ -185,7 +185,7 @@ class WandBotCorrectnessEvaluator:
                     response=response,
                     passing=passing,
                     score=score,
-                    feedback=reasoning,
+                    reasoning=reasoning,
                     has_error=True,
                     error_message=error_msg
                 )
@@ -195,7 +195,7 @@ class WandBotCorrectnessEvaluator:
                 response=response,
                 passing=passing,
                 score=score,
-                feedback=reasoning,
+                reasoning=reasoning,
                 has_error=False,
                 error_message=None
             )
@@ -206,7 +206,7 @@ class WandBotCorrectnessEvaluator:
                 response=response or "",
                 passing=False,
                 score=1.0,  # Lowest score since evaluation failed
-                feedback="Evaluation failed due to an error",
+                reasoning="Evaluation failed due to an error",
                 has_error=True,
                 error_message=error_msg
             )

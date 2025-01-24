@@ -198,8 +198,6 @@ class WandbotCorrectnessScorer(weave.Scorer):
                     "answer_correct": False,
                     "reasoning": error_msg,
                     "score": 1.0,
-                    "invalid_result": True,
-                    "invalid_reasoning": error_msg,
                     "has_error": True,
                     "error_message": error_msg
                 }
@@ -210,8 +208,6 @@ class WandbotCorrectnessScorer(weave.Scorer):
                     "answer_correct": False,
                     "reasoning": error_msg,
                     "score": 1.0,
-                    "invalid_result": True,
-                    "invalid_reasoning": error_msg,
                     "has_error": True,
                     "error_message": error_msg
                 }
@@ -227,12 +223,10 @@ class WandbotCorrectnessScorer(weave.Scorer):
             res = result.model_dump()
             return {
                 "answer_correct": res.get("passing", None),
-                "reasoning": res.get("feedback"),
-                "score": res.get("score"),
-                "invalid_result": res.get("invalid_result"),
-                "invalid_reasoning": res.get("invalid_result"),
+                "reasoning": res.get("reasoning", ""),
+                "score": res.get("score", None),
                 "has_error": False,
-                "error_message": None
+                "error_message": ""
             }
         except Exception as e:
             error_msg = f"Error evaluating answer: {str(e)}"
@@ -240,9 +234,7 @@ class WandbotCorrectnessScorer(weave.Scorer):
             return {
                 "answer_correct": False,
                 "reasoning": "Evaluation failed due to an error",
-                "score": 1.0,  # Lowest score since evaluation failed
-                "invalid_result": True,
-                "invalid_reasoning": error_msg,
+                "score": 1.0,
                 "has_error": True,
                 "error_message": error_msg
             }

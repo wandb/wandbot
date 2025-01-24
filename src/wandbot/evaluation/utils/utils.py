@@ -9,9 +9,9 @@ class EvaluationResult(BaseModel):
     """Result of an evaluation."""
     query: str
     response: str
-    passing: Optional[bool] = None
+    reasoning: Optional[str] = None
     score: Optional[float] = None
-    feedback: Optional[str] = None
+    passing: Optional[bool] = None
     has_error: bool = False
     error_message: Optional[str] = None
 
