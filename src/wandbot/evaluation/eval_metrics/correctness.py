@@ -1,10 +1,10 @@
-import json
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List
 import regex as re
 from pydantic import BaseModel, Field
+import weave
 
 from wandbot.evaluation.utils.utils import EvaluationResult
-from wandbot.models.llm import LLMModel
+from wandbot.models.llm import LLMModel, LLMError
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a technical support chatbot.
 
@@ -30,28 +30,28 @@ Follow these guidelines for scoring:
 
 CRITICAL: You must output ONLY a JSON object. No text before or after. No explanations. No notes. Just the JSON object in exactly this format:
 {
-    "reason": <<Provide a brief explanation for your decision here>>,
+    "reasoning": <<Provide a brief explanation for your decision here>>,
     "score": <<Provide a score as per the above guidelines>>,
     "decision": <<Provide your final decision here, either 'correct', or 'incorrect'>>
 }
 
 Example Response 1:
 {
-    "reason": "The generated answer has the exact details as the reference answer and completely answer's the user's query.",
+    "reasoning": "The generated answer has the exact details as the reference answer and completely answer's the user's query.",
     "score": 3,
     "decision": "correct"
 }
 
 Example Response 2:
 {
-    "reason": "The generated answer doesn't match the reference answer, and deviates from the documentation provided",
+    "reasoning": "The generated answer doesn't match the reference answer, and deviates from the documentation provided",
     "score": 1,
     "decision": "incorrect"
 }
 
 Example Response 3:
 {
-    "reason": "The generated answer follows the same steps as the reference answer. However, it includes assumptions about methods that are not mentioned in the documentation.",
+    "reasoning": "The generated answer follows the same steps as the reference answer. However, it includes assumptions about methods that are not mentioned in the documentation.",
     "score": 2,
     "decision": "incorrect"
 }"""
@@ -74,10 +74,16 @@ USER_TEMPLATE = """
 """
 
 
-class CorrectnessEvaluationResult(BaseModel):
-    reason: str = Field(..., description="Provide a brief explanation for your decision here")
+class CorrectnessEvaluationModel(BaseModel):
+    reasoning: str = Field(..., description="Provide a brief explanation for your decision here")
     score: float = Field(..., description="Provide a score as per the above guidelines")
     decision: str = Field(..., description="Provide your final decision here, either 'correct', or 'incorrect'")
+
+
+class CorrectnessEvaluationResult(CorrectnessEvaluationModel):
+    answer_correct: bool
+    has_error: bool
+    error_message: str
 
 
 class WandBotCorrectnessEvaluator:
@@ -93,7 +99,8 @@ class WandBotCorrectnessEvaluator:
         model_name: str = "gpt-4-1106-preview",
         provider: str = "openai",
         temperature: float = 0.1,
-        system_template: Optional[str] = None,
+        system_template: Optional[str] = SYSTEM_TEMPLATE,
+        user_template: Optional[str] = USER_TEMPLATE,
         max_concurrent_requests: int = 20,
         **kwargs
     ):
@@ -111,44 +118,23 @@ class WandBotCorrectnessEvaluator:
             provider=provider,
             model_name=model_name,
             temperature=temperature,
-            response_model=CorrectnessEvaluationResult,
+            response_model=CorrectnessEvaluationModel,
             n_parallel_api_calls=max_concurrent_requests,
             **kwargs
         )
-        self.system_template = system_template or SYSTEM_TEMPLATE
+        self.system_template = system_template 
+        self.user_template = user_template
 
-    async def _get_completion(self, system_prompt: str, user_prompt: str, temperature: float) -> str:
-        """Get completion from the model."""
+    async def _get_completion(self, system_prompt: str, user_prompt: str) -> CorrectnessEvaluationResult:
+        """Call the LLM, all other parameters are set in the LLMModel init."""
         return await self.llm.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=temperature,
         )
 
-    async def safe_parse_eval_response(
-        self, eval_response: str, expected_decision: str
-    ) -> Tuple[bool, str, float, bool, Optional[str]]:
-        """Safely parse the evaluation response.
-        
-        Returns:
-            Tuple of (passing, reasoning, score, has_error, error_message)
-        """
-        try:
-            # Clean up the response if it's wrapped in ```json blocks
-            cleaned_response = eval_response
-            if eval_response.startswith("```json"):
-                cleaned_response = eval_response.replace("```json", "").replace("```", "").strip()
-            result = json.loads(cleaned_response)
-            passing = result["decision"].lower() == expected_decision.lower()
-            reasoning = result["reason"]
-            score = float(result["score"])
-            return passing, reasoning, score, False, None
-        except (json.JSONDecodeError, KeyError) as e:
-            error_msg = f"Failed to parse evaluation response: {str(e)}"
-            return False, "Evaluation failed due to parsing error", 1.0, True, error_msg
-
+    @weave.op
     async def aevaluate(
         self,
         query: Optional[str] = None,
@@ -156,7 +142,7 @@ class WandBotCorrectnessEvaluator:
         contexts: Optional[List[str]] = None,
         reference: Optional[str] = None,
         **kwargs: Any,
-    ) -> EvaluationResult:
+    ) -> CorrectnessEvaluationResult:
         """Evaluate the correctness of a response.
         
         Args:
@@ -174,7 +160,7 @@ class WandBotCorrectnessEvaluator:
             if query is None or response is None or reference is None:
                 raise ValueError("query, response, and reference must be provided")
 
-            user_prompt = USER_TEMPLATE.format(
+            user_prompt = self.user_template.format(
                 query=query,
                 generated_answer=response,
                 reference_answer=reference,
@@ -184,37 +170,38 @@ class WandBotCorrectnessEvaluator:
                 reference_notes=kwargs.get("reference_notes", ""),
             )
 
+            # Run evaluation
             eval_response = await self._get_completion(system_prompt=self.system_template, user_prompt=user_prompt)
-            passing, reasoning, score, has_error, error_msg = await self.safe_parse_eval_response(eval_response, "correct")
-
-            if has_error:
-                return EvaluationResult(
-                    query=query,
-                    response=response,
-                    passing=passing,
-                    score=score,
-                    reasoning=reasoning,
+    
+            if isinstance(eval_response, LLMError):
+                return CorrectnessEvaluationResult(
+                    answer_correct=False,
+                    score=1.0,
+                    reasoning=f"Evaluation failed due to an LLM error: {eval_response.error}",
+                    decision="incorrect",
                     has_error=True,
-                    error_message=error_msg
+                    error_message=eval_response.error_message
                 )
-
-            return EvaluationResult(
-                query=query,
-                response=response,
-                passing=passing,
+            
+            decision = eval_response.decision
+            answer_correct = decision.lower() == "correct"
+            score = eval_response.score
+            reasoning = eval_response.reasoning
+            return CorrectnessEvaluationResult(
+                answer_correct=answer_correct,
                 score=score,
                 reasoning=reasoning,
+                decision=decision,
                 has_error=False,
-                error_message=None
+                error_message=""
             )
         except Exception as e:
             error_msg = f"Error during evaluation: {str(e)}"
-            return EvaluationResult(
-                query=query or "",
-                response=response or "",
-                passing=False,
+            return CorrectnessEvaluationResult(
+                answer_correct=False,
                 score=1.0,  # Lowest score since evaluation failed
-                reasoning="Evaluation failed due to an error",
+                reasoning=error_msg,
+                decision="incorrect",
                 has_error=True,
                 error_message=error_msg
             )

@@ -7,11 +7,10 @@ import re
 import logging
 import requests
 from weave import Evaluation
-from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, after_log
 
 from wandbot.utils import get_logger
-from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator
+from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator, CorrectnessEvaluationResult
 from wandbot.evaluation.eval_config import get_eval_config, EvalConfig
 from dotenv import load_dotenv
 
@@ -215,31 +214,27 @@ class WandbotCorrectnessScorer(weave.Scorer):
                 }
             
             # If not error from wandbot generation, run the correctness evaluator
-            result = await self.correctness_evaluator.aevaluate(
+            return await self.correctness_evaluator.aevaluate(
                 query=question,
                 response=model_output.get("generated_answer", ""),
                 reference=ground_truth,
                 contexts=contexts,
                 reference_notes=notes,
             )
-            res = result.model_dump()
-            return {
-                "answer_correct": res.get("passing", None),
-                "reasoning": res.get("reasoning", ""),
-                "score": res.get("score", None),
-                "has_error": False,
-                "error_message": ""
-            }
+
         except Exception as e:
             error_msg = f"Error evaluating answer: {str(e)}"
             logger.error(error_msg)
-            return {
-                "answer_correct": False,
-                "reasoning": "Evaluation failed due to an error",
-                "score": 1.0,
-                "has_error": True,
-                "error_message": error_msg
-            }
+            return CorrectnessEvaluationResult(
+                query=question,
+                response=model_output.get("generated_answer", ""),
+                contexts=contexts,
+                passing=False,
+                score=1.0,
+                reasoning=error_msg,
+                has_error=True,
+                error_message=error_msg
+            )
 
 
 def main():
@@ -308,8 +303,8 @@ def main():
             "wandbot_app_config": wandbot_info.get("app_config", {})
             }
 
-    logger.info("Number of evaluation samples: %s", len(question_rows))
-    logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials")
+    logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials, \
+{len(question_rows) * config.n_trials} calls in total.")
     with weave.attributes(eval_attributes):
         asyncio.run(wandbot_evaluator.evaluate(
             model=wandbot, __weave={"display_name": config.experiment_name}

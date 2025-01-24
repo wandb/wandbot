@@ -12,6 +12,10 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
+class LLMError(BaseModel):
+    error: bool
+    error_message: str
+
 def extract_system_and_messages(messages: List[Dict[str, Any]]) -> tuple[Optional[str], List[Dict[str, Any]]]:
     """Extract system message and convert remaining messages to Anthropic format."""
     system_msg = None
@@ -94,11 +98,9 @@ class AsyncOpenAILLMModel(BaseLLMModel):
     async def create(self, 
                     messages: List[Dict[str, Any]]) -> Union[str, BaseModel]:
         async with self.semaphore:
-
             api_params = {
                 "model": self.model_name,
                 "temperature": self.temperature,
-                "response_model": self.response_model,
                 "messages": messages,
             }
             if api_params["temperature"] == 0:
@@ -107,20 +109,20 @@ class AsyncOpenAILLMModel(BaseLLMModel):
             if self.model_name.startswith("o"):
                 api_params.pop("temperature", None)
             
-            if api_params["response_model"]:
+            if self.response_model:
                 # For models that don't support the Structure Outputs api:
                 if any(self.model_name.startswith(prefix) for prefix in self.JSON_MODELS):
                     if not self.model_name.startswith("o1-mini"):  # o1-mini doesn't support response_format either
                         api_params["response_format"] = {"type": "json_object"}
                     
-                    api_params["messages"] += add_json_response_model_to_messages(api_params["response_model"])
-                    api_params.pop("response_model", None)
+                    api_params["messages"] += add_json_response_model_to_messages(self.response_model)
                     response = await self.client.chat.completions.create(**api_params)
                     json_str = response.choices[0].message.content
                     json_str = clean_json_string(json_str)
-                    return api_params["response_model"].model_validate_json(json_str)
+                    return self.response_model.model_validate_json(json_str)
                 # Else use the Structure Outputs api
                 else:
+                    api_params["response_model"] = self.response_model
                     for msg in api_params["messages"]:
                         if msg["role"] == "system":
                             msg["role"] = "developer"
@@ -190,13 +192,12 @@ class LLMModel:
 
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    **kwargs) -> str:
-        return await self.model.create(
-            messages=messages,
-            **kwargs
-        )
-
-    async def __call__(self, 
-                       messages: List[Dict[str, Any]], 
-                       **kwargs) -> str:
-        return await self.create(messages, **kwargs)
+                    **kwargs) -> Union[str, Exception]:
+        try:
+            return await self.model.create(
+                messages=messages,
+                **kwargs
+            )
+        except Exception as e:
+            logger.error(f"LLMModel: Error in LLM API call: {str(e)}")
+            return LLMError(error=True, error_message=str(e))

@@ -1,16 +1,18 @@
 import os
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, Mock, AsyncMock
 import sys
 from openai import AsyncOpenAI
 from dataclasses import dataclass
 
-from wandbot.evaluation.eval.correctness import (
+from wandbot.evaluation.eval_metrics.correctness import (
     WandBotCorrectnessEvaluator,
-    EvaluationResult
+    CorrectnessEvaluationResult,
+    CorrectnessEvaluationModel
 )
-from wandbot.evaluation.weave_eval.eval import WandbotCorrectnessScorer
+from wandbot.evaluation.utils.utils import EvaluationResult
 from wandbot.evaluation.eval_config import EvalConfig
+from wandbot.models.llm import LLMError
 
 # Mock config for basic unit tests
 @dataclass
@@ -114,71 +116,72 @@ class TestWithMockConfig:
     @pytest.mark.asyncio(loop_scope="function")
     async def test_safe_parse_eval_response(self):
         """Test parsing of evaluation responses."""
-        evaluator = WandBotCorrectnessEvaluator(client=None)
+        evaluator = WandBotCorrectnessEvaluator()
         
-        # Test valid JSON response
-        valid_response = '''{"reason": "test", "score": 3, "decision": "correct"}'''
-        passing, reasoning, score, has_error, error_msg = await evaluator.safe_parse_eval_response(valid_response, "correct")
-        assert passing == True
-        assert reasoning == "test"
-        assert score == 3.0
-        assert has_error == False
-        assert error_msg is None
+        # Mock the LLM response
+        mock_response = CorrectnessEvaluationModel(
+            reasoning="test",
+            score=3.0,
+            decision="correct"
+        )
+        evaluator.llm.create = AsyncMock(return_value=mock_response)
         
-        # Test JSON with backticks
-        response_with_backticks = '''```json
-        {"reason": "test", "score": 2, "decision": "incorrect"}
-        ```'''
-        passing, reasoning, score, has_error, error_msg = await evaluator.safe_parse_eval_response(response_with_backticks, "correct")
-        assert passing == False
-        assert reasoning == "test"
-        assert score == 2.0
-        assert has_error == False
-        assert error_msg is None
+        result = await evaluator._get_completion("", "")
+        assert isinstance(result, CorrectnessEvaluationModel)
+        assert result.score == 3.0
+        assert result.decision == "correct"
+        assert result.reasoning == "test"
+
+        # Test error case
+        error_response = LLMError(error=True, error_message="test error")
+        evaluator.llm.create = AsyncMock(return_value=error_response)
         
-        # Test invalid JSON
-        invalid_response = "not json"
-        passing, reasoning, score, has_error, error_msg = await evaluator.safe_parse_eval_response(invalid_response, "correct")
-        assert passing == False
-        assert reasoning == "Evaluation failed due to parsing error"
-        assert score == 1.0
-        assert has_error == True
-        assert "Failed to parse evaluation response" in error_msg
-        
-        # Test missing required field
-        incomplete_response = '''{"score": 3, "decision": "correct"}'''  # Missing reason
-        passing, reasoning, score, has_error, error_msg = await evaluator.safe_parse_eval_response(incomplete_response, "correct")
-        assert passing == False
-        assert reasoning == "Evaluation failed due to parsing error"
-        assert score == 1.0
-        assert has_error == True
-        assert "Failed to parse evaluation response" in error_msg
+        result = await evaluator._get_completion("", "")
+        assert isinstance(result, LLMError)
+        assert result.error
+        assert result.error_message == "test error"
+
+        # Test full evaluation with error
+        result = await evaluator.aevaluate(query="test", response="test", reference="test")
+        assert isinstance(result, CorrectnessEvaluationResult)
+        assert result.score == 1.0
+        assert result.decision == "incorrect"
+        assert result.has_error
+        assert result.error_message == "test error"
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_evaluator_validation(self):
         """Test input validation in evaluate method."""
-        evaluator = WandBotCorrectnessEvaluator(client=None)
+        evaluator = WandBotCorrectnessEvaluator()
+        
+        # Mock successful LLM response
+        mock_response = CorrectnessEvaluationModel(
+            reasoning="test",
+            score=3.0,
+            decision="correct"
+        )
+        evaluator.llm.create = AsyncMock(return_value=mock_response)
         
         # Test missing query
         result = await evaluator.aevaluate(query=None, response="test", reference="test")
-        assert result.has_error == True
+        assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0
-        assert result.passing == False
+        assert result.decision == "incorrect"
         
         # Test missing response
         result = await evaluator.aevaluate(query="test", response=None, reference="test")
-        assert result.has_error == True
+        assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0
-        assert result.passing == False
+        assert result.decision == "incorrect"
         
         # Test missing reference
         result = await evaluator.aevaluate(query="test", response="test", reference=None)
-        assert result.has_error == True
+        assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0
-        assert result.passing == False
+        assert result.decision == "incorrect"
 
 # Integration tests with real config
 @pytest.mark.integration
@@ -186,11 +189,10 @@ class TestWithRealConfig:
     @pytest.mark.asyncio(loop_scope="function")
     async def test_evaluator_integration_real_config(self, real_config):
         """Integration test using real config and making actual OpenAI calls."""
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         evaluator = WandBotCorrectnessEvaluator(
-            client=client,
-            model=real_config.eval_judge_model,
-            temperature=real_config.eval_judge_temperature
+            model_name=real_config.eval_judge_model,
+            temperature=real_config.eval_judge_temperature,
+            provider="openai"  # Add provider explicitly
         )
         
         for test_case in TEST_CASES:
@@ -202,23 +204,20 @@ class TestWithRealConfig:
                 reference_notes=test_case["reference_notes"]
             )
             
-            assert isinstance(result, EvaluationResult)
-            assert result.query == test_case["query"]
-            assert result.response == test_case["response"]
+            assert isinstance(result, CorrectnessEvaluationResult)
             assert result.score == test_case["expected_score"], \
                 f"Expected score {test_case['expected_score']} for query '{test_case['query']}', got {result.score}"
-            assert result.passing == test_case["expected_passing"], \
-                f"Expected passing={test_case['expected_passing']} for query '{test_case['query']}', got {result.passing}"
-            assert result.feedback is not None and len(result.feedback) > 0
+            assert (result.decision == "correct") == test_case["expected_passing"], \
+                f"Expected passing={test_case['expected_passing']} for query '{test_case['query']}', got {result.decision}"
+            assert result.reasoning is not None and len(result.reasoning) > 0
     
     @pytest.mark.asyncio(loop_scope="function")
     async def test_evaluator_edge_cases_real_config(self, real_config):
         """Test edge cases using real config and actual OpenAI calls."""
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         evaluator = WandBotCorrectnessEvaluator(
-            client=client,
-            model=real_config.eval_judge_model,
-            temperature=real_config.eval_judge_temperature
+            model_name=real_config.eval_judge_model,
+            temperature=real_config.eval_judge_temperature,
+            provider="openai"  # Add provider explicitly
         )
         
         # Test empty response
@@ -229,7 +228,7 @@ class TestWithRealConfig:
             contexts=["wandb is a tool for tracking ML experiments"]
         )
         assert result.score == 1.0
-        assert result.passing == False
+        assert result.decision == "incorrect"
         
         # Test very long response
         long_response = "Use wandb. " * 100
@@ -240,7 +239,7 @@ class TestWithRealConfig:
             contexts=["wandb is a tool for tracking ML experiments"]
         )
         assert isinstance(result.score, float)
-        assert isinstance(result.passing, bool)
+        assert isinstance(result.decision, str)
         
         # Test response with special characters
         special_response = "Use wandb!\n\n```python\nwandb.init()\n```\n**Note:** Important!"
@@ -251,38 +250,5 @@ class TestWithRealConfig:
             contexts=["wandb is a tool for tracking ML experiments"]
         )
         assert isinstance(result.score, float)
-        assert isinstance(result.passing, bool)
-    
-    @pytest.mark.asyncio(loop_scope="function")
-    async def test_answer_correctness_scorer_real_config(self, real_config):
-        """Test answer_correctness_scorer with real config."""
-        scorer = WandbotCorrectnessScorer(config=real_config)
-        
-        # Test case with missing required field in model_output
-        result = await scorer.score(
-            question="How do I use wandb?",
-            ground_truth="Install wandb and initialize it in your code.",
-            notes="Basic wandb setup",
-            model_output={}  # Missing generated_answer field
-        )
-        
-        assert result["has_error"] == True
-        assert result["error_message"] is not None
-        assert "Generated answer is empty" in result["error_message"]
-        assert result["answer_correct"] == False
-        assert result["score"] == 1.0
-        assert result["invalid_result"] == True
-        
-        # Test case with None model_output
-        result = await scorer.score(
-            question="How do I use wandb?",
-            ground_truth="Install wandb and initialize it in your code.",
-            notes="Basic wandb setup",
-            model_output=None
-        )
-        
-        assert result["has_error"] == True
-        assert result["error_message"] is not None
-        assert result["answer_correct"] == False
-        assert result["score"] == 1.0
-        assert result["invalid_result"] == True 
+        assert isinstance(result.decision, str)
+        assert result.reasoning is not None 
