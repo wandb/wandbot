@@ -1,20 +1,10 @@
 import asyncio
 import json
-from dataclasses import dataclass
 from typing import Any, Optional, List, Tuple
 import regex as re
 from openai import AsyncOpenAI
-from pydantic import BaseModel
 
-class EvaluationResult(BaseModel):
-    """Result of an evaluation."""
-    query: str
-    response: str
-    passing: Optional[bool] = None
-    score: Optional[float] = None
-    feedback: Optional[str] = None
-    has_error: bool = False
-    error_message: Optional[str] = None
+from wandbot.evaluation.utils.utils import EvaluationResult
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a technical support chatbot.
 

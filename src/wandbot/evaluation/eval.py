@@ -11,7 +11,7 @@ from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, after_log
 
 from wandbot.utils import get_logger
-from wandbot.evaluation.eval.correctness import WandBotCorrectnessEvaluator
+from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator
 from wandbot.evaluation.eval_config import get_eval_config, EvalConfig
 from dotenv import load_dotenv
 

@@ -1,13 +1,3 @@
-import asyncio
-import re
-from typing import Any, Optional, Sequence
-
-from llama_index.core.evaluation import CorrectnessEvaluator, EvaluationResult
-
-from wandbot.evaluation.eval.utils import (
-    make_eval_template,
-    safe_parse_eval_response,
-)
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the factful consistency of answers to questions asked by users to a technical support chatbot.
 
@@ -70,43 +60,3 @@ USER_TEMPLATE = """
 ## Generated Answer
 {generated_answer}
 """
-
-FACTFULNESS_EVAL_TEMPLATE = make_eval_template(SYSTEM_TEMPLATE, USER_TEMPLATE)
-
-
-class WandbFactfulnessEvaluator(CorrectnessEvaluator):
-    async def aevaluate(
-        self,
-        query: Optional[str] = None,
-        response: Optional[str] = None,
-        contexts: Optional[Sequence[str]] = None,
-        reference: Optional[str] = None,
-        sleep_time_in_seconds: int = 0,
-        **kwargs: Any,
-    ) -> EvaluationResult:
-        await asyncio.sleep(sleep_time_in_seconds)
-
-        if query is None or response is None or reference is None:
-            print(query, response, reference, flush=True)
-            raise ValueError("query, response, and reference must be provided")
-
-        eval_response = await self._llm.apredict(
-            prompt=self._eval_template,
-            query=query,
-            generated_answer=response,
-            context_str=re.sub(
-                "\n+", "\n", "\n---\n".join(contexts) if contexts else ""
-            ),
-        )
-
-        passing, reasoning, score = await safe_parse_eval_response(
-            eval_response, "consistent"
-        )
-
-        return EvaluationResult(
-            query=query,
-            response=response,
-            passing=passing,
-            score=score,
-            feedback=reasoning,
-        )

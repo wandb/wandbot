@@ -1,8 +1,19 @@
 import json
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+class EvaluationResult(BaseModel):
+    """Result of an evaluation."""
+    query: str
+    response: str
+    passing: Optional[bool] = None
+    score: Optional[float] = None
+    feedback: Optional[str] = None
+    has_error: bool = False
+    error_message: Optional[str] = None
 
 async def safe_parse_eval_response(eval_response: str, expected_decision: str) -> Tuple[bool, str, float]:
     """Safely parse the evaluation response."""
