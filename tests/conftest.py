@@ -1,7 +1,7 @@
 import pytest
 import os
 from openai import AsyncOpenAI
-from wandbot.evaluation.eval.correctness import WandBotCorrectnessEvaluator
+from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""

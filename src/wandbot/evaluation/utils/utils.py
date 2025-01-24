@@ -14,6 +14,7 @@ class EvaluationResult(BaseModel):
     passing: Optional[bool] = None
     has_error: bool = False
     error_message: Optional[str] = None
+    
 
 async def safe_parse_eval_response(eval_response: str, expected_decision: str) -> Tuple[bool, str, float]:
     """Safely parse the evaluation response."""

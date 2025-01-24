@@ -1,10 +1,10 @@
-import asyncio
 import json
 from typing import Any, Optional, List, Tuple
 import regex as re
-from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
 
 from wandbot.evaluation.utils.utils import EvaluationResult
+from wandbot.models.llm import LLMModel
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a technical support chatbot.
 
@@ -73,6 +73,13 @@ USER_TEMPLATE = """
 {generated_answer}
 """
 
+
+class CorrectnessEvaluationResult(BaseModel):
+    reason: str = Field(..., description="Provide a brief explanation for your decision here")
+    score: float = Field(..., description="Provide a score as per the above guidelines")
+    decision: str = Field(..., description="Provide your final decision here, either 'correct', or 'incorrect'")
+
+
 class WandBotCorrectnessEvaluator:
     """Evaluates the correctness of a question answering system.
     
@@ -83,41 +90,45 @@ class WandBotCorrectnessEvaluator:
     
     def __init__(
         self,
-        client: AsyncOpenAI,
-        model: str = "gpt-4-1106-preview",
+        model_name: str = "gpt-4-1106-preview",
+        provider: str = "openai",
         temperature: float = 0.1,
         score_threshold: float = 2.0,
         system_template: Optional[str] = None,
         max_concurrent_requests: int = 20,
+        **kwargs
     ):
         """Initialize the evaluator.
         
         Args:
-            client: AsyncOpenAI client instance
-            model: OpenAI model to use
+            model_name: Name of the model to use
+            provider: Provider of the model (e.g., "openai" or "anthropic")
             temperature: Temperature for model sampling
             score_threshold: Score threshold for passing evaluation
             system_template: Optional custom system template to use for evaluation
+            max_concurrent_requests: Maximum number of concurrent requests
+            **kwargs: Additional keyword arguments for LLMModel
         """
-        self.client = client
-        self.model = model
-        self.temperature = temperature
+        self.llm = LLMModel(
+            provider=provider,
+            model_name=model_name,
+            temperature=temperature,
+            n_parallel_api_calls=max_concurrent_requests,
+            **kwargs
+        )
         self.score_threshold = score_threshold
         self.system_template = system_template or SYSTEM_TEMPLATE
-        self.request_semaphore = asyncio.Semaphore(max_concurrent_requests)
-        
+        self.response_model = CorrectnessEvaluationResult
+
     async def _get_completion(self, system_prompt: str, user_prompt: str) -> str:
-        """Get completion from OpenAI API with rate limiting."""
-        async with self.request_semaphore:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                temperature=self.temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
-            )
-            return response.choices[0].message.content
+        """Get completion from the model."""
+        return await self.llm.generate(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_model=self.response_model
+        )
 
     async def safe_parse_eval_response(
         self, eval_response: str, expected_decision: str
