@@ -1,28 +1,22 @@
 import enum
 import json
-from operator import itemgetter
 from typing import Any, Dict, List, Optional, Tuple
+import asyncio
 
 import regex as re
 import weave
-from langchain_core.messages import convert_to_messages, get_buffer_string
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import (
-    Runnable,
-    RunnableLambda,
-    RunnableParallel,
-    RunnablePassthrough,
+from pydantic import BaseModel, Field, ValidationError
+from tenacity import (
+    retry,
+    stop_after_attempt, 
+    wait_exponential,
+    retry_if_exception,
+    before_sleep_log
 )
-from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
-from pydantic import ValidationError
 
 from wandbot.configs.chat_config import ChatConfig
-from wandbot.rag.utils import ChatModel
 from wandbot.utils import get_logger
-
-from weave.integrations.langchain.langchain import langchain_patcher
-langchain_patcher.undo_patch()
+from wandbot.models.llm import LLMModel, LLMError
 
 logger = get_logger(__name__)
 
@@ -256,46 +250,21 @@ ENHANCER_SYSTEM_PROMPT = (
 )
 
 
-# ENHANCER_SYSTEM_PROMPT = """
-# # Task
-# Given a query from a user, you are tasked with generating an expanded list of additional \
-# queries that will help in retrieving information relevant to the user's query.
-
-# The point of this is to help retrieve relevant information from both our keyword search \
-# and semantic search vector data base. We want to improve recall across potentially relevant \
-# content such as our documentation, blogs, FAQs and code snippets in our vector database.
-
-# Try and generate a broad diversity of queries while still staying focused on the \
-# original intent and technical focus of the query.
-# """
-
-
-# USER_PROMPT ="""# User Query\
-# Given this user query, please generate relevant, related queries to improve recall \
-# for our keyword and vector search services:
-
-# ## User Query
-# {query}
-
-# !!! Tip: Make sure to answer in the correct format."""
-
-ENHANCER_PROMPT_MESSAGES = [
-    ("system", ENHANCER_SYSTEM_PROMPT),
-    ("human", "Question: {query}"),
-    ("human", "!!! Tip: Make sure to answer in the correct format"),
-]
-
-
-# ENHANCER_PROMPT_MESSAGES = [
-#     ("system", ENHANCER_SYSTEM_PROMPT),
-#     ("human", USER_PROMPT)
-# ]
+def format_chat_history(chat_history: Optional[List[Tuple[str, str]]]) -> str:
+    """Format chat history into a string"""
+    if not chat_history:
+        return "No chat history available."
+    
+    formatted = []
+    for user_msg, assistant_msg in chat_history:
+        formatted.extend([
+            f"User: {user_msg}",
+            f"Assistant: {assistant_msg}"
+        ])
+    return "\n".join(formatted)
 
 
 class QueryEnhancer:
-    model: ChatModel = ChatModel()
-    fallback_model: ChatModel = ChatModel(max_retries=3)
-
     def __init__(
         self,
         model_name: str,
@@ -303,57 +272,60 @@ class QueryEnhancer:
         fallback_model_name: str,
         fallback_temperature: float,
     ):
-        self.model = {"model_name": model_name, "temperature": temperature}  # type: ignore
-        self.fallback_model = {"model_name": fallback_model_name, "temperature": fallback_temperature}  # type: ignore
-        self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
-        self._chain = None
-
-    @property
-    def chain(self) -> Runnable:
-        if self._chain is None:
-            base_chain = self._load_chain(self.model)
-            fallback_chain = self._load_chain(self.fallback_model)
-            self._chain = base_chain.with_fallbacks([fallback_chain])
-
-        return self._chain
-
-    def _load_chain(self, model: ChatOpenAI) -> Runnable:
-        base_query_enhancer = self.prompt | model.with_structured_output(
-            EnhancedQuery
+        self.model = LLMModel(
+            provider="openai",
+            model_name=model_name,
+            temperature=temperature,
+            response_model=EnhancedQuery,
+            max_retries=3
+        )
+        self.fallback_model = LLMModel(
+            provider="openai",
+            model_name=fallback_model_name,
+            temperature=fallback_temperature,
+            response_model=EnhancedQuery,
+            max_retries=3
         )
 
-        # Add retry specifically for validation errors
-        query_enhancer_chain = base_query_enhancer.with_retry(
-            retry_if_exception_type=(ValidationError,),
-            wait_exponential_jitter=True,  # Add jitter to prevent thundering herd
-            stop_after_attempt=6,
-        )
-
-        input_chain = RunnableParallel(
-            query=RunnablePassthrough(),
-            chat_history=(
-                RunnableLambda(lambda x: convert_to_messages(x["chat_history"]))
-                | RunnableLambda(
-                    lambda x: get_buffer_string(x, "user", "assistant")
-                )
-            ),
-        )
-
-        full_query_enhancer_chain = input_chain | query_enhancer_chain
-
-        intermediate_chain = RunnableParallel(
-            query=itemgetter("query"),
-            chat_history=itemgetter("chat_history"),
-            enhanced_query=full_query_enhancer_chain,
-        )
-        chain = intermediate_chain | RunnableLambda(
-            lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"])
-            )
-        )
-
-        return chain
+    @retry(
+        retry=retry_if_exception,
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        before_sleep=before_sleep_log(logger, log_level=10),
+    )
+    async def _try_enhance_query(
+        self,
+        model: LLMModel,
+        query: str,
+        chat_history: Optional[List[Tuple[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Try to enhance a query using the given model"""
+        messages = [
+            {"role": "system", "content": ENHANCER_SYSTEM_PROMPT.format(
+                chat_history=format_chat_history(chat_history)
+            )},
+            {"role": "user", "content": f"Question: {query}"},
+            {"role": "user", "content": "!!! Tip: Make sure to answer in the correct format"}
+        ]
+        
+        response = await model.create(messages=messages)
+        if isinstance(response, LLMError):
+            raise Exception(response.error_message)
+            
+        return response.parse_output(query, chat_history)
 
     @weave.op
-    def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
-        return self.chain.invoke(inputs)
+    async def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhance a query with retries and fallback"""
+        query = inputs.get("query", "")
+        chat_history = inputs.get("chat_history")
+        
+        try:
+            return await self._try_enhance_query(self.model, query, chat_history)
+        except Exception as e:
+            logger.warning(f"Primary Query Enhancer model failed, trying fallback: {str(e)}")
+            try:
+                return await self._try_enhance_query(self.fallback_model, query, chat_history)
+            except Exception as e:
+                logger.error(f"Both primary and fallback Query Enhancer models failed: {str(e)}")
+                raise

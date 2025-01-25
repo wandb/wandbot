@@ -92,6 +92,7 @@ class RAGPipeline:
         # with get_openai_callback() as query_enhancer_cb, Timer() as query_enhancer_tb:
         # If QueryEnhancer is fully sync, do:
         enhanced_query = self.query_enhancer({"query": question, "chat_history": chat_history})
+
         # or if it is truly async, do:
         # enhanced_query = await self.query_enhancer.acall({"query": question, "chat_history": chat_history})
 
