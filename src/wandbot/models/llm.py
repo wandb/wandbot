@@ -122,7 +122,7 @@ class AsyncOpenAILLMModel(BaseLLMModel):
                     return self.response_model.model_validate_json(json_str)
                 # Else use the Structure Outputs api
                 else:
-                    api_params["response_model"] = self.response_model
+                    api_params["response_format"] = self.response_model
                     for msg in api_params["messages"]:
                         if msg["role"] == "system":
                             msg["role"] = "developer"
@@ -151,7 +151,6 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
             api_params = {
                 "model": self.model_name,
                 "temperature": self.temperature,
-                "response_model": self.response_model,
                 "messages": chat_messages,
                 "max_tokens": max_tokens
             }
@@ -161,16 +160,15 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
             if system_msg:
                 api_params["system"] = system_msg
 
-            if api_params["response_model"]:
-                api_params["messages"] += add_json_response_model_to_messages(api_params["response_model"])
-                api_params.pop("response_model", None)
+            if self.response_model:
+                api_params["messages"] += add_json_response_model_to_messages(self.response_model)
 
             response = await self.client.messages.create(**api_params)
             content = response.content[0].text
 
-            if api_params["response_model"]:
+            if self.response_model:
                 json_str = clean_json_string(content)
-                return api_params["response_model"].model_validate_json(json_str)
+                return self.response_model.model_validate_json(json_str)
             return content
 
 
