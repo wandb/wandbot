@@ -10,8 +10,8 @@ e2b*
 # C extensions
 *.so
 
-test_*.py
-test_*.ipynb
+testing_*.py
+testing_*.ipynb
 temp_*
 
 # Distribution / packaging
