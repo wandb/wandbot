@@ -120,7 +120,7 @@ class TestWithMockConfig:
         
         # Mock the LLM response
         mock_response = CorrectnessEvaluationModel(
-            reasoning="test",
+            reason="test",
             score=3.0,
             decision="correct"
         )
@@ -130,7 +130,7 @@ class TestWithMockConfig:
         assert isinstance(result, CorrectnessEvaluationModel)
         assert result.score == 3.0
         assert result.decision == "correct"
-        assert result.reasoning == "test"
+        assert result.reason == "test"
 
         # Test error case
         error_response = LLMError(error=True, error_message="test error")
@@ -156,7 +156,7 @@ class TestWithMockConfig:
         
         # Mock successful LLM response
         mock_response = CorrectnessEvaluationModel(
-            reasoning="test",
+            reason="test",
             score=3.0,
             decision="correct"
         )
@@ -209,7 +209,7 @@ class TestWithRealConfig:
                 f"Expected score {test_case['expected_score']} for query '{test_case['query']}', got {result.score}"
             assert (result.decision == "correct") == test_case["expected_passing"], \
                 f"Expected passing={test_case['expected_passing']} for query '{test_case['query']}', got {result.decision}"
-            assert result.reasoning is not None and len(result.reasoning) > 0
+            assert result.reason is not None and len(result.reason) > 0
     
     @pytest.mark.asyncio(loop_scope="function")
     async def test_evaluator_edge_cases_real_config(self, real_config):
@@ -251,4 +251,4 @@ class TestWithRealConfig:
         )
         assert isinstance(result.score, float)
         assert isinstance(result.decision, str)
-        assert result.reasoning is not None 
+        assert result.reason is not None 

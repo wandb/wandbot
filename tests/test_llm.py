@@ -9,7 +9,8 @@ from wandbot.models.llm import (
     AsyncOpenAILLMModel,
     AsyncAnthropicLLMModel,
     LLMModel,
-    extract_system_and_messages
+    extract_system_and_messages,
+    LLMError
 )
 
 # Load environment variables from .env
@@ -84,10 +85,14 @@ async def test_openai_llm_create(model_name):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("model_name", openai_models)
 async def test_openai_llm_create_with_response_model(model_name):
-    model = AsyncOpenAILLMModel(model_name=model_name, temperature=0)
+    model = AsyncOpenAILLMModel(
+        model_name=model_name, 
+        temperature=0,
+        response_model=SimpleResponse
+    )
     response = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
-    ], response_model=SimpleResponse)
+    ])
     
     assert isinstance(response, SimpleResponse)
     assert response.answer == 4
@@ -124,10 +129,14 @@ async def test_anthropic_invalid_model():
 
 @pytest.mark.asyncio
 async def test_anthropic_llm_create_with_response_model():
-    model = AsyncAnthropicLLMModel(model_name="claude-3-5-sonnet-20241022", temperature=0)
+    model = AsyncAnthropicLLMModel(
+        model_name="claude-3-5-sonnet-20241022", 
+        temperature=0,
+        response_model=SimpleResponse
+    )
     response = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
-    ], response_model=SimpleResponse)
+    ])
     
     assert isinstance(response, SimpleResponse)
     assert response.answer == 4
@@ -140,14 +149,18 @@ def test_llm_model_invalid_provider():
 @pytest.mark.asyncio
 async def test_llm_model_invalid_openai_model():
     model = LLMModel(provider="openai", model_name="invalid-model")
-    with pytest.raises(Exception):  # Will raise on API call
-        await model.create([{"role": "user", "content": "test"}])
+    response = await model.create([{"role": "user", "content": "test"}])
+    assert isinstance(response, LLMError)
+    assert response.error
+    assert "model_not_found" in response.error_message
 
 @pytest.mark.asyncio
 async def test_llm_model_invalid_anthropic_model():
     model = LLMModel(provider="anthropic", model_name="invalid-model")
-    with pytest.raises(Exception):  # Will raise on API call
-        await model.create([{"role": "user", "content": "test"}])
+    response = await model.create([{"role": "user", "content": "test"}])
+    assert isinstance(response, LLMError)
+    assert response.error
+    assert "not_found_error" in response.error_message
 
 @pytest.mark.parametrize("provider,model_name", [
     ("openai", "gpt-4-1106-preview"),
@@ -159,19 +172,15 @@ def test_llm_model_valid_models(provider, model_name):
     assert model.model.model_name == model_name
 
 @pytest.mark.asyncio
-async def test_llm_model_call():
-    model = LLMModel(provider="openai", model_name="gpt-4-1106-preview")
-    response = await model([
-        {"role": "user", "content": "What is 2+2? Answer with just the number."}
-    ])
-    assert response.strip() == "4"
-
-@pytest.mark.asyncio
-async def test_llm_model_call_with_response_model():
-    model = LLMModel(provider="openai", model_name="gpt-4o-2024-08-06")
-    response = await model([
+async def test_llm_model_create_with_response_model():
+    model = LLMModel(
+        provider="openai", 
+        model_name="gpt-4o-2024-08-06",
+        response_model=SimpleResponse
+    )
+    response = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
-    ], response_model=SimpleResponse)
+    ])
     assert isinstance(response, SimpleResponse)
     assert response.answer == 4
 
