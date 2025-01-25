@@ -185,7 +185,7 @@ class WandbotCorrectnessScorer(weave.Scorer):
 
         if self.debug:
             if model_output is not None:
-                logger.info(f"In get_answer_correctness, model_output keys:\n{model_output.keys()}")
+                logger.info(f"In WandbotCorrectnessScorer, model_output keys:\n{model_output.keys()}")
             else:
                 logger.error("model_output is None")
     
