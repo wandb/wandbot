@@ -302,6 +302,7 @@ def main():
             "wandbot_git_info": wandbot_info.get("git_info", {}),
             "wandbot_app_config": wandbot_info.get("app_config", {})
             }
+    eval_attributes["wandbot_app_config"]["application"] = config.experiment_name
 
     logger.info(f"Starting evaluation of {len(question_rows)} samples with {config.n_trials} trials, \
 {len(question_rows) * config.n_trials} calls in total.")

@@ -30,28 +30,28 @@ Follow these guidelines for scoring:
 
 CRITICAL: You must output ONLY a JSON object. No text before or after. No explanations. No notes. Just the JSON object in exactly this format:
 {
-    "reasoning": <<Provide a brief explanation for your decision here>>,
+    "reason": <<Provide a brief explanation for your decision here>>,
     "score": <<Provide a score as per the above guidelines>>,
     "decision": <<Provide your final decision here, either 'correct', or 'incorrect'>>
 }
 
 Example Response 1:
 {
-    "reasoning": "The generated answer has the exact details as the reference answer and completely answer's the user's query.",
+    "reason": "The generated answer has the exact details as the reference answer and completely answer's the user's query.",
     "score": 3,
     "decision": "correct"
 }
 
 Example Response 2:
 {
-    "reasoning": "The generated answer doesn't match the reference answer, and deviates from the documentation provided",
+    "reason": "The generated answer doesn't match the reference answer, and deviates from the documentation provided",
     "score": 1,
     "decision": "incorrect"
 }
 
 Example Response 3:
 {
-    "reasoning": "The generated answer follows the same steps as the reference answer. However, it includes assumptions about methods that are not mentioned in the documentation.",
+    "reason": "The generated answer follows the same steps as the reference answer. However, it includes assumptions about methods that are not mentioned in the documentation.",
     "score": 2,
     "decision": "incorrect"
 }"""
@@ -75,7 +75,7 @@ USER_TEMPLATE = """
 
 
 class CorrectnessEvaluationModel(BaseModel):
-    reasoning: str = Field(..., description="Provide a brief explanation for your decision here")
+    reason: str = Field(..., description="Provide a brief explanation for your decision here")
     score: float = Field(..., description="Provide a score as per the above guidelines")
     decision: str = Field(..., description="Provide your final decision here, either 'correct', or 'incorrect'")
 
@@ -91,7 +91,7 @@ class WandBotCorrectnessEvaluator:
     
     This evaluator depends on a reference answer being provided, in addition to the
     query string and response string. It outputs a score between 1 and 3, where 1 
-    is the worst and 3 is the best, along with a reasoning for the score.
+    is the worst and 3 is the best, along with a reason for the score.
     """
     
     def __init__(
@@ -177,7 +177,7 @@ class WandBotCorrectnessEvaluator:
                 return CorrectnessEvaluationResult(
                     answer_correct=False,
                     score=1.0,
-                    reasoning=f"Evaluation failed due to an LLM error: {eval_response.error}",
+                    reason=f"Evaluation failed due to an LLM error: {eval_response.error_message}",
                     decision="incorrect",
                     has_error=True,
                     error_message=eval_response.error_message
@@ -186,11 +186,11 @@ class WandBotCorrectnessEvaluator:
             decision = eval_response.decision
             answer_correct = decision.lower() == "correct"
             score = eval_response.score
-            reasoning = eval_response.reasoning
+            reason = eval_response.reason
             return CorrectnessEvaluationResult(
                 answer_correct=answer_correct,
                 score=score,
-                reasoning=reasoning,
+                reason=reason,
                 decision=decision,
                 has_error=False,
                 error_message=""
@@ -200,7 +200,7 @@ class WandBotCorrectnessEvaluator:
             return CorrectnessEvaluationResult(
                 answer_correct=False,
                 score=1.0,  # Lowest score since evaluation failed
-                reasoning=error_msg,
+                reason=error_msg,
                 decision="incorrect",
                 has_error=True,
                 error_message=error_msg
