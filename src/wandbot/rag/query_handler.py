@@ -1,11 +1,10 @@
 import enum
 import json
 from typing import Any, Dict, List, Optional, Tuple
-import asyncio
 
 import regex as re
 import weave
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from tenacity import (
     retry,
     stop_after_attempt, 
@@ -321,12 +320,24 @@ class QueryEnhancer:
         query = inputs.get("query", "")
         chat_history = inputs.get("chat_history")
         
+        query_enhancer_success = True
+        query_enhancer_error = None
+        result = None
+        
         try:
-            return await self._try_enhance_query(self.model, query, chat_history)
+            result = await self._try_enhance_query(self.model, query, chat_history)
         except Exception as e:
             logger.warning(f"Primary Query Enhancer model failed, trying fallback: {str(e)}")
             try:
-                return await self._try_enhance_query(self.fallback_model, query, chat_history)
+                result = await self._try_enhance_query(self.fallback_model, query, chat_history)
             except Exception as e:
                 logger.error(f"Both primary and fallback Query Enhancer models failed: {str(e)}")
+                query_enhancer_success = False
+                query_enhancer_error = str(e)
                 raise
+        
+        if result:
+            result["query_enhancer_success"] = query_enhancer_success
+            result["query_enhancer_error"] = query_enhancer_error
+            
+        return result

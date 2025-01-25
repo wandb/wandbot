@@ -121,7 +121,15 @@ class RAGPipeline:
             # time_taken=query_enhancer_tb.elapsed + retrieval_tb.elapsed + response_tb.elapsed,
             # start_time=query_enhancer_tb.start,
             # end_time=response_tb.stop,
-            api_call_statuses={"web_search_success": retrieval_results["web_search_success"]},
+            api_call_statuses={
+                "web_search_success": retrieval_results["web_search_success"],
+                "reranker_success": retrieval_results.get("reranker_success", True),
+                "reranker_error_message": retrieval_results.get("reranker_error_message", None),
+                "query_enhancer_success": enhanced_query.get("query_enhancer_success", True),
+                "query_enhancer_error_message": enhanced_query.get("query_enhancer_error_message", None),
+                "embedding_success": retrieval_results.get("embedding_success", True),
+                "embedding_error_message": retrieval_results.get("embedding_error_message", None)
+            },
         )
         return output
 

@@ -1,7 +1,7 @@
 import os
 import asyncio
 import weave
-from typing import List, Union
+from typing import List, Union, Tuple, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential
 import base64
 import numpy as np
@@ -113,9 +113,21 @@ class EmbeddingModel:
         
         self.model = self.PROVIDER_MAP[provider](**kwargs)
 
-    def embed(self, input: Union[str, List[str]] = None) -> List[List[float]]:
-        return self.model.embed(input)
+    def embed(self, input: Union[str, List[str]] = None) -> Tuple[List[List[float]], Dict[str, Any]]:
+        try:
+            embeddings = self.model.embed(input)
+            return embeddings, {
+                "embedding_success": True,
+                "embedding_error_message": None
+            }
+        except Exception as e:
+            logger.error(f"EMBEDDING: Error in embedding model: {e}")
+            return None, {
+                "embedding_success": False,
+                "embedding_error_message": str(e)
+            }
 
     def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
         """Required interface for Chroma's EmbeddingFunction"""
-        return self.embed(input)
+        embeddings, _ = self.embed(input)  # Ignore status for Chroma interface
+        return embeddings

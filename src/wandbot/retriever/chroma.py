@@ -230,11 +230,16 @@ of lengths: {[len(r) for r in res['documents']]}")
             input_type="search_query",
             encoding_format="base64"
         )
-        v1_3_embeddings = v1_3_embedding_model.embed(query_texts)
-        # print(f"Query embedding: {v1_3_embeddings[0][:50]}")
-        # print("*"*100)
 
-        # END DEBUG
+        try:
+            v1_3_embeddings, embedding_status = v1_3_embedding_model.embed(query_texts)
+        except Exception as e:
+            logger.error(f"Error embedding query texts: {e}")
+            v1_3_embeddings = [[]]
+            embedding_status = {
+                "embedding_success": False,
+                "embedding_error_message": str(e)
+            }
 
         # Get or create event loop without closing it
         try:
@@ -272,7 +277,7 @@ of lengths: {[len(r) for r in res['documents']]}")
         
         
         # DEBUG
-        print(f"Constructing results_dict")
+        print("Constructing results_dict")
         ## END DEBUG
 
         # Link query to result, mostly for logging visibility
@@ -280,19 +285,8 @@ of lengths: {[len(r) for r in res['documents']]}")
         for i, result in enumerate(results):
             results_dict[query_texts[i]] = result
 
-        # DEBUG
-        def debug_log_mmr_results(results_dict):
-            for query, results in results_dict.items():
-                if query == "concurrent writes":
-                    print(f"concurrent writes found at index: {i}")    
-                    print(f"MRR IDs for query: {query}")
-                    for doc in results:
-                        print(doc.metadata['id'])
-                    print("*"*100)
-                    break
-            return results_dict
-        
-        _ = debug_log_mmr_results(results_dict)
+        # Add embedding status to results
+        results_dict["_embedding_status"] = embedding_status
         
         return results_dict
 

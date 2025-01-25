@@ -9,6 +9,7 @@ import cohere
 import weave
 from weave.trace.autopatch import autopatch
 from wandbot.utils import run_sync
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import _async_run_web_search
@@ -40,6 +41,8 @@ class FusionRetrievalEngine:
             raise e
 
     @weave.op
+    @retry(stop=stop_after_attempt(3), 
+           wait=wait_exponential(multiplier=1, min=4, max=60))
     def rerank_results(
         self,
         query: str,
@@ -146,20 +149,28 @@ class FusionRetrievalEngine:
             logger.info(f"RETRIEVAL-ENGINE: Deduped {len_fused_context - len(fused_context_deduped)} duplicate documents.")
             
             # Rerank results
-            if use_async:
-                context = await self._async_rerank_results(
-                    query=inputs["standalone_query"],
-                    context=fused_context_deduped,
-                    top_k=self.top_k,
-                    language=inputs["language"]
-                )
-            else:
-                context = self.rerank_results(
-                    query=inputs["standalone_query"],
-                    context=fused_context_deduped,
-                    top_k=self.top_k,
-                    language=inputs["language"]
-                )
+            reranker_success = True
+            reranker_error = None
+            try:
+                if use_async:
+                    context = await self._async_rerank_results(
+                        query=inputs["standalone_query"],
+                        context=fused_context_deduped,
+                        top_k=self.top_k,
+                        language=inputs["language"]
+                    )
+                else:
+                    context = self.rerank_results(
+                        query=inputs["standalone_query"],
+                        context=fused_context_deduped,
+                        top_k=self.top_k,
+                        language=inputs["language"]
+                    )
+            except Exception as e:
+                logger.error(f"FUSION-RETRIEVAL: Reranker failed: {e}")
+                context = fused_context_deduped[:self.top_k]  # Fallback to non-reranked results
+                reranker_success = False
+                reranker_error = str(e)
                 
             logger.debug(f"RETRIEVAL-ENGINE: Reranked {len(context)} documents.")
             
@@ -169,6 +180,10 @@ class FusionRetrievalEngine:
                 "full_context": fused_context_deduped,
                 "context": context,
                 "web_search_success": web_search_results.web_search_success,
+                "reranker_success": reranker_success,
+                "reranker_error_message": reranker_error,
+                "embedding_success": docs_context.get("_embedding_status", {}).get("embedding_success", True),
+                "embedding_error_message": docs_context.get("_embedding_status", {}).get("embedding_error_message", None),
                 "standalone_query": inputs["standalone_query"],
                 "language": inputs["language"],
                 "intents": inputs.get("intents", []),
