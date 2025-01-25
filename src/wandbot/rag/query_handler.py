@@ -10,7 +10,7 @@ from tenacity import (
     retry,
     stop_after_attempt, 
     wait_exponential,
-    retry_if_exception,
+    retry_if_exception_type,
     before_sleep_log
 )
 
@@ -288,10 +288,11 @@ class QueryEnhancer:
         )
 
     @retry(
-        retry=retry_if_exception,
-        stop=stop_after_attempt(6),
+        retry=retry_if_exception_type(Exception),
+        stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=60),
         before_sleep=before_sleep_log(logger, log_level=10),
+        reraise=True
     )
     async def _try_enhance_query(
         self,
