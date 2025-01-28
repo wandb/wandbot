@@ -17,13 +17,13 @@ import pathlib
 from typing import List
 
 from langchain_chroma import Chroma
-from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
 from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.utils import get_logger
+from wandbot.schema.document import Document
 
 logger = get_logger(__name__)
 

@@ -7,7 +7,8 @@ from langchain.text_splitter import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import BaseDocumentTransformer
+from wandbot.schema.document import Document
 
 from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 

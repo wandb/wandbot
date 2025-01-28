@@ -24,7 +24,6 @@ from urllib.parse import urljoin, urlparse
 import nbformat
 import pandas as pd
 from google.cloud import bigquery
-from langchain.schema import Document
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
@@ -52,6 +51,7 @@ from wandbot.ingestion.utils import (
     fetch_git_repo,
 )
 from wandbot.utils import get_logger
+from wandbot.schema.document import Document
 
 logger = get_logger(__name__)
 

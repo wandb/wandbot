@@ -9,7 +9,6 @@ dependency while maintaining exact compatibility with its behavior, including:
 import asyncio
 import weave
 from typing import Any, Callable, Dict, List, Optional
-from langchain_core.documents import Document
 import numpy as np
 
 import chromadb
@@ -18,6 +17,7 @@ from chromadb.config import Settings
 from wandbot.retriever.utils import maximal_marginal_relevance
 from wandbot.utils import get_logger
 from wandbot.models.embedding import EmbeddingModel
+from wandbot.schema.document import Document
 
 logger = get_logger(__name__)
 

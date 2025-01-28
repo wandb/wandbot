@@ -6,7 +6,7 @@ from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
     TokenTextSplitter,
 )
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import BaseDocumentTransformer
 from tree_sitter import Node
 from tree_sitter_languages import get_language, get_parser
 
@@ -15,6 +15,7 @@ from wandbot.ingestion.preprocessors.markdown import (
     create_id_from_document,
 )
 from wandbot.utils import FastTextLangDetect, FasttextModelConfig
+from wandbot.schema.document import Document
 
 
 def extract_docstrings(node: Node, node_type: str, language: Any):

@@ -2,7 +2,7 @@ from typing import List, Dict
 import asyncio
 import weave
 from wandbot.retriever.chroma import ChromaVectorStore
-from langchain_core.documents import Document
+from wandbot.schema.document import Document
 import wandb
 
 from wandbot.models.embedding import EmbeddingModel

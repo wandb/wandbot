@@ -1,6 +1,7 @@
 from typing import Any, Callable, List, Sequence, Union
 import numpy as np
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import BaseDocumentTransformer
+from wandbot.schema.document import Document
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import TypeAlias
 import weave

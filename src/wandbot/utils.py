@@ -39,7 +39,7 @@ import subprocess
 import fasttext
 import nest_asyncio
 import tiktoken
-from langchain_core.documents import Document
+from wandbot.schema.document import Document
 from pydantic import Field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

@@ -1,6 +1,6 @@
 import json
 
-from langchain_core.documents import Document
+from wandbot.schema.document import Document
 from langchain_core.prompts import PromptTemplate, format_document
 from langchain_openai import ChatOpenAI
 
