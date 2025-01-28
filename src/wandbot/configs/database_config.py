@@ -13,11 +13,13 @@ Typical usage example:
 from typing import Any
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DataBaseConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="", env_file=".env", env_file_encoding="utf-8")
+    
     SQLALCHEMY_DATABASE_URL: str = Field(
-        "sqlite:///./data/cache/app.db", env="SQLALCHEMY_DATABASE_URL"
+        "sqlite:///./data/cache/app.db"
     )
     connect_args: dict[str, Any] = Field({"check_same_thread": False})
