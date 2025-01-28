@@ -154,7 +154,10 @@ of lengths: {[len(r) for r in res['documents']]}")
             Dict of lists
         """
         
-        query_embeddings = self.embedding_function(query_texts)
+        # ORIGINAL chroma, MAYBE KEEP 
+        # query_embeddings = self.embedding_function(query_texts)
+
+
         # DEBUG
         # print(f"len query embeds: {len(query_embeddings)}")
         # print(f"len first query embed: {len(query_embeddings[0])}")
@@ -165,31 +168,31 @@ of lengths: {[len(r) for r in res['documents']]}")
         #         print("*"*100)
         #         break
 
-        retrieved_results = self.query(
-            query_embeddings=query_embeddings,
-            n_results=fetch_k,
-            filter=filter,
-            where_document=where_document,
-            include=['documents', 'metadatas', 'distances', 'embeddings']
-        )
+        # retrieved_results = self.query(
+        #     query_embeddings=query_embeddings,
+        #     n_results=fetch_k,
+        #     filter=filter,
+        #     where_document=where_document,
+        #     include=['documents', 'metadatas', 'distances', 'embeddings']
+        # )
 
         # DEBUG
-        @weave.op
-        def debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings):
-            for i, q in enumerate(query_texts):
-                if q == "concurrent writes":
-                    print(f"Unranked fetch_k {fetch_k} ids for {q}:")
-                    for doc in retrieved_results["metadatas"][i]:
-                        print(doc['id'])
-                    print("*"*100)
-                    print(f"Query Embeddings:\n{query_embeddings[i][:10]}")
-                    break
-            return query_texts, retrieved_results, query_embeddings
-        _ = debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings)
-        # END DEBUG
+        # @weave.op
+        # def debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings):
+        #     for i, q in enumerate(query_texts):
+        #         if q == "concurrent writes":
+        #             print(f"Unranked fetch_k {fetch_k} ids for {q}:")
+        #             for doc in retrieved_results["metadatas"][i]:
+        #                 print(doc['id'])
+        #             print("*"*100)
+        #             print(f"Query Embeddings:\n{query_embeddings[i][:10]}")
+        #             break
+        #     return query_texts, retrieved_results, query_embeddings
+        # _ = debug_log_retrieved_results(query_texts, retrieved_results, query_embeddings)
+        # # END DEBUG
         
-        logger.debug(f"VECTORSTORE: {len(retrieved_results['documents'])} sets of results returned from MMR search call.")
-        logger.debug(f"VECTORSTORE: First query's document IDs: {[meta.get('id') for meta in retrieved_results['metadatas'][0]]}")
+        # logger.debug(f"VECTORSTORE: {len(retrieved_results['documents'])} sets of results returned from MMR search call.")
+        # logger.debug(f"VECTORSTORE: First query's document IDs: {[meta.get('id') for meta in retrieved_results['metadatas'][0]]}")
         
         async def run_mmr_batch(
             query_embedding: List[float],
@@ -233,7 +236,15 @@ of lengths: {[len(r) for r in res['documents']]}")
             encoding_format="base64"
         )
 
-        v1_3_embeddings, error_info = v1_3_embedding_model.embed(query_texts)
+        v1_3_query_embeddings, error_info = v1_3_embedding_model.embed(query_texts)
+
+        retrieved_results = self.query(
+            query_embeddings=v1_3_query_embeddings,
+            n_results=fetch_k,
+            filter=filter,
+            where_document=where_document,
+            include=['documents', 'metadatas', 'distances', 'embeddings']
+        )
 
         # Get or create event loop without closing it
         try:
@@ -260,7 +271,7 @@ of lengths: {[len(r) for r in res['documents']]}")
             lambda_mult
         ) for query_embed, doc_embed, docs, metadatas, distances in zip(
             # query_embeddings, # DEBUG
-            v1_3_embeddings,
+            v1_3_query_embeddings,
             retrieved_results["embeddings"],
             retrieved_results["documents"],
             retrieved_results["metadatas"],
