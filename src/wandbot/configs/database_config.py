@@ -17,7 +17,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DataBaseConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="", env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_prefix="", 
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
     
     SQLALCHEMY_DATABASE_URL: str = Field(
         "sqlite:///./data/cache/app.db"

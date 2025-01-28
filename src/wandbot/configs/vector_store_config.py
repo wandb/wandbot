@@ -1,7 +1,15 @@
 import pathlib
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
+
 class VectorStoreConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="", 
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+    
     # Vector Store
     vectordb_collection_name: str = "vectorstore"
     vectordb_index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")

@@ -80,7 +80,7 @@ def get_logger(name: str) -> logging.Logger:
         "critical": "red bold",
         "debug": "grey50"
     })
-    console = Console(theme=theme, width=110, tab_size=4)
+    console = Console(theme=theme, width=100, tab_size=4)
 
     logging.basicConfig(
         level=level,

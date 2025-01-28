@@ -55,7 +55,7 @@ class FusionRetrievalEngine:
         language: str = "en",
     ) -> tuple[List[Document], APIStatus]:
         """Reranks results and returns both results and API status"""
-        api_status = APIStatus(component="reranker", success=True)
+        api_status = APIStatus(component="reranker_api", success=True)
         
         documents = [doc.page_content for doc in context]
         reranker_model_name = (
@@ -78,7 +78,7 @@ class FusionRetrievalEngine:
             error = f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n"
             logger.error(error)
             error_info = ErrorInfo(
-                component="reranker",
+                component="reranker_api",
                 has_error=True,
                 error_message=str(e),
                 error_type=type(e).__name__,
@@ -86,7 +86,7 @@ class FusionRetrievalEngine:
                 file_path=get_error_file_path(sys.exc_info()[2])
             )
             return [], APIStatus(
-                component="reranker",
+                component="reranker_api",
                 success=False,
                 error_info=error_info
             )
@@ -122,6 +122,7 @@ class FusionRetrievalEngine:
     def dedupe_retrieved_results(self, results: List[Document]) -> List[Document]:
         return list({doc.metadata["id"]: doc for doc in results}.values())
 
+    @weave.op
     async def _run_retrieval_common(self, inputs: Dict[str, Any], use_async: bool) -> Dict[str, Any]:
         """Single function containing the entire retrieval logic."""
         try:
@@ -148,7 +149,8 @@ class FusionRetrievalEngine:
                     avoid=not self.do_web_search
                 ))
 
-            def flatten_retrieved_results(results: Dict[str, Any]) -> List[Document]:
+            def flatten_retrieved_results(results: Dict[str, Any]) -> tuple[List[Document], Any]:
+                embedding_status = results.get("_embedding_status")
                 docs = [results[k] for k in results.keys() if not k.startswith('_')]  # Skip metadata keys
                 if isinstance(docs, list) and all(isinstance(d, list) for d in docs):
                     docs = [item for sublist in docs for item in sublist]  # flattens to List[Tuple[Document, float]]
@@ -163,10 +165,10 @@ class FusionRetrievalEngine:
                                 if 'relevance_score' not in doc.metadata:
                                     doc.metadata['relevance_score'] = score
                                 processed_docs.append(doc)
-                    return processed_docs
-                return docs if isinstance(docs, list) else [docs]
+                    return processed_docs, embedding_status
+                return docs if isinstance(docs, list) else [docs], embedding_status
             
-            docs_context = flatten_retrieved_results(docs_context)
+            docs_context, embedding_status = flatten_retrieved_results(docs_context)
 
             logger.debug(f"RETRIEVAL-ENGINE: First retrieved document from vector store:\n{docs_context[0]}\n")
             logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(docs_context)} documents from vector store.")
@@ -201,7 +203,7 @@ class FusionRetrievalEngine:
                     raise Exception(api_status.error_message)  # Raise for weave tracing
             except Exception as e:
                 error_info = ErrorInfo(
-                    component="reranker",
+                    component="reranker_api",
                     has_error=True,
                     error_message=str(e),
                     error_type=type(e).__name__,
@@ -214,31 +216,22 @@ class FusionRetrievalEngine:
             retrieval_result = RetrievalResult(
                 documents=context,
                 retrieval_info={
-                    "num_vector_store_docs": len(docs_context),
-                    "num_web_docs": len(web_search_results.web_contexts),
-                    "num_deduped": len_fused_context - len(fused_context_deduped),
                     "query": inputs["standalone_query"],
                     "language": inputs["language"],
                     "intents": inputs.get("intents", []),
                     "sub_queries": inputs.get("sub_queries", []),
+                    "num_vector_store_docs": len(docs_context),
+                    "num_web_docs": len(web_search_results.web_contexts),
+                    "num_deduped": len_fused_context - len(fused_context_deduped),
+                    "api_statuses": {
+                        "web_search_api": web_search_results.api_status,
+                        "reranker_api": api_status,
+                        "embedding_api": embedding_status
+                    }
                 }
             )
             
-            return {
-                "docs_context": docs_context,
-                "search_results": web_search_results,
-                "full_context": fused_context_deduped,
-                "retrieval_result": retrieval_result,
-                "api_statuses": {
-                    "web_search": web_search_results.api_status,
-                    "reranker": api_status,
-                    "embedding": docs_context.get("_embedding_status")
-                },
-                "standalone_query": inputs["standalone_query"],
-                "language": inputs["language"],
-                "intents": inputs.get("intents", []),
-                "sub_queries": inputs.get("sub_queries", [])
-            }
+            return retrieval_result
         except Exception as e:
             logger.error(f"FUSION-RETRIEVAL: Error in retrieval: {e}")
             raise
@@ -249,3 +242,4 @@ class FusionRetrievalEngine:
 
     async def __acall__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return await self._run_retrieval_common(inputs, use_async=True)
+

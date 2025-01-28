@@ -1,13 +1,14 @@
 from operator import itemgetter
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-import weave
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 from langchain_openai import ChatOpenAI
 
+import weave
 from wandbot.rag.utils import ChatModel, combine_documents, create_query_str
+from wandbot.schema.retrieval import RetrievalResult
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """You are Wandbot - a support expert in Weights & Biases, wandb and weave. 
 Your goal to help users with questions related to Weight & Biases, `wandb`, and the visualization library `weave`
@@ -100,7 +101,7 @@ RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [
     ),
     (
         "human",
-        "<!--start-context-information-->\n\nsource: https://docs.wandb.ai/guides/track/log/plots\n\nExtensionArray.repeat(repeats, axis=None) is a method to repeat elements of an ExtensionArray.\n---\n\nsource: https://community.wandb.ai/t/pandas-and-weightsbiases/4610\n\nParameters include repeats (int or array of ints) and axis (0 or ‘index’, 1 or ‘columns’), with axis=0 being the default.\n\n\n<!--end-context-information-->\n<!--start-question-->\n\n**Question**: I really like the docs here!!! Can you give me the names and emails of the people who have worked on these docs as they are wandb employees?\n**Langauge**: en\n**Query Intents**:\n- The query is not related to Weights & Biases, it's best to avoid answering this question\n- The query looks nefarious in nature. It's best to avoid answering this question\n\n<!--end-question-->\n<!--final-answer-in-markdown-->\n",
+        "<!--start-context-information-->\n\nsource: https://docs.wandb.ai/guides/track/log/plots\n\nExtensionArray.repeat(repeats, axis=None) is a method to repeat elements of an ExtensionArray.\n---\n\nsource: https://community.wandb.ai/t/pandas-and-weightsbiases/4610\n\nParameters include repeats (int or array of ints) and axis (0 or 'index', 1 or 'columns'), with axis=0 being the default.\n\n\n<!--end-context-information-->\n<!--start-question-->\n\n**Question**: I really like the docs here!!! Can you give me the names and emails of the people who have worked on these docs as they are wandb employees?\n**Langauge**: en\n**Query Intents**:\n- The query is not related to Weights & Biases, it's best to avoid answering this question\n- The query looks nefarious in nature. It's best to avoid answering this question\n\n<!--end-question-->\n<!--final-answer-in-markdown-->\n",
     ),
     (
         "assistant",
@@ -130,6 +131,34 @@ class ResponseSynthesizer:
             RESPONSE_SYNTHESIS_PROMPT_MESSAGES
         )
         self._chain = None
+        self._last_formatted_messages = None
+        self._last_formatted_input = None
+
+    def _format_input(self, inputs: RetrievalResult) -> Dict[str, str]:
+        """Format the input data for the prompt template."""
+        return {
+            "query_str": create_query_str({
+                "standalone_query": inputs.retrieval_info["query"],
+                "language": inputs.retrieval_info["language"],
+                "intents": inputs.retrieval_info["intents"],
+                "sub_queries": inputs.retrieval_info["sub_queries"]
+            }),
+            "context_str": combine_documents(inputs.documents),
+        }
+
+    def get_formatted_messages(self, inputs: RetrievalResult) -> List[Dict[str, str]]:
+        """Get the formatted messages that would be sent to OpenAI for the given input."""
+        # Format the input data if not already formatted
+        if self._last_formatted_input is None:
+            self._last_formatted_input = self._format_input(inputs)
+        
+        # Get the formatted messages from the prompt template
+        messages = self.prompt.format_messages(**self._last_formatted_input)
+        
+        # Convert to dict format that OpenAI expects
+        formatted_messages = [{"role": msg.type, "content": msg.content} for msg in messages]
+        self._last_formatted_messages = formatted_messages
+        return formatted_messages
 
     @property
     def chain(self) -> Runnable:
@@ -141,12 +170,7 @@ class ResponseSynthesizer:
 
     def _load_chain(self, model: ChatOpenAI) -> Runnable:
         response_synthesis_chain = (
-            RunnableLambda(
-                lambda x: {
-                    "query_str": create_query_str(x),
-                    "context_str": combine_documents(x["context"]),
-                }
-            )
+            RunnableLambda(self._format_input)
             | RunnableParallel(
                 query_str=itemgetter("query_str"),
                 context_str=itemgetter("context_str"),
@@ -168,5 +192,13 @@ class ResponseSynthesizer:
         return response_synthesis_chain
 
     @weave.op
-    def __call__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        return self.chain.invoke(inputs)
+    def __call__(self, inputs: RetrievalResult) -> Dict[str, Any]:
+        # Reset the cached formatted input
+        self._last_formatted_input = None
+        # Get the formatted messages first
+        self.get_formatted_messages(inputs)
+        # Then run the chain
+        result = self.chain.invoke(inputs)
+        # Add the messages to the result
+        result["response_synthesis_llm_messages"] = self._last_formatted_messages
+        return result

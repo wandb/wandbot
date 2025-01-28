@@ -17,7 +17,7 @@ Typical usage example:
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 
 from pydantic import BaseModel
 
@@ -62,3 +62,4 @@ class ChatResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     api_call_statuses: dict = {}
+    response_synthesis_llm_messages: List[Dict[str, str]] | None = None

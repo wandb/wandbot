@@ -271,8 +271,8 @@ of lengths: {[len(r) for r in res['documents']]}")
         
         
         # DEBUG
-        print("Constructing results_dict")
-        ## END DEBUG
+        # print("Constructing results_dict")
+        # ## END DEBUG
 
         # Link query to result, mostly for logging visibility
         results_dict = {}

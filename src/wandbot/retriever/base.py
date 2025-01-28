@@ -51,7 +51,7 @@ class VectorStore:
 
     @weave.op
     def retrieve(self, query_texts: List[str], search_type: str = "mmr", search_kwargs: dict = None) -> Dict[str, List[Document]]:
-        """`retrieve` method returns a list of documents per query in query_texts."""
+        """retrieve method returns a list of documents per query in query_texts."""
         search_kwargs = search_kwargs or {}
 
         if search_type == "mmr":
@@ -72,8 +72,9 @@ class VectorStore:
             )
 
         return results
-    
-    async def _async_retrieve(self, query_texts: List[str], search_type: str = "mmr", search_kwargs: dict = None) -> List[Document]:
+
+    async def _async_retrieve(self, query_texts: List[str], search_type: str = "mmr", search_kwargs: dict = None) -> Dict[str, List[Document]]:
+        """Async version of retrieve that returns the same dictionary structure."""
         return await asyncio.to_thread(
             self.retrieve,
             query_texts=query_texts,

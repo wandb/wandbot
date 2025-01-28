@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import weave
 from pydantic import BaseModel
@@ -46,6 +46,7 @@ class RAGPipelineOutput(BaseModel):
     start_time: datetime.datetime
     end_time: datetime.datetime
     api_call_statuses: dict = {}
+    response_synthesis_llm_messages: List[Dict[str, str]] | None = None
 
 
 class RAGPipeline:
@@ -94,10 +95,10 @@ class RAGPipeline:
 
         # with Timer() as retrieval_tb:
         # If retrieval_engine is async, do:
-        retrieval_results = await self.retrieval_engine.__acall__(enhanced_query)
+        retrieval_result = await self.retrieval_engine.__acall__(enhanced_query)
 
         # with get_openai_callback() as response_cb, Timer() as response_tb:
-        response = self.response_synthesizer(retrieval_results)
+        response = self.response_synthesizer(retrieval_result)
         # or if it is truly async, do:
         # response = await self.response_synthesizer.__acall__(retrieval_results)
 
@@ -106,7 +107,7 @@ class RAGPipeline:
             question=enhanced_query["standalone_query"],
             answer=response["response"],
             sources="\n".join(
-                [item.metadata["source"] for item in retrieval_results["context"]]
+                [doc.metadata["source"] for doc in retrieval_result.documents]
             ),
             source_documents=response["context_str"],
             system_prompt=response["response_prompt"],
@@ -124,14 +125,15 @@ class RAGPipeline:
             # start_time=query_enhancer_tb.start,
             # end_time=response_tb.stop,
             api_call_statuses={
-                "web_search_success": retrieval_results["web_search_success"],
-                "reranker_error_info": retrieval_results.get("reranker_error_info", ErrorInfo()),
-                "reranker_success": not retrieval_results.get("reranker_error_info", ErrorInfo()).has_error,
-                "query_enhancer_error_info": enhanced_query.get("error_info", ErrorInfo()),
-                "query_enhancer_success": not enhanced_query.get("error_info", ErrorInfo()).has_error,
-                "embedding_error_info": retrieval_results.get("embedding_error_info", ErrorInfo()),
-                "embedding_success": not retrieval_results.get("embedding_error_info", ErrorInfo()).has_error,
+                "web_search_success": retrieval_result.retrieval_info["api_statuses"]["web_search_api"].success,
+                "reranker_api_error_info": retrieval_result.retrieval_info["api_statuses"]["reranker_api"].error_info,
+                "reranker_api_success": retrieval_result.retrieval_info["api_statuses"]["reranker_api"].success,
+                "query_enhancer_llm_api_error_info": enhanced_query.get("api_statuses", {}).get("query_enhancer_llm_api", {}).error_info if enhanced_query.get("api_statuses") else None,
+                "query_enhancer_llm_api_success": enhanced_query.get("api_statuses", {}).get("query_enhancer_llm_api", {}).success if enhanced_query.get("api_statuses") else False,
+                "embedding_api_error_info": retrieval_result.retrieval_info["api_statuses"]["embedding_api"].error_info,
+                "embedding_api_success": retrieval_result.retrieval_info["api_statuses"]["embedding_api"].success,
             },
+            response_synthesis_llm_messages=response.get("response_synthesis_llm_messages")
         )
         return output
 

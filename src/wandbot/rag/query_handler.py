@@ -15,7 +15,9 @@ from tenacity import (
 
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.utils import get_logger
-from wandbot.models.llm import LLMModel, LLMError
+from wandbot.models.llm import LLMModel
+from wandbot.schema.api_status import APIStatus
+
 
 logger = get_logger(__name__)
 
@@ -310,6 +312,36 @@ class QueryEnhancer:
             max_retries=max_retries
         )
 
+    @weave.op
+    async def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhance a query with retries and fallback"""
+        query = inputs.get("query", "")
+        chat_history = inputs.get("chat_history")
+        
+        result = None
+        llm_api_status = None
+        
+        try:
+            # Try primary model
+            result, llm_api_status = await self._try_enhance_query(self.model, query, chat_history)
+            parsed_result = result.parse_output(query, chat_history)
+        except Exception as e:
+            logger.warning(f"Primary Query Enhancer model failed, trying fallback: {str(e)}")
+            try:
+                # Try fallback model
+                result, llm_api_status = await self._try_enhance_query(self.fallback_model, query, chat_history)
+                parsed_result = result.parse_output(query, chat_history)
+            except Exception as e:
+                logger.error(f"Both primary and fallback Query Enhancer models failed: {str(e)}")
+                # If both models fail, raise the error
+                raise Exception(f"Query enhancement failed: {str(e)}")
+        
+        # Only include LLM API status
+        parsed_result["api_statuses"] = {
+            "query_enhancer_llm_api": llm_api_status
+        }
+        return parsed_result
+
     @retry(
         retry=retry_if_exception_type(Exception),
         stop=stop_after_attempt(3),
@@ -322,7 +354,7 @@ class QueryEnhancer:
         model: LLMModel,
         query: str,
         chat_history: Optional[List[Tuple[str, str]]] = None
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Dict[str, Any], APIStatus]:
         """Try to enhance a query using the given model"""
         messages = [
             {"role": "system", "content": ENHANCER_SYSTEM_PROMPT.format(
@@ -336,32 +368,4 @@ class QueryEnhancer:
         if not api_status.success:
             raise Exception(api_status.error_info.error_message)
             
-        return response.parse_output(query, chat_history)
-
-    @weave.op
-    async def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Enhance a query with retries and fallback"""
-        query = inputs.get("query", "")
-        chat_history = inputs.get("chat_history")
-        
-        query_enhancer_success = True
-        query_enhancer_error = None
-        result = None
-        
-        try:
-            result = await self._try_enhance_query(self.model, query, chat_history)
-        except Exception as e:
-            logger.warning(f"Primary Query Enhancer model failed, trying fallback: {str(e)}")
-            try:
-                result = await self._try_enhance_query(self.fallback_model, query, chat_history)
-            except Exception as e:
-                logger.error(f"Both primary and fallback Query Enhancer models failed: {str(e)}")
-                query_enhancer_success = False
-                query_enhancer_error = str(e)
-                raise
-        
-        if result:
-            result["query_enhancer_success"] = query_enhancer_success
-            result["query_enhancer_error"] = query_enhancer_error
-            
-        return result
+        return response, api_status
