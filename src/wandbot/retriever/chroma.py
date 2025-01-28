@@ -17,6 +17,7 @@ from chromadb.config import Settings
 
 from wandbot.retriever.utils import maximal_marginal_relevance
 from wandbot.utils import get_logger
+from wandbot.models.embedding import EmbeddingModel
 
 logger = get_logger(__name__)
 
@@ -95,14 +96,14 @@ of lengths: {[len(r) for r in res['documents']]}")
             where_document: Optional document content filter
             
         Returns:
-            List of Dicts
+            Dict mapping query texts to lists of Documents, plus embedding status
         """
         
         return_components = ['documents', 'metadatas', 'distances']
         if return_embeddings:
             return_components.append("embeddings")
 
-        query_embeddings =self.embed_query(query_texts)
+        query_embeddings, error_info = self.embedding_function.embed(query_texts)
         retrieved_results = self.query(
             query_embeddings=query_embeddings,
             n_results=top_k,
@@ -130,6 +131,9 @@ of lengths: {[len(r) for r in res['documents']]}")
         results_dict = {}
         for i, result in enumerate(all_documents):
             results_dict[query_texts[i]] = result
+            
+        # Add embedding status to results
+        results_dict["_embedding_status"] = error_info
         
         return results_dict
 
@@ -221,8 +225,6 @@ of lengths: {[len(r) for r in res['documents']]}")
             return res
 
         # DEBUG
-        from wandbot.models.embedding import EmbeddingModel
-
         v1_3_embedding_model = EmbeddingModel(
             provider="openai",
             model_name="text-embedding-3-small",
@@ -231,15 +233,7 @@ of lengths: {[len(r) for r in res['documents']]}")
             encoding_format="base64"
         )
 
-        try:
-            v1_3_embeddings, embedding_status = v1_3_embedding_model.embed(query_texts)
-        except Exception as e:
-            logger.error(f"Error embedding query texts: {e}")
-            v1_3_embeddings = [[]]
-            embedding_status = {
-                "embedding_success": False,
-                "embedding_error_message": str(e)
-            }
+        v1_3_embeddings, error_info = v1_3_embedding_model.embed(query_texts)
 
         # Get or create event loop without closing it
         try:
@@ -286,7 +280,7 @@ of lengths: {[len(r) for r in res['documents']]}")
             results_dict[query_texts[i]] = result
 
         # Add embedding status to results
-        results_dict["_embedding_status"] = embedding_status
+        results_dict["_embedding_status"] = error_info
         
         return results_dict
 

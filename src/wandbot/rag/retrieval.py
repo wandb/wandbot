@@ -3,12 +3,14 @@ import os
 import logging
 from typing import Any, Dict, List
 from copy import deepcopy
+import traceback
+import sys
 
 from langchain_core.documents import Document
 import cohere
 import weave
 from weave.trace.autopatch import autopatch
-from wandbot.utils import run_sync
+from wandbot.utils import run_sync, get_error_file_path, ErrorInfo
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from wandbot.retriever.base import VectorStore
@@ -49,7 +51,9 @@ class FusionRetrievalEngine:
         context: List[Document],
         top_k: int,
         language: str = "en",
-    ) -> List[Document]:
+    ) -> tuple[List[Document], ErrorInfo]:
+        """Reranks results and returns both results and error info"""
+        error_info = ErrorInfo(component="reranker")
         
         documents = [doc.page_content for doc in context]
         reranker_model_name = (
@@ -69,8 +73,14 @@ class FusionRetrievalEngine:
             )
             logger.info(f"FUSION-RETRIEVAL: Reranked {len(results.results)} documents.")
         except Exception as e:
-            logger.error(f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n")
-            raise e
+            error = f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n"
+            logger.error(error)
+            error_info.has_error = True
+            error_info.error_message = str(e)
+            error_info.error_type = type(e).__name__
+            error_info.stacktrace = ''.join(traceback.format_exc())
+            error_info.file_path = get_error_file_path(sys.exc_info()[2])
+            return [], error_info
         
         reranked_docs = []
         for hit in results.results:
@@ -82,7 +92,7 @@ class FusionRetrievalEngine:
             doc_copy.metadata["reranker_relevance_score"] = hit.relevance_score
             reranked_docs.append(doc_copy)
             
-        return reranked_docs
+        return reranked_docs, error_info
 
     async def _async_rerank_results(
         self,
@@ -149,28 +159,34 @@ class FusionRetrievalEngine:
             logger.info(f"RETRIEVAL-ENGINE: Deduped {len_fused_context - len(fused_context_deduped)} duplicate documents.")
             
             # Rerank results
-            reranker_success = True
-            reranker_error = None
             try:
                 if use_async:
-                    context = await self._async_rerank_results(
+                    context, error_info = await self._async_rerank_results(
                         query=inputs["standalone_query"],
                         context=fused_context_deduped,
                         top_k=self.top_k,
                         language=inputs["language"]
                     )
                 else:
-                    context = self.rerank_results(
+                    context, error_info = self.rerank_results(
                         query=inputs["standalone_query"],
                         context=fused_context_deduped,
                         top_k=self.top_k,
                         language=inputs["language"]
                     )
+                if error_info.has_error:
+                    logger.error(f"FUSION-RETRIEVAL: Reranker failed: {error_info.error_message}")
+                    context = fused_context_deduped[:self.top_k]  # Fallback to non-reranked results
+                    raise Exception(error_info.error_message)  # Raise for weave tracing
             except Exception as e:
-                logger.error(f"FUSION-RETRIEVAL: Reranker failed: {e}")
+                error_info = ErrorInfo(
+                    component="reranker",
+                    has_error=True,
+                    error_message=str(e),
+                    error_type=type(e).__name__,
+                    stacktrace=''.join(traceback.format_exc())
+                )
                 context = fused_context_deduped[:self.top_k]  # Fallback to non-reranked results
-                reranker_success = False
-                reranker_error = str(e)
                 
             logger.debug(f"RETRIEVAL-ENGINE: Reranked {len(context)} documents.")
             
@@ -180,14 +196,13 @@ class FusionRetrievalEngine:
                 "full_context": fused_context_deduped,
                 "context": context,
                 "web_search_success": web_search_results.web_search_success,
-                "reranker_success": reranker_success,
-                "reranker_error_message": reranker_error,
-                "embedding_success": docs_context.get("_embedding_status", {}).get("embedding_success", True),
-                "embedding_error_message": docs_context.get("_embedding_status", {}).get("embedding_error_message", None),
+                "reranker_error_info": error_info,
+                "embedding_error_info": docs_context.get("_embedding_status", ErrorInfo()),
                 "standalone_query": inputs["standalone_query"],
                 "language": inputs["language"],
                 "intents": inputs.get("intents", []),
-                "sub_queries": inputs.get("sub_queries", [])
+                "sub_queries": inputs.get("sub_queries", []),
+                "error_info": error_info
             }
         except Exception as e:
             logger.error(f"FUSION-RETRIEVAL: Error in retrieval: {e}")

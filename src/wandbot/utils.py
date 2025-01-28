@@ -40,7 +40,7 @@ import fasttext
 import nest_asyncio
 import tiktoken
 from langchain_core.documents import Document
-from pydantic import Field
+from pydantic import Field, BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from rich.logging import RichHandler
@@ -511,3 +511,25 @@ def run_sync(coro: Coroutine) -> Any:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         return loop.run_until_complete(coro)
+
+def get_error_file_path(tb) -> str:
+    """Extract the file path where an error occurred from a traceback.
+    
+    Args:
+        tb: A traceback object from sys.exc_info()[2]
+        
+    Returns:
+        The file path where the error occurred
+    """
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    return tb.tb_frame.f_code.co_filename
+
+class ErrorInfo(BaseModel):
+    """Base model for error information that can be included in any response"""
+    has_error: bool = False
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    component: Optional[str] = None  # e.g. "reranker", "embedding", "llm"
+    stacktrace: Optional[str] = None  # Full stacktrace when error occurs
+    file_path: Optional[str] = None  # File where the error occurred

@@ -270,20 +270,21 @@ class QueryEnhancer:
         temperature: float,
         fallback_model_name: str,
         fallback_temperature: float,
+        max_retries: int = 3
     ):
         self.model = LLMModel(
             provider="openai",
             model_name=model_name,
             temperature=temperature,
             response_model=EnhancedQuery,
-            max_retries=3
+            max_retries=max_retries
         )
         self.fallback_model = LLMModel(
             provider="openai",
             model_name=fallback_model_name,
             temperature=fallback_temperature,
             response_model=EnhancedQuery,
-            max_retries=3
+            max_retries=max_retries
         )
 
     @retry(
@@ -308,9 +309,9 @@ class QueryEnhancer:
             {"role": "user", "content": "!!! Tip: Make sure to answer in the correct format"}
         ]
         
-        response = await model.create(messages=messages)
-        if isinstance(response, LLMError):
-            raise Exception(response.error_message)
+        response, error_info = await model.create(messages=messages)
+        if error_info.has_error:
+            raise Exception(error_info.error_message)
             
         return response.parse_output(query, chat_history)
 

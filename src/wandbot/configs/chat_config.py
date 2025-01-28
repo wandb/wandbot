@@ -15,7 +15,7 @@ Typical usage example:
 from pydantic_settings import BaseSettings
 from typing import Literal
 
-class ChatConfig(BaseSettings):
+class ChatConfig(BaseSettings):    
     # Retrieval settings
     top_k: int = 15
     top_k_per_query: int = 15
@@ -43,3 +43,21 @@ class ChatConfig(BaseSettings):
     response_synthesizer_fallback_temperature: float = 0.1
     # Translation models settings
     ja_translation_model_name: str = "gpt-4o-2024-08-06"
+    
+    # LLM Model retry settings
+    llm_max_retries: int = 3
+    llm_retry_min_wait: int = 4  # minimum seconds to wait between retries
+    llm_retry_max_wait: int = 60  # maximum seconds to wait between retries
+    llm_retry_multiplier: int = 1  # multiplier for exponential backoff
+
+    # Embedding Model retry settings
+    embedding_max_retries: int = 3
+    embedding_retry_min_wait: int = 4
+    embedding_retry_max_wait: int = 60
+    embedding_retry_multiplier: int = 1
+
+    # Reranker retry settings
+    reranker_max_retries: int = 3
+    reranker_retry_min_wait: int = 4
+    reranker_retry_max_wait: int = 60
+    reranker_retry_multiplier: int = 1

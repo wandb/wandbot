@@ -10,6 +10,7 @@ from wandbot.rag.response_synthesis import ResponseSynthesizer
 from wandbot.rag.retrieval import FusionRetrievalEngine
 from wandbot.retriever import VectorStore
 from wandbot.utils import Timer, get_logger, run_sync
+from wandbot.utils import ErrorInfo
 
 logger = get_logger(__name__)
 chat_config = ChatConfig()
@@ -60,6 +61,7 @@ class RAGPipeline:
             temperature = chat_config.query_enhancer_temperature,
             fallback_model_name = chat_config.query_enhancer_fallback_model,
             fallback_temperature = chat_config.query_enhancer_fallback_temperature,
+            max_retries=chat_config.llm_max_retries
         )
         self.retrieval_engine = FusionRetrievalEngine(
             vector_store=vector_store,
@@ -123,12 +125,12 @@ class RAGPipeline:
             # end_time=response_tb.stop,
             api_call_statuses={
                 "web_search_success": retrieval_results["web_search_success"],
-                "reranker_success": retrieval_results.get("reranker_success", True),
-                "reranker_error_message": retrieval_results.get("reranker_error_message", None),
-                "query_enhancer_success": enhanced_query.get("query_enhancer_success", True),
-                "query_enhancer_error_message": enhanced_query.get("query_enhancer_error_message", None),
-                "embedding_success": retrieval_results.get("embedding_success", True),
-                "embedding_error_message": retrieval_results.get("embedding_error_message", None)
+                "reranker_error_info": retrieval_results.get("reranker_error_info", ErrorInfo()),
+                "reranker_success": not retrieval_results.get("reranker_error_info", ErrorInfo()).has_error,
+                "query_enhancer_error_info": enhanced_query.get("error_info", ErrorInfo()),
+                "query_enhancer_success": not enhanced_query.get("error_info", ErrorInfo()).has_error,
+                "embedding_error_info": retrieval_results.get("embedding_error_info", ErrorInfo()),
+                "embedding_success": not retrieval_results.get("embedding_error_info", ErrorInfo()).has_error,
             },
         )
         return output
