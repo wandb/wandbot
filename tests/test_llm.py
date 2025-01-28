@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -15,6 +16,47 @@ from wandbot.schema.api_status import APIStatus
 
 # Load environment variables from .env
 load_dotenv()
+
+@pytest_asyncio.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        try:
+            # Cancel all tasks
+            tasks = [t for t in asyncio.all_tasks(loop) if t is not asyncio.current_task()]
+            if tasks:
+                for task in tasks:
+                    task.cancel()
+                loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            
+            # Close the loop
+            if not loop.is_closed():
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
+        except Exception:
+            pass  # Ignore cleanup errors
+        finally:
+            asyncio.set_event_loop(None)
+
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_clients():
+    """Cleanup any HTTP clients after each test."""
+    try:
+        yield
+    finally:
+        # Force close any remaining clients
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for task in tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception:
+            pass  # Ignore cleanup errors
 
 class ResponseModelForTest(BaseModel):
     answer: str

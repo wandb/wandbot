@@ -1,10 +1,9 @@
-import os
 import pytest
 import json
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 import httpx
 
-from wandbot.evaluation.weave_eval.eval import (
+from wandbot.evaluation.eval import (
     get_answer,
     get_record,
     WandbotModel,
@@ -37,7 +36,9 @@ class MockAsyncClient:
     async def post(self, *args, **kwargs):
         if self.error:
             raise self.error
-        return self.response
+        response = self.response
+        await response.raise_for_status()
+        return response
 
 class MockResponse:
     def __init__(self, data):
@@ -51,7 +52,6 @@ class MockResponse:
     async def raise_for_status(self):
         if isinstance(self._data, Exception):
             raise self._data
-        return None
 
 @pytest.mark.asyncio(loop_scope="function")
 async def test_get_answer_success():
@@ -125,7 +125,7 @@ async def test_get_answer_failure():
 @pytest.mark.asyncio(loop_scope="function")
 async def test_get_record_success():
     """Test successful record retrieval."""
-    with patch('wandbot.evaluation.weave_eval.eval.get_answer') as mock_get_answer:
+    with patch('wandbot.evaluation.eval.get_answer') as mock_get_answer:
         mock_get_answer.return_value = json.dumps(MOCK_API_RESPONSE)
         
         result = await get_record(
@@ -143,7 +143,7 @@ async def test_get_record_success():
 @pytest.mark.asyncio(loop_scope="function")
 async def test_get_record_empty_response():
     """Test get_record with empty API response."""
-    with patch('wandbot.evaluation.weave_eval.eval.get_answer') as mock_get_answer:
+    with patch('wandbot.evaluation.eval.get_answer') as mock_get_answer:
         mock_get_answer.return_value = json.dumps({})
         
         result = await get_record(
@@ -158,7 +158,7 @@ async def test_get_record_empty_response():
 @pytest.mark.asyncio(loop_scope="function")
 async def test_get_record_api_error():
     """Test get_record with API error."""
-    with patch('wandbot.evaluation.weave_eval.eval.get_answer') as mock_get_answer:
+    with patch('wandbot.evaluation.eval.get_answer') as mock_get_answer:
         mock_get_answer.side_effect = Exception("API Error")
         
         result = await get_record(
@@ -188,7 +188,7 @@ This is document 2"""
 @pytest.mark.asyncio(loop_scope="function")
 async def test_wandbot_model():
     """Test WandbotModel prediction."""
-    with patch('wandbot.evaluation.weave_eval.eval.get_record') as mock_get_record:
+    with patch('wandbot.evaluation.eval.get_record') as mock_get_record:
         mock_get_record.return_value = {
             "system_prompt": "test prompt",
             "generated_answer": "test answer",

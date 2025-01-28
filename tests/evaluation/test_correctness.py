@@ -1,8 +1,6 @@
-import os
 import pytest
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import AsyncMock
 import sys
-from openai import AsyncOpenAI
 from dataclasses import dataclass
 
 from wandbot.evaluation.eval_metrics.correctness import (
@@ -10,9 +8,9 @@ from wandbot.evaluation.eval_metrics.correctness import (
     CorrectnessEvaluationResult,
     CorrectnessEvaluationModel
 )
-from wandbot.evaluation.utils.utils import EvaluationResult
 from wandbot.evaluation.eval_config import EvalConfig
 from wandbot.models.llm import LLMError
+from wandbot.schema.api_status import APIStatus, ErrorInfo
 
 # Mock config for basic unit tests
 @dataclass
@@ -80,33 +78,33 @@ def setup_test_args():
 TEST_CASES = [
     {
         "query": "How do I log metrics in wandb?",
-        "response": "To log metrics in wandb, use wandb.log() with a dictionary of metrics. For example: wandb.log({'loss': 0.2, 'accuracy': 0.85})",
+        "response": "To log metrics in wandb, use wandb.log() with a dictionary of metrics. For example: wandb.log({'loss': 0.2, 'accuracy': 0.85}). This will log your metrics to the W&B dashboard where you can visualize them in real-time.",
         "reference": "Use wandb.log() to log metrics. Pass a dictionary with metric names as keys and values as the metric values. Example: wandb.log({'loss': 0.2, 'accuracy': 0.85})",
         "reference_notes": "This is the correct way to log metrics in wandb using the wandb.log() method.",
         "contexts": ["wandb.log() is used to log metrics during training. It accepts a dictionary of metric names and values."],
         "expected_score": 3.0,
         "expected_passing": True,
-        "reason": "Perfect match with reference"
+        "reason": "Perfect match with reference - provides complete, accurate information with example"
     },
     {
         "query": "How do I save a model checkpoint?",
-        "response": "Just use model.save('checkpoint.h5')",
+        "response": "Use TensorFlow's model.save() function to save your model.",
         "reference": "To save model checkpoints with wandb, use either wandb.save() to save files directly, or wandb.log_artifact() to version and track your models.",
         "reference_notes": "The response should mention wandb-specific methods for saving checkpoints.",
         "contexts": ["Model checkpoints can be saved using wandb.save() or wandb.log_artifact()"],
         "expected_score": 1.0,
         "expected_passing": False,
-        "reason": "Incorrect method not using wandb"
+        "reason": "Completely incorrect - suggests non-wandb method when wandb-specific methods exist"
     },
     {
         "query": "How do I log images in wandb?",
-        "response": "Use wandb.log() with a wandb.Image object",
+        "response": "Use wandb.log() with wandb.Image. Example: wandb.log({'image': wandb.Image(array)})",
         "reference": "To log images, use wandb.log() with wandb.Image. You can log PNG, JPG, or other image formats. You can also add optional captions and masks. Example: wandb.log({'image': wandb.Image(img_array, caption='My Image')})",
         "reference_notes": "The response should mention wandb.log with wandb.Image and ideally include format support and optional parameters.",
         "contexts": ["Images can be logged using wandb.log() with wandb.Image objects. Supports various formats and optional parameters like captions."],
         "expected_score": 2.0,
         "expected_passing": False,
-        "reason": "Correct but incomplete"
+        "reason": "Partially correct - has basic functionality but missing important details about formats and options"
     }
 ]
 
@@ -124,7 +122,8 @@ class TestWithMockConfig:
             score=3.0,
             decision="correct"
         )
-        evaluator.llm.create = AsyncMock(return_value=mock_response)
+        api_status = APIStatus(component="llm", success=True)
+        evaluator.llm.create = AsyncMock(return_value=(mock_response, api_status))
         
         result = await evaluator._get_completion("", "")
         assert isinstance(result, CorrectnessEvaluationModel)
@@ -133,8 +132,8 @@ class TestWithMockConfig:
         assert result.reason == "test"
 
         # Test error case
-        error_response = LLMError(error=True, error_message="test error")
-        evaluator.llm.create = AsyncMock(return_value=error_response)
+        error_status = APIStatus(component="llm", success=False, error_info=ErrorInfo(has_error=True, error_message="test error"))
+        evaluator.llm.create = AsyncMock(return_value=(None, error_status))
         
         result = await evaluator._get_completion("", "")
         assert isinstance(result, LLMError)
@@ -160,7 +159,8 @@ class TestWithMockConfig:
             score=3.0,
             decision="correct"
         )
-        evaluator.llm.create = AsyncMock(return_value=mock_response)
+        api_status = APIStatus(component="llm", success=True)
+        evaluator.llm.create = AsyncMock(return_value=(mock_response, api_status))
         
         # Test missing query
         result = await evaluator.aevaluate(query=None, response="test", reference="test")

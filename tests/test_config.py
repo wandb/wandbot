@@ -1,7 +1,13 @@
 from wandbot.configs.chat_config import ChatConfig
+from pydantic import ConfigDict
 
 class TestConfig(ChatConfig):
     """Test configuration with minimal retry settings for faster tests"""
+    
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="allow"
+    )
     
     # Override LLM retry settings
     llm_max_retries: int = 1
