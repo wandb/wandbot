@@ -97,10 +97,15 @@ class Intent(BaseModel):
 
     reasoning: str = Field(
         ...,
-        description="The reason to associate the intent with the query",
+        json_schema_extra={
+            "description": "The reason to associate the intent with the query"
+        }
     )
     label: Labels = Field(
-        ..., description="An intent associated with the query"
+        ..., 
+        json_schema_extra={
+            "description": "An intent associated with the query"
+        }
     )
 
 
@@ -109,8 +114,10 @@ class Keyword(BaseModel):
 
     keyword: str = Field(
         ...,
-        description="A search phrase to get the most relevant information related to Weights & Biases from the web "
-        " This will be used to gather information required to answer the query",
+        json_schema_extra={
+            "description": "A search phrase to get the most relevant information related to Weights & Biases from the web. "
+            "This will be used to gather information required to answer the query"
+        }
     )
 
 
@@ -119,8 +126,10 @@ class SubQuery(BaseModel):
 
     query: str = Field(
         ...,
-        description="The sub query that needs to be answered to answer the query. This will be used to define the "
-        "steps required to answer the query",
+        json_schema_extra={
+            "description": "The sub query that needs to be answered to answer the query. This will be used to define the "
+            "steps required to answer the query"
+        }
     )
 
 
@@ -129,8 +138,10 @@ class VectorSearchQuery(BaseModel):
 
     query: str = Field(
         ...,
-        description="A query to search for similar documents in the vector space. This will be used to find documents "
-        "required to answer the query",
+        json_schema_extra={
+            "description": "A query to search for similar documents in the vector space. This will be used to find documents "
+            "required to answer the query"
+        }
     )
 
 
@@ -139,38 +150,50 @@ class EnhancedQuery(BaseModel):
 
     language: str = Field(
         ...,
-        description="The ISO code of language of the query",
+        json_schema_extra={
+            "description": "The ISO code of language of the query"
+        }
     )
     intents: List[Intent] = Field(
         ...,
-        description=f"A list of one or more intents associated with the query. Here are the possible intents that "
-        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": f"A list of one or more intents associated with the query. Here are the possible intents that "
+            f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}"
+        },
+        min_length=1,
+        max_length=5,
     )
     keywords: List[Keyword] = Field(
         ...,
-        description="A list of diverse search terms associated with the query.",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of diverse search terms associated with the query."
+        },
+        min_length=1,
+        max_length=5,
     )
     sub_queries: List[SubQuery] = Field(
         ...,
-        description="A list of sub queries that break the query into smaller parts",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of sub queries that break the query into smaller parts"
+        },
+        min_length=1,
+        max_length=5,
     )
     vector_search_queries: List[VectorSearchQuery] = Field(
         ...,
-        description="A list of diverse queries to search for similar documents in the vector space",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of diverse queries to search for similar documents in the vector space"
+        },
+        min_length=1,
+        max_length=5,
     )
 
     standalone_query: str = Field(
         ...,
-        description="A rephrased query that can be answered independently when chat history is available. If chat "
-        "history is `None`, the original query must be copied verbatim",
+        json_schema_extra={
+            "description": "A rephrased query that can be answered independently when chat history is available. If chat "
+            "history is `None`, the original query must be copied verbatim"
+        }
     )
 
     @property
@@ -309,9 +332,9 @@ class QueryEnhancer:
             {"role": "user", "content": "!!! Tip: Make sure to answer in the correct format"}
         ]
         
-        response, error_info = await model.create(messages=messages)
-        if error_info.has_error:
-            raise Exception(error_info.error_message)
+        response, api_status = await model.create(messages=messages)
+        if not api_status.success:
+            raise Exception(api_status.error_info.error_message)
             
         return response.parse_output(query, chat_history)
 
