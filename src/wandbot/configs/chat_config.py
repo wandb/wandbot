@@ -22,18 +22,22 @@ class ChatConfig(BaseSettings):
     search_type: Literal["mmr", "similarity"] = "mmr"
     do_web_search: bool = False
     redundant_similarity_threshold: float = 0.95  # used to remove very similar retrieved documents
+    
     # Retrieval settings: MMR settings
     fetch_k: int = 60  # Used in mmr retrieval. Typically set as top_k * 4
     mmr_lambda_mult: float = 0.5  # used in mmr retrieval
+    
     # Reranker models
     rereanker_provider: str = "cohere"
     english_reranker_model: str = "rerank-english-v2.0"
     multilingual_reranker_model: str = "rerank-multilingual-v2.0"
+    
     # Query enhancer settings
     query_enhancer_model: str = "gpt-4-0125-preview"
     query_enhancer_temperature: float = 0.1
     query_enhancer_fallback_model: str = "gpt-4-0125-preview"
     query_enhancer_fallback_temperature: float = 0.1
+    
     # Response synthesis model settings
     response_synthesizer_provider: str = "openai"
     response_synthesizer_model: str = "gpt-4-0125-preview"

@@ -144,10 +144,11 @@ class Chat:
             api_call_statuses["chat"] = error_info.model_dump()
             
             with Timer() as timer:
-                result = {
+                result_dict = {
                     "system_prompt": "",
                     "question": chat_request.question,
                     "answer": error_info.error_message,
+                    "response_synthesis_llm_messages": [],
                     "model": "",
                     "sources": "",
                     "source_documents": "",
@@ -156,15 +157,16 @@ class Chat:
                     "completion_tokens": 0,
                     "api_call_statuses": api_call_statuses
                 }
-            result.update(
+            result_dict.update(
                 {
                     "time_taken": timer.elapsed,
                     "start_time": timer.start,
                     "end_time": timer.stop,
-                }
-            )
+                    "application": chat_request.application,
+                    "api_call_statuses": api_call_statuses
+                })
 
-            return ChatResponse(**result)
+            return ChatResponse(**result_dict)
 
     @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:

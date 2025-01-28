@@ -109,6 +109,7 @@ async def get_record(question: str, wandbot_url: str, application: str = "api-ev
             return {
                 "system_prompt": "",
                 "generated_answer": "",
+                "response_synthesis_llm_messages": [],
                 "retrieved_contexts": [],
                 "model": "",
                 "total_tokens": 0,
@@ -116,12 +117,14 @@ async def get_record(question: str, wandbot_url: str, application: str = "api-ev
                 "completion_tokens": 0,
                 "time_taken": 0,
                 "has_error": True,
+                "api_call_statuses": {},
                 "error_message": error_msg
             }
         
         return {
             "system_prompt": response_dict.get("system_prompt", ""),
             "generated_answer": response_dict.get("answer", ""),
+            "response_synthesis_llm_messages": response_dict.get("response_synthesis_llm_messages", []),
             "retrieved_contexts": parse_text_to_json(
                 response_dict.get("source_documents", "")
             ),
@@ -130,15 +133,17 @@ async def get_record(question: str, wandbot_url: str, application: str = "api-ev
             "prompt_tokens": response_dict.get("prompt_tokens", 0),
             "completion_tokens": response_dict.get("completion_tokens", 0),
             "time_taken": response_dict.get("time_taken", 0),
+            "api_call_statuses": response_dict.get("api_call_statuses", {}),
             "has_error": False,
             "error_message": None
         }
     except Exception as e:
-        error_msg = f"Error getting answer from API: {str(e)}"
+        error_msg = f"Error getting response from wandbotAPI: {str(e)}"
         logger.error(error_msg)
         return {
             "system_prompt": "",
             "generated_answer": "",
+            "response_synthesis_llm_messages": [],
             "retrieved_contexts": [],
             "model": "",
             "total_tokens": 0,
@@ -146,6 +151,7 @@ async def get_record(question: str, wandbot_url: str, application: str = "api-ev
             "completion_tokens": 0,
             "time_taken": 0,
             "has_error": True,
+            "api_call_statuses": {},
             "error_message": error_msg
         }
 
