@@ -56,40 +56,65 @@ JA_FALLBACK_WARNING_MESSAGE = (
 
 
 class SlackAppEnConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        extra="allow"
+    )
+        
     APPLICATION: str = Field("Slack_EN")
-    SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_EN_APP_TOKEN")
-    SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_EN_BOT_TOKEN")
+    SLACK_APP_TOKEN: str = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_EN_APP_TOKEN"}
+    )
+    SLACK_BOT_TOKEN: str = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_EN_BOT_TOKEN"}
+    )
     SLACK_SIGNING_SECRET: str = Field(
-        ..., validation_alias="SLACK_EN_SIGNING_SECRET"
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_EN_SIGNING_SECRET"}
     )
     INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(EN_ERROR_MESSAGE)
     WARNING_MESSAGE: str = Field(EN_FALLBACK_WARNING_MESSAGE)
-    WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
+    WANDBOT_API_URL: AnyHttpUrl = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "WANDBOT_API_URL"}
+    )
     include_sources: bool = True
     bot_language: str = "en"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="allow"
-    )
 
 
 class SlackAppJaConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        extra="allow"
+    )
     APPLICATION: str = Field("Slack_JA")
-    SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_JA_APP_TOKEN")
-    SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_JA_BOT_TOKEN")
+    SLACK_APP_TOKEN: str = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_JA_APP_TOKEN"}
+    )
+    SLACK_BOT_TOKEN: str = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_JA_BOT_TOKEN"}
+    )
     SLACK_SIGNING_SECRET: str = Field(
-        ..., validation_alias="SLACK_JA_SIGNING_SECRET"
+        ..., 
+        json_schema_extra={"validation_alias": "SLACK_JA_SIGNING_SECRET"}
     )
     INTRO_MESSAGE: str = Field(JA_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(JA_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(JA_ERROR_MESSAGE)
     WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
-    WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
+    WANDBOT_API_URL: AnyHttpUrl = Field(
+        ..., 
+        json_schema_extra={"validation_alias": "WANDBOT_API_URL"}
+    )
     include_sources: bool = True
     bot_language: str = "ja"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="allow"
-    )
