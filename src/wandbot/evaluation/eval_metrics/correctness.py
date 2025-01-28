@@ -3,7 +3,6 @@ import regex as re
 from pydantic import BaseModel, Field
 import weave
 
-from wandbot.evaluation.utils.utils import EvaluationResult
 from wandbot.models.llm import LLMModel, LLMError
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a technical support chatbot.
@@ -127,12 +126,15 @@ class WandBotCorrectnessEvaluator:
 
     async def _get_completion(self, system_prompt: str, user_prompt: str) -> CorrectnessEvaluationResult:
         """Call the LLM, all other parameters are set in the LLMModel init."""
-        return await self.llm.create(
+        response, api_status = await self.llm.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
         )
+        if not api_status.success:
+            return LLMError(error=True, error_message=api_status.error_info.error_message)
+        return response
 
     @weave.op
     async def aevaluate(

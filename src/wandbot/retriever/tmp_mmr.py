@@ -1,6 +1,6 @@
 # DEBUG
 from typing import List, Optional, Dict, Any, Union, Tuple
-from langchain_core.documents import Document
+from wandbot.schema.document import Document
 import numpy as np
 import weave
 

@@ -11,6 +11,7 @@ from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
 from wandbot.utils import get_logger, get_error_file_path, ErrorInfo
+from wandbot.schema.api_status import APIStatus
 
 logger = get_logger(__name__)
 
@@ -79,7 +80,7 @@ class BaseLLMModel:
 
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    **kwargs) -> tuple[Union[str, BaseModel], ErrorInfo]:
+                    **kwargs) -> tuple[Union[str, BaseModel], APIStatus]:
         raise NotImplementedError("Subclasses must implement create method")
 
 class AsyncOpenAILLMModel(BaseLLMModel):
@@ -98,8 +99,8 @@ class AsyncOpenAILLMModel(BaseLLMModel):
 
     @weave.op
     async def create(self, 
-                    messages: List[Dict[str, Any]]) -> tuple[Union[str, BaseModel], ErrorInfo]:
-        error_info = ErrorInfo(component="openai")
+                    messages: List[Dict[str, Any]]) -> tuple[Union[str, BaseModel], APIStatus]:
+        api_status = APIStatus(component="openai", success=True)
         try:
             api_params = {
                 "model": self.model_name,
@@ -122,7 +123,7 @@ class AsyncOpenAILLMModel(BaseLLMModel):
                     response = await self.client.chat.completions.create(**api_params)
                     json_str = response.choices[0].message.content
                     json_str = clean_json_string(json_str)
-                    return self.response_model.model_validate_json(json_str), error_info
+                    return self.response_model.model_validate_json(json_str), api_status
                 # Else use the Structure Outputs api
                 else:
                     api_params["response_format"] = self.response_model
@@ -131,17 +132,24 @@ class AsyncOpenAILLMModel(BaseLLMModel):
                             msg["role"] = "developer"
                     
                     response = await self.client.beta.chat.completions.parse(**api_params)
-                    return response.choices[0].message.parsed, error_info
+                    return response.choices[0].message.parsed, api_status
             else:
                 response = await self.client.chat.completions.create(**api_params)
-                return response.choices[0].message.content, error_info
+                return response.choices[0].message.content, api_status
         except Exception as e:
-            error_info.has_error = True
-            error_info.error_message = str(e)
-            error_info.error_type = type(e).__name__
-            error_info.stacktrace = ''.join(traceback.format_exc())
-            error_info.file_path = get_error_file_path(sys.exc_info()[2])
-            return None, error_info
+            error_info = ErrorInfo(
+                component="openai",
+                has_error=True,
+                error_message=str(e),
+                error_type=type(e).__name__,
+                stacktrace=''.join(traceback.format_exc()),
+                file_path=get_error_file_path(sys.exc_info()[2])
+            )
+            return None, APIStatus(
+                component="openai",
+                success=False,
+                error_info=error_info
+            )
 
 class AsyncAnthropicLLMModel(BaseLLMModel):
     def __init__(self, **kwargs):
@@ -155,8 +163,8 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
     @weave.op
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    max_tokens: int = 4000) -> tuple[Union[str, BaseModel], ErrorInfo]:
-        error_info = ErrorInfo(component="anthropic")
+                    max_tokens: int = 4000) -> tuple[Union[str, BaseModel], APIStatus]:
+        api_status = APIStatus(component="anthropic", success=True)
         try:
             system_msg, chat_messages = extract_system_and_messages(messages)
             api_params = {
@@ -179,15 +187,22 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
 
             if self.response_model:
                 json_str = clean_json_string(content)
-                return self.response_model.model_validate_json(json_str), error_info
-            return content, error_info
+                return self.response_model.model_validate_json(json_str), api_status
+            return content, api_status
         except Exception as e:
-            error_info.has_error = True
-            error_info.error_message = str(e)
-            error_info.error_type = type(e).__name__
-            error_info.stacktrace = ''.join(traceback.format_exc())
-            error_info.file_path = get_error_file_path(sys.exc_info()[2])
-            return None, error_info
+            error_info = ErrorInfo(
+                component="anthropic",
+                has_error=True,
+                error_message=str(e),
+                error_type=type(e).__name__,
+                stacktrace=''.join(traceback.format_exc()),
+                file_path=get_error_file_path(sys.exc_info()[2])
+            )
+            return None, APIStatus(
+                component="anthropic",
+                success=False,
+                error_info=error_info
+            )
 
 
 class LLMModel:
@@ -208,15 +223,13 @@ class LLMModel:
 
     async def create(self, 
                     messages: List[Dict[str, Any]], 
-                    **kwargs) -> tuple[Union[str, BaseModel], ErrorInfo]:
+                    **kwargs) -> tuple[Union[str, BaseModel], APIStatus]:
         try:
-            response, error_info = await self.model.create(
+            response, api_status = await self.model.create(
                 messages=messages,
                 **kwargs
             )
-            if not error_info.has_error:
-                error_info.component = "llm"
-            return response, error_info
+            return response, api_status
         except Exception as e:
             logger.error(f"LLMModel: Error in LLM API call: {str(e)}")
             error_info = ErrorInfo(
@@ -227,4 +240,8 @@ class LLMModel:
                 file_path=get_error_file_path(sys.exc_info()[2]),
                 component="llm"
             )
-            return None, error_info
+            return None, APIStatus(
+                component="llm",
+                success=False,
+                error_info=error_info
+            )

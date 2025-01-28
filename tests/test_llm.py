@@ -11,6 +11,7 @@ from wandbot.models.llm import (
     extract_system_and_messages,
 )
 from wandbot.utils import ErrorInfo
+from wandbot.schema.api_status import APIStatus
 
 # Load environment variables from .env
 load_dotenv()
@@ -76,11 +77,14 @@ async def test_openai_llm_creation(model_name):
 @pytest.mark.parametrize("model_name", openai_models)
 async def test_openai_llm_create(model_name):
     model = AsyncOpenAILLMModel(model_name=model_name, temperature=0)
-    result, error_info = await model.create([
+    result, api_status = await model.create([
         {"role": "user", "content": "What is 2+2? Answer with just the number."}
     ])
     assert result.strip() == "4"
-    assert not error_info.has_error
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "openai"
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("model_name", openai_models)
@@ -90,24 +94,27 @@ async def test_openai_llm_create_with_response_model(model_name):
         temperature=0,
         response_model=SimpleResponse
     )
-    result, error_info = await model.create([
+    result, api_status = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
     ])
     
     assert isinstance(result, SimpleResponse)
     assert result.answer == 4
-    assert not error_info.has_error
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "openai"
 
 @pytest.mark.asyncio
 async def test_openai_invalid_model():
     client = AsyncOpenAILLMModel(model_name="invalid-model")
-    result = await client.create([{"role": "user", "content": "test"}])
-    assert isinstance(result, tuple)
-    assert result[0] is None
-    assert isinstance(result[1], ErrorInfo)
-    assert result[1].has_error is True
-    assert "model_not_found" in result[1].error_message
-    assert result[1].component == "openai"
+    result, api_status = await client.create([{"role": "user", "content": "test"}])
+    assert result is None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert "model_not_found" in api_status.error_info.error_message
+    assert api_status.component == "openai"
 
 # Anthropic model tests
 @pytest.mark.asyncio
@@ -122,22 +129,25 @@ async def test_anthropic_llm_creation(model_name):
 @pytest.mark.parametrize("model_name", anthropic_models)
 async def test_anthropic_llm_create(model_name):
     model = AsyncAnthropicLLMModel(model_name=model_name, temperature=0)
-    result, error_info = await model.create([
+    result, api_status = await model.create([
         {"role": "user", "content": "What is 2+2? Answer with just the number."}
     ], max_tokens=4000)
     assert result.strip() == "4"
-    assert not error_info.has_error
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "anthropic"
 
 @pytest.mark.asyncio
 async def test_anthropic_invalid_model():
     client = AsyncAnthropicLLMModel(model_name="invalid-model")
-    result = await client.create([{"role": "user", "content": "test"}])
-    assert isinstance(result, tuple)
-    assert result[0] is None
-    assert isinstance(result[1], ErrorInfo)
-    assert result[1].has_error is True
-    assert "not_found_error" in result[1].error_message
-    assert result[1].component == "anthropic"
+    result, api_status = await client.create([{"role": "user", "content": "test"}])
+    assert result is None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert "not_found_error" in api_status.error_info.error_message
+    assert api_status.component == "anthropic"
 
 @pytest.mark.asyncio
 async def test_anthropic_llm_create_with_response_model():
@@ -146,13 +156,16 @@ async def test_anthropic_llm_create_with_response_model():
         temperature=0,
         response_model=SimpleResponse
     )
-    result, error_info = await model.create([
+    result, api_status = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
     ])
     
     assert isinstance(result, SimpleResponse)
     assert result.answer == 4
-    assert not error_info.has_error
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "anthropic"
 
 # LLMModel wrapper tests
 def test_llm_model_invalid_provider():
@@ -162,38 +175,40 @@ def test_llm_model_invalid_provider():
 @pytest.mark.asyncio
 async def test_llm_model_invalid_openai_model():
     model = LLMModel(provider="openai", model_name="invalid-model")
-    response, error_info = await model.create([{"role": "user", "content": "test"}])
+    response, api_status = await model.create([{"role": "user", "content": "test"}])
     assert response is None
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error is True
-    assert "model_not_found" in error_info.error_message
-    assert error_info.component == "openai"
-    assert error_info.error_type is not None
-    assert error_info.stacktrace is not None
-    assert error_info.file_path is not None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert "model_not_found" in api_status.error_info.error_message
+    assert api_status.component == "openai"
+    assert api_status.error_info.error_type is not None
+    assert api_status.error_info.stacktrace is not None
+    assert api_status.error_info.file_path is not None
 
 @pytest.mark.asyncio
 async def test_llm_model_invalid_anthropic_model():
     model = LLMModel(provider="anthropic", model_name="invalid-model")
-    response, error_info = await model.create([{"role": "user", "content": "test"}])
+    response, api_status = await model.create([{"role": "user", "content": "test"}])
     assert response is None
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error is True
-    assert "not_found_error" in error_info.error_message
-    assert error_info.component == "anthropic"
-    assert error_info.error_type is not None
-    assert error_info.stacktrace is not None
-    assert error_info.file_path is not None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert "not_found_error" in api_status.error_info.error_message
+    assert api_status.component == "anthropic"
+    assert api_status.error_info.error_type is not None
+    assert api_status.error_info.stacktrace is not None
+    assert api_status.error_info.file_path is not None
 
 @pytest.mark.asyncio
 async def test_successful_call_error_info():
     model = LLMModel(provider="openai", model_name="gpt-4-1106-preview")
-    result, error_info = await model.create([{"role": "user", "content": "Say 'test'"}])
+    result, api_status = await model.create([{"role": "user", "content": "Say 'test'"}])
     assert result is not None
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error is False
-    assert error_info.error_message is None
-    assert error_info.component == "llm"
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "openai"
 
 @pytest.mark.parametrize("provider,model_name", [
     ("openai", "gpt-4-1106-preview"),
@@ -211,12 +226,13 @@ async def test_llm_model_create_with_response_model():
         model_name="gpt-4o-2024-08-06",
         response_model=SimpleResponse
     )
-    response, error_info = await model.create([
+    response, api_status = await model.create([
         {"role": "user", "content": "Return the number 4 as a JSON object with the key 'answer'. Respond with only valid JSON."}
     ])
     assert isinstance(response, SimpleResponse)
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error is False
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
     assert response.answer == 4
 
 @pytest.mark.asyncio
@@ -229,6 +245,9 @@ async def test_parallel_api_calls():
         ]))
     
     responses = await asyncio.gather(*tasks)
-    for i, (result, error_info) in enumerate(responses):
+    for i, (result, api_status) in enumerate(responses):
         assert result.strip() == str(i + i)
-        assert not error_info.has_error 
+        assert isinstance(api_status, APIStatus)
+        assert api_status.success
+        assert api_status.error_info is None
+        assert api_status.component == "openai" 

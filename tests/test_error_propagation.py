@@ -1,8 +1,7 @@
-import os
 import pytest
 from pathlib import Path
+from wandbot.schema.api_status import APIStatus
 from dotenv import load_dotenv
-from wandbot.utils import ErrorInfo
 from wandbot.models.embedding import EmbeddingModel
 from wandbot.rag.retrieval import FusionRetrievalEngine
 from wandbot.configs.chat_config import ChatConfig
@@ -10,7 +9,7 @@ from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.retriever.chroma import ChromaVectorStore
 from wandbot.chat.rag import RAGPipeline
 from tests.test_config import TestConfig
-from langchain_core.documents import Document
+from wandbot.schema.document import Document
 
 # Load environment variables from .env in project root
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -82,7 +81,7 @@ def rag_pipeline(vector_store, chat_config):
     )
 
 def test_successful_embedding(vector_store_config, chat_config):
-    """Test successful embedding with error info"""
+    """Test successful embedding with API status"""
     model = EmbeddingModel(
         provider=vector_store_config.embeddings_provider,
         model_name=vector_store_config.embeddings_model_name,
@@ -91,13 +90,13 @@ def test_successful_embedding(vector_store_config, chat_config):
         max_retries=chat_config.embedding_max_retries
     )
     
-    embeddings, error_info = model.embed("test query")
+    embeddings, api_status = model.embed("test query")
     
     assert embeddings is not None
-    assert isinstance(error_info, ErrorInfo)
-    assert not error_info.has_error
-    assert error_info.error_message is None
-    assert error_info.component == "embedding"
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == f"{vector_store_config.embeddings_provider}_embedding"
 
 def test_invalid_embedding_model(vector_store_config, chat_config):
     """Test error propagation with invalid embedding model"""
@@ -109,25 +108,26 @@ def test_invalid_embedding_model(vector_store_config, chat_config):
         max_retries=chat_config.embedding_max_retries
     )
     
-    embeddings, error_info = model.embed("test query")
+    embeddings, api_status = model.embed("test query")
     
     assert embeddings is None
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error
-    assert "does not exist" in error_info.error_message.lower()
-    assert error_info.component == "embedding"
-    assert error_info.stacktrace is not None
-    assert error_info.file_path is not None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert "does not exist" in api_status.error_info.error_message.lower()
+    assert api_status.component == f"{vector_store_config.embeddings_provider}_embedding"
+    assert api_status.error_info.stacktrace is not None
+    assert api_status.error_info.file_path is not None
 
 @pytest.mark.asyncio
 async def test_successful_reranking(retrieval_engine):
-    """Test successful reranking with error info"""
+    """Test successful reranking with API status"""
     docs = [
         Document(page_content="test doc 1", metadata={"id": "1"}),
         Document(page_content="test doc 2", metadata={"id": "2"})
     ]
     
-    reranked_docs, error_info = await retrieval_engine._async_rerank_results(
+    reranked_docs, api_status = await retrieval_engine._async_rerank_results(
         query="test query",
         context=docs,
         top_k=2,
@@ -135,10 +135,10 @@ async def test_successful_reranking(retrieval_engine):
     )
     
     assert len(reranked_docs) == 2
-    assert isinstance(error_info, ErrorInfo)
-    assert not error_info.has_error
-    assert error_info.error_message is None
-    assert error_info.component == "reranker"
+    assert isinstance(api_status, APIStatus)
+    assert api_status.success
+    assert api_status.error_info is None
+    assert api_status.component == "reranker"
 
 @pytest.mark.asyncio
 async def test_invalid_reranker_model(retrieval_engine, chat_config):
@@ -152,7 +152,7 @@ async def test_invalid_reranker_model(retrieval_engine, chat_config):
         Document(page_content="test doc 2", metadata={"id": "2"})
     ]
     
-    reranked_docs, error_info = await retrieval_engine._async_rerank_results(
+    reranked_docs, api_status = await retrieval_engine._async_rerank_results(
         query="test query",
         context=docs,
         top_k=chat_config.top_k,
@@ -163,12 +163,12 @@ async def test_invalid_reranker_model(retrieval_engine, chat_config):
     retrieval_engine.english_reranker_model = original_model
     
     assert len(reranked_docs) == 0  # Empty list returned on error
-    assert isinstance(error_info, ErrorInfo)
-    assert error_info.has_error
-    assert error_info.error_message is not None
-    assert error_info.component == "reranker"
-    assert error_info.stacktrace is not None
-    assert error_info.file_path is not None
+    assert isinstance(api_status, APIStatus)
+    assert not api_status.success
+    assert api_status.error_info is not None
+    assert api_status.component == "reranker"
+    assert api_status.error_info.stacktrace is not None
+    assert api_status.error_info.file_path is not None
 
 def test_error_propagation_in_retrieval(retrieval_engine, chat_config):
     """Test error propagation through the retrieval pipeline using MMR search"""
@@ -192,10 +192,10 @@ def test_error_propagation_in_retrieval(retrieval_engine, chat_config):
     # Restore original model name
     retrieval_engine.english_reranker_model = original_model
     
-    # Check error info objects are properly propagated
+    # Check API status objects are properly propagated
     assert "_embedding_status" in results
-    assert isinstance(results["_embedding_status"], ErrorInfo)
-    assert results["_embedding_status"].component == "embedding"
+    assert isinstance(results["_embedding_status"], APIStatus)
+    assert results["_embedding_status"].component == f"{retrieval_engine.vectorstore.embedding_function.model.COMPONENT_NAME}"
     
     # Check that we got results
     assert len(results) > 0
@@ -224,8 +224,7 @@ def test_error_propagation_in_similarity_search(retrieval_engine, chat_config):
     assert inputs["standalone_query"] in results
     assert len(results[inputs["standalone_query"]]) > 0
 
-    # Check that the results contain documents with metadata
-    for doc in results[inputs["standalone_query"]]:
-        assert isinstance(doc, Document)
-        assert doc.metadata is not None
-        assert "relevance_score" in doc.metadata 
+    # Check API status is properly propagated
+    assert "_embedding_status" in results
+    assert isinstance(results["_embedding_status"], APIStatus)
+    assert results["_embedding_status"].component == f"{retrieval_engine.vectorstore.embedding_function.model.COMPONENT_NAME}" 

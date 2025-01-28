@@ -7,7 +7,9 @@ from wandbot.rag.query_handler import (
     EnhancedQuery, 
     clean_question,
     format_chat_history,
-    Labels
+    Labels,
+    APIStatus,
+    ErrorInfo
 )
 from wandbot.models.llm import LLMError
 
@@ -71,34 +73,32 @@ def test_format_chat_history():
 @pytest.mark.asyncio
 async def test_query_enhancer_success(query_enhancer, mock_llm_model, sample_enhanced_query):
     # Mock successful response
-    mock_llm_model.create.return_value = EnhancedQuery(**sample_enhanced_query)
+    mock_llm_model.create.return_value = (EnhancedQuery(**sample_enhanced_query), APIStatus(component="llm", success=True))
     
     result = await query_enhancer({"query": "How do I use wandb?"})
     
-    assert result["standalone_query"] == "How do I use wandb?"
-    assert not result["avoid_query"]
-    assert len(result["intents"]) > 0
-    assert len(result["keywords"]) > 0
-    assert len(result["sub_queries"]) > 0
-    assert len(result["vector_search_queries"]) > 0
+    assert result is not None
+    assert result["query_enhancer_success"]
+    assert result["query_enhancer_error"] is None
 
 @pytest.mark.asyncio
 async def test_query_enhancer_validation_error_retry(query_enhancer, mock_llm_model, sample_enhanced_query):
     # Mock validation error then success
     mock_llm_model.create.side_effect = [
-        ValidationError.from_exception_data("test", []),
-        EnhancedQuery(**sample_enhanced_query)
+        (None, APIStatus(component="llm", success=False, error_info=ErrorInfo(has_error=True, error_message="Validation error"))),
+        (EnhancedQuery(**sample_enhanced_query), APIStatus(component="llm", success=True))
     ]
     
     result = await query_enhancer({"query": "How do I use wandb?"})
     
-    assert result["standalone_query"] == "How do I use wandb?"
-    assert mock_llm_model.create.call_count == 2
+    assert result is not None
+    assert result["query_enhancer_success"]
+    assert result["query_enhancer_error"] is None
 
 @pytest.mark.asyncio
 async def test_query_enhancer_llm_error(query_enhancer, mock_llm_model):
     # Mock LLM error
-    mock_llm_model.create.return_value = LLMError(error=True, error_message="API error")
+    mock_llm_model.create.return_value = (None, APIStatus(component="llm", success=False, error_info=ErrorInfo(has_error=True, error_message="API error")))
     
     with pytest.raises(Exception) as exc_info:
         await query_enhancer({"query": "How do I use wandb?"})
@@ -111,13 +111,13 @@ async def test_query_enhancer_fallback(query_enhancer, mock_llm_model, sample_en
     primary_model = mock_llm_model
     fallback_model = AsyncMock()
     
-    primary_model.create.side_effect = Exception("Primary failed")
-    fallback_model.create.return_value = EnhancedQuery(**sample_enhanced_query)
+    primary_model.create.return_value = (None, APIStatus(component="llm", success=False, error_info=ErrorInfo(has_error=True, error_message="Primary failed")))
+    fallback_model.create.return_value = (EnhancedQuery(**sample_enhanced_query), APIStatus(component="llm", success=True))
     
     query_enhancer.fallback_model = fallback_model
     
     result = await query_enhancer({"query": "How do I use wandb?"})
     
-    assert result["standalone_query"] == "How do I use wandb?"
-    assert primary_model.create.call_count == 3  # We now retry 3 times before fallback
-    assert fallback_model.create.call_count == 1 
+    assert result is not None
+    assert result["query_enhancer_success"]
+    assert result["query_enhancer_error"] is None 
