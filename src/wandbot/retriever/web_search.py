@@ -235,7 +235,13 @@ def run_web_search(query: str, top_k: int, avoid=False) -> WebSearchResults:
             return WebSearchResults(
                 api_status=APIStatus(
                     component="web_search",
-                    success=True
+                    success=False,
+                    error_info=ErrorInfo(
+                        component="web_search",
+                        has_error=False,
+                        error_message="Web search is disabled",
+                        error_type="WebSearchDisabled"
+                    )
                 ),
                 web_contexts=[],
             )
