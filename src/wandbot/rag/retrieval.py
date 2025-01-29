@@ -9,6 +9,7 @@ import sys
 from wandbot.schema.document import Document
 from wandbot.schema.retrieval import RetrievalResult
 from wandbot.schema.api_status import APIStatus
+from wandbot.configs.chat_config import ChatConfig
 import cohere
 import weave
 from weave.trace.autopatch import autopatch
@@ -26,18 +27,10 @@ class FusionRetrievalEngine:
     def __init__(
         self,
         vector_store: VectorStore,
-        top_k: int,
-        search_type: str,
-        english_reranker_model: str,
-        multilingual_reranker_model: str,
-        do_web_search: bool
+        chat_config: ChatConfig,
     ):
         self.vectorstore = vector_store
-        self.top_k = top_k
-        self.search_type = search_type
-        self.english_reranker_model = english_reranker_model
-        self.multilingual_reranker_model = multilingual_reranker_model
-        self.do_web_search = do_web_search
+        self.chat_config = chat_config
         try:
             self.reranker_client = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
         except Exception as e:
@@ -59,8 +52,8 @@ class FusionRetrievalEngine:
         
         documents = [doc.page_content for doc in context]
         reranker_model_name = (
-            self.english_reranker_model if language == "en" 
-            else self.multilingual_reranker_model
+            self.chat_config.english_reranker_model if language == "en" 
+            else self.chat_config.multilingual_reranker_model
         )
         assert isinstance(query, str), "In rerank, `query` must be a string"
         assert len(documents) > 0, "No context documents passed to the re-ranker"
@@ -130,23 +123,33 @@ class FusionRetrievalEngine:
                 docs_context, web_search_results = await asyncio.gather(
                     self.vectorstore._async_retrieve(
                         query_texts=inputs["all_queries"],
-                        search_type=self.search_type,
+                        search_type=self.chat_config.search_type,
+                        search_params={
+                            "top_k": self.chat_config.top_k_per_query,
+                            "fetch_k": self.chat_config.fetch_k,
+                            "lambda_mult": self.chat_config.mmr_lambda_mult
+                        }
                     ),
                     _async_run_web_search(
                         query=inputs["standalone_query"],
-                        top_k=self.top_k,
-                        avoid=not self.do_web_search
+                        top_k=self.chat_config.top_k,
+                        avoid=not self.chat_config.do_web_search
                     )
                 )
             else:
                 docs_context = self.vectorstore.retrieve(
                     query_texts=inputs["all_queries"],
-                    search_type=self.search_type,
+                    search_type=self.chat_config.search_type,
+                    search_params={
+                        "top_k": self.chat_config.top_k_per_query,
+                        "fetch_k": self.chat_config.fetch_k,
+                        "lambda_mult": self.chat_config.mmr_lambda_mult
+                    }
                 )
                 web_search_results = run_sync(_async_run_web_search(
                     query=inputs["standalone_query"],
-                    top_k=self.top_k,
-                    avoid=not self.do_web_search
+                    top_k=self.chat_config.top_k,
+                    avoid=not self.chat_config.do_web_search
                 ))
 
             def flatten_retrieved_results(results: Dict[str, Any]) -> tuple[List[Document], Any]:
@@ -187,19 +190,19 @@ class FusionRetrievalEngine:
                     context, api_status = await self._async_rerank_results(
                         query=inputs["standalone_query"],
                         context=fused_context_deduped,
-                        top_k=self.top_k,
+                        top_k=self.chat_config.top_k,
                         language=inputs["language"]
                     )
                 else:
                     context, api_status = self.rerank_results(
                         query=inputs["standalone_query"],
                         context=fused_context_deduped,
-                        top_k=self.top_k,
+                        top_k=self.chat_config.top_k,
                         language=inputs["language"]
                     )
                 if api_status.has_error:
                     logger.error(f"FUSION-RETRIEVAL: Reranker failed: {api_status.error_message}")
-                    context = fused_context_deduped[:self.top_k]  # Fallback to non-reranked results
+                    context = fused_context_deduped[:self.chat_config.top_k]  # Fallback to non-reranked results
                     raise Exception(api_status.error_message)  # Raise for weave tracing
             except Exception as e:
                 error_info = ErrorInfo(
@@ -209,7 +212,7 @@ class FusionRetrievalEngine:
                     error_type=type(e).__name__,
                     stacktrace=''.join(traceback.format_exc())
                 )
-                context = fused_context_deduped[:self.top_k]  # Fallback to non-reranked results
+                context = fused_context_deduped[:self.chat_config.top_k]  # Fallback to non-reranked results
                 
             logger.debug(f"RETRIEVAL-ENGINE: Reranked {len(context)} documents.")
             

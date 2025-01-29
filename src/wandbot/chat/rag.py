@@ -66,11 +66,7 @@ class RAGPipeline:
         )
         self.retrieval_engine = FusionRetrievalEngine(
             vector_store=vector_store,
-            top_k=chat_config.top_k,
-            search_type=chat_config.search_type,
-            english_reranker_model=chat_config.english_reranker_model,
-            multilingual_reranker_model=chat_config.multilingual_reranker_model,
-            do_web_search=chat_config.do_web_search,
+            chat_config=chat_config,
         )
         self.response_synthesizer = ResponseSynthesizer(
             model=chat_config.response_synthesizer_model,
