@@ -262,6 +262,7 @@ of lengths: {[len(r) for r in res['documents']]}")
         tasks = [debug_run_mmr_batch(
         # END DEBUG
         # tasks = [run_mmr_batch(
+            query,
             query_embed,
             doc_embed,
             docs,
@@ -269,8 +270,9 @@ of lengths: {[len(r) for r in res['documents']]}")
             distances,
             top_k,
             lambda_mult
-        ) for query_embed, doc_embed, docs, metadatas, distances in zip(
+        ) for query, query_embed, doc_embed, docs, metadatas, distances in zip(
             # query_embeddings, # DEBUG
+            query_texts,
             v1_3_query_embeddings,
             retrieved_results["embeddings"],
             retrieved_results["documents"],
