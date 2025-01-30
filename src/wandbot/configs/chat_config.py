@@ -24,7 +24,7 @@ class ChatConfig(BaseSettings):
     redundant_similarity_threshold: float = 0.95  # used to remove very similar retrieved documents
     
     # Retrieval settings: MMR settings
-    fetch_k: int = 60  # Used in mmr retrieval. Typically set as top_k * 4
+    fetch_k: int = 20  # Used in mmr retrieval. Typically set as top_k * 4
     mmr_lambda_mult: float = 0.5  # used in mmr retrieval
     
     # Reranker models
@@ -45,6 +45,7 @@ class ChatConfig(BaseSettings):
     response_synthesizer_fallback_provider: str = "openai"
     response_synthesizer_fallback_model: str = "gpt-4-0125-preview"
     response_synthesizer_fallback_temperature: float = 0.1
+    
     # Translation models settings
     ja_translation_model_name: str = "gpt-4o-2024-08-06"
     
