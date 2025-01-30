@@ -192,8 +192,9 @@ class FusionRetrievalEngine:
                 context = [f"Error: {err_msg}"]  # Fallback to non-reranked results
                 raise Exception(err_msg)  # Raise for weave tracing
                 
-            logger.debug(f"RETRIEVAL-ENGINE: Reranked {len(context)} documents.")
+            logger.debug(f"RETRIEVAL-ENGINE: Reranked and selected {len(fused_context_deduped)} -> {len(context)} documents.")
             
+            # Return retrieval result
             retrieval_result = RetrievalResult(
                 documents=context,
                 retrieval_info={
