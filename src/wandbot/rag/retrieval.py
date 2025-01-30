@@ -144,7 +144,8 @@ class FusionRetrievalEngine:
 
             logger.debug(f"RETRIEVAL-ENGINE: First retrieved document from vector store:\n{docs_context[0]}\n")
             logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(docs_context)} documents from vector store.")
-            logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(web_search_results.web_contexts)} web contexts.")
+            if self.chat_config.do_web_search:  
+                logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(web_search_results.web_contexts)} web contexts.")
             
             fused_context = docs_context + web_search_results.web_contexts
 
