@@ -63,6 +63,6 @@ class ChatConfig(BaseSettings):
 
     # Reranker retry settings
     reranker_max_retries: int = 3
-    reranker_retry_min_wait: int = 4
-    reranker_retry_max_wait: int = 60
-    reranker_retry_multiplier: int = 1
+    reranker_retry_min_wait: int = 0.5
+    reranker_retry_max_wait: int = 120
+    reranker_retry_multiplier: int = 2

@@ -14,12 +14,13 @@ import cohere
 import weave
 from weave.trace.autopatch import autopatch
 from wandbot.utils import run_sync, get_error_file_path, ErrorInfo
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, after_log
 
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import _async_run_web_search
 
 logger = logging.getLogger(__name__)
+retry_chat_config = ChatConfig()
 
 autopatch()
 
@@ -37,9 +38,17 @@ class FusionRetrievalEngine:
             logger.error(f"FUSION-RETRIEVAL: Issue with initialising rerank api:\n{e}\n")
             raise e
 
+    @retry(
+        stop=stop_after_attempt(retry_chat_config.reranker_max_retries), 
+        wait=wait_exponential(multiplier=retry_chat_config.reranker_retry_multiplier,
+                               min=retry_chat_config.reranker_retry_min_wait, 
+                               max=retry_chat_config.reranker_retry_max_wait),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Attempt {retry_state.attempt_number} failed. Retrying in {retry_state.next_action.sleep} seconds..."
+        ),
+        after=after_log(logger, logging.ERROR)
+    )
     @weave.op
-    @retry(stop=stop_after_attempt(3), 
-           wait=wait_exponential(multiplier=1, min=4, max=60))
     def rerank_results(
         self,
         query: str,
