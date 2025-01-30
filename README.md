@@ -159,8 +159,7 @@ WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
 --workers 8 \
 --timeout-keep-alive 75 \
 --loop uvloop \
---http httptools \
---log-level debug
+--http httptools
 ```
 
 alternatively you can also run wandbot with `gunicorn`:
