@@ -1,28 +1,49 @@
 """Handles chat interactions for WandBot.
 
-This module contains the Chat class which is responsible for handling chat interactions. 
-It includes methods for initializing the chat, loading the storage context from an artifact, 
-loading the chat engine, validating and formatting questions, formatting responses, and getting answers. 
-It also contains a function for generating a list of chat messages from a given chat history.
+This module contains the Chat class which is responsible for handling chat interactions with the WandBot system.
+It provides both synchronous and asynchronous interfaces for chat operations, manages translations between
+languages, and coordinates the RAG (Retrieval Augmented Generation) pipeline.
+
+The Chat class handles:
+- Initialization of the vector store and RAG pipeline
+- Translation between Japanese and English (when needed)
+- Error handling and status tracking
+- Timing of operations
+- Response generation and formatting
 
 Typical usage example:
 
-  config = ChatConfig()
-  chat = Chat(config=config)
-  chat_history = []
-  while True:
-      question = input("You: ")
-      if question.lower() == "quit":
-          break
-      else:
-          response = chat(
-              ChatRequest(question=question, chat_history=chat_history)
-          )
-          chat_history.append(
-              QuestionAnswer(question=question, answer=response.answer)
-          )
-          print(f"WandBot: {response.answer}")
-          print(f"Time taken: {response.time_taken}")
+    from wandbot.configs.chat_config import ChatConfig
+    from wandbot.configs.vector_store_config import VectorStoreConfig
+    from wandbot.chat.schemas import ChatRequest
+    
+    # Initialize with both required configs
+    vector_store_config = VectorStoreConfig()
+    chat_config = ChatConfig()
+    chat = Chat(vector_store_config=vector_store_config, chat_config=chat_config)
+    
+    # Async usage
+    async def chat_example():
+        response = await chat.__acall__(
+            ChatRequest(
+                question="How do I use wandb?",
+                chat_history=[],
+                language="en"
+            )
+        )
+        print(f"Answer: {response.answer}")
+        print(f"Time taken: {response.time_taken}")
+    
+    # Sync usage
+    response = chat(
+        ChatRequest(
+            question="How do I use wandb?",
+            chat_history=[],
+            language="en"
+        )
+    )
+    print(f"Answer: {response.answer}")
+    print(f"Time taken: {response.time_taken}")
 """
 from typing import List
 
@@ -81,98 +102,121 @@ class Chat:
         """Async method for chat interactions."""
         original_language = chat_request.language
         api_call_statuses = {}
-        try:
-            if original_language == "ja":
-                try:
-                    translated_question = translate_ja_to_en(
-                        chat_request.question,
-                        self.chat_config.ja_translation_model_name
-                    )
-                    chat_request.language = "en"
-                    chat_request = ChatRequest(
-                        question=translated_question,
-                        chat_history=chat_request.chat_history,
-                        application=chat_request.application,
-                        language="en",
-                    )
-                except Exception as e:
-                    error_info = ErrorInfo(
-                        has_error=True,
-                        error_message=str(e),
-                        error_type=type(e).__name__,
-                        stacktrace=''.join(traceback.format_exc()),
-                        file_path=get_error_file_path(sys.exc_info()[2]),
-                        component="translation"
-                    )
-                    api_call_statuses["translation"] = error_info.model_dump()
-                    raise
+        
+        # Initialize working request with original request
+        working_request = chat_request
+        
+        with Timer() as timer:
+            try:
+                # Handle Japanese translation
+                if original_language == "ja":
+                    try:
+                        translated_question = translate_ja_to_en(
+                            chat_request.question,
+                            self.chat_config.ja_translation_model_name
+                        )
+                        working_request = ChatRequest(
+                            question=translated_question,
+                            chat_history=chat_request.chat_history,
+                            application=chat_request.application,
+                            language="en",
+                        )
+                    except Exception as e:
+                        error_info = ErrorInfo(
+                            has_error=True,
+                            error_message=str(e),
+                            error_type=type(e).__name__,
+                            stacktrace=''.join(traceback.format_exc()),
+                            file_path=get_error_file_path(sys.exc_info()[2]),
+                            component="translation"
+                        )
+                        api_call_statuses["translation"] = error_info.model_dump()
+                        # Create error response preserving translation error context
+                        return ChatResponse(
+                            system_prompt="",
+                            question=chat_request.question,  # Original question
+                            answer=f"Translation error: {str(e)}",
+                            response_synthesis_llm_messages=[],
+                            model="",
+                            sources="",
+                            source_documents="",
+                            total_tokens=0,
+                            prompt_tokens=0,
+                            completion_tokens=0,
+                            time_taken=timer.elapsed,
+                            start_time=timer.start,
+                            end_time=timer.stop,
+                            application=chat_request.application,
+                            api_call_statuses=api_call_statuses
+                        )
 
-            result = await self._aget_answer(
-                chat_request.question, chat_request.chat_history or []
-            )
+                # Get answer using working request
+                result = await self._aget_answer(
+                    working_request.question, working_request.chat_history or []
+                )
 
-            result_dict = result.model_dump()
-            api_call_statuses.update(result_dict.get("api_call_statuses", {}))
+                result_dict = result.model_dump()
+                api_call_statuses.update(result_dict.get("api_call_statuses", {}))
 
-            if original_language == "ja":
-                try:
-                    result_dict["answer"] = translate_en_to_ja(
-                        result_dict["answer"],
-                        self.chat_config.ja_translation_model_name
-                    )
-                except Exception as e:
-                    error_info = ErrorInfo(
-                        has_error=True,
-                        error_message=str(e),
-                        error_type=type(e).__name__,
-                        stacktrace=''.join(traceback.format_exc()),
-                        file_path=get_error_file_path(sys.exc_info()[2]),
-                        component="translation"
-                    )
-                    api_call_statuses["translation"] = error_info.model_dump()
-                    raise
+                # Handle Japanese translation of response
+                if original_language == "ja":
+                    try:
+                        result_dict["answer"] = translate_en_to_ja(
+                            result_dict["answer"],
+                            self.chat_config.ja_translation_model_name
+                        )
+                    except Exception as e:
+                        error_info = ErrorInfo(
+                            has_error=True,
+                            error_message=str(e),
+                            error_type=type(e).__name__,
+                            stacktrace=''.join(traceback.format_exc()),
+                            file_path=get_error_file_path(sys.exc_info()[2]),
+                            component="translation"
+                        )
+                        api_call_statuses["translation"] = error_info.model_dump()
+                        # Return response with translation error but preserve original answer
+                        result_dict["answer"] = f"Translation error: {str(e)}\nOriginal answer: {result_dict['answer']}"
 
-            result_dict.update({
-                "application": chat_request.application,
-                "api_call_statuses": api_call_statuses
-            })
-
-            return ChatResponse(**result_dict)
-        except Exception as e:
-            error_info = ErrorInfo(
-                has_error=True,
-                error_message=str(e),
-                error_type=type(e).__name__,
-                stacktrace=''.join(traceback.format_exc()),
-                file_path=get_error_file_path(sys.exc_info()[2]),
-                component="chat"
-            )
-            api_call_statuses["chat"] = error_info.model_dump()
-            
-            with Timer() as timer:
-                result_dict = {
-                    "system_prompt": "",
-                    "question": chat_request.question,
-                    "answer": error_info.error_message,
-                    "response_synthesis_llm_messages": [],
-                    "model": "",
-                    "sources": "",
-                    "source_documents": "",
-                    "total_tokens": 0,
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "api_call_statuses": api_call_statuses
-                }
-            result_dict.update(
-                {
+                # Update with final metadata
+                result_dict.update({
+                    "application": chat_request.application,
+                    "api_call_statuses": api_call_statuses,
                     "time_taken": timer.elapsed,
                     "start_time": timer.start,
                     "end_time": timer.stop,
-                    "application": chat_request.application,
-                    "api_call_statuses": api_call_statuses
                 })
 
-            return ChatResponse(**result_dict)
+                return ChatResponse(**result_dict)
+
+            except Exception as e:
+                error_info = ErrorInfo(
+                    has_error=True,
+                    error_message=str(e),
+                    error_type=type(e).__name__,
+                    stacktrace=''.join(traceback.format_exc()),
+                    file_path=get_error_file_path(sys.exc_info()[2]),
+                    component="chat"
+                )
+                api_call_statuses["chat"] = error_info.model_dump()
+                
+                return ChatResponse(
+                    system_prompt="",
+                    question=chat_request.question,
+                    answer=error_info.error_message,
+                    response_synthesis_llm_messages=[],
+                    model="",
+                    sources="",
+                    source_documents="",
+                    total_tokens=0,
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    time_taken=timer.elapsed,
+                    start_time=timer.start,
+                    end_time=timer.stop,
+                    application=chat_request.application,
+                    api_call_statuses=api_call_statuses
+                )
 
     @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
