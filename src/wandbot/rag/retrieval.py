@@ -133,12 +133,6 @@ class FusionRetrievalEngine:
             else:
                 docs_context = self.vectorstore.retrieve(
                     query_texts=inputs["all_queries"],
-                    search_type=self.chat_config.search_type,
-                    search_params={
-                        "top_k": self.chat_config.top_k_per_query,
-                        "fetch_k": self.chat_config.fetch_k,
-                        "lambda_mult": self.chat_config.mmr_lambda_mult
-                    }
                 )
                 web_search_results = run_sync(_async_run_web_search(
                     query=inputs["standalone_query"],
