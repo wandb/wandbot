@@ -27,8 +27,8 @@ Typical usage example:
 from typing import List
 
 import weave
-import asyncio
 from wandbot.configs.chat_config import ChatConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.database.schemas import QuestionAnswer
@@ -42,21 +42,27 @@ import sys
 logger = get_logger(__name__)
 
 class Chat:
-    """
-    Class for handling chat interactions and setting up the RAG pipeline, LLMs, etc.
-    """
+    """Class for handling chat interactions and managing the RAG system components."""
 
-    def __init__(self, vector_store: VectorStore, config: ChatConfig):
-        """Initializes the Chat instance.
-
+    def __init__(self, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
+        """Initializes the Chat instance with all necessary RAG components.
+        
         Args:
-            config: An instance of ChatConfig containing configuration settings.
+            vector_store_config: Configuration for vector store setup
+            chat_config: Configuration for chat and RAG behavior
         """
-        self.vector_store = vector_store
-        self.chat_config = config
+        self.chat_config = chat_config
+        
+        # Initialize vector store internally
+        self.vector_store = VectorStore.from_config(
+            vector_store_config=vector_store_config,
+            chat_config=chat_config
+        )
+        
+        # Initialize RAG pipeline with internal vector store
         self.rag_pipeline = RAGPipeline(
-            vector_store=vector_store,
-            chat_config=config,
+            vector_store=self.vector_store,
+            chat_config=chat_config,
         )
 
     @weave.op
