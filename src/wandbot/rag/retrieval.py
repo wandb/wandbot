@@ -201,9 +201,11 @@ class FusionRetrievalEngine:
                         language=inputs["language"]
                     )
                 if api_status.has_error:
-                    logger.error(f"FUSION-RETRIEVAL: Reranker failed: {api_status.error_message}")
-                    context = fused_context_deduped[:self.chat_config.top_k]  # Fallback to non-reranked results
-                    raise Exception(api_status.error_message)  # Raise for weave tracing
+                    err_msg = f"FUSION-RETRIEVAL: Reranker failed: {api_status.component}, \
+{api_status.error_info.model_dump_json(indent=4)}"
+                    logger.error(err_msg)
+                    context = [f"Error: {err_msg}"]  # Fallback to non-reranked results
+                    raise Exception(err_msg)  # Raise for weave tracing
             except Exception as e:
                 error_info = ErrorInfo(
                     component="reranker_api",
@@ -212,7 +214,11 @@ class FusionRetrievalEngine:
                     error_type=type(e).__name__,
                     stacktrace=''.join(traceback.format_exc())
                 )
-                context = fused_context_deduped[:self.chat_config.top_k]  # Fallback to non-reranked results
+                err_msg = f"FUSION-RETRIEVAL: Reranker failed: {error_info.component}, \
+{error_info.model_dump_json(indent=4)}"
+                logger.error(err_msg)
+                context = [f"Error: {err_msg}"]  # Fallback to non-reranked results
+                raise Exception(err_msg)  # Raise for weave tracing
                 
             logger.debug(f"RETRIEVAL-ENGINE: Reranked {len(context)} documents.")
             
