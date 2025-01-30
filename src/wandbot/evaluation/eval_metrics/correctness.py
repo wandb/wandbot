@@ -139,10 +139,10 @@ class WandBotCorrectnessEvaluator:
     @weave.op
     async def aevaluate(
         self,
-        query: Optional[str] = None,
-        response: Optional[str] = None,
-        contexts: Optional[List[str]] = None,
-        reference: Optional[str] = None,
+        query: str,
+        response: str,
+        contexts: List[str],
+        reference: str,
         **kwargs: Any,
     ) -> CorrectnessEvaluationResult:
         """Evaluate the correctness of a response.
@@ -162,7 +162,7 @@ class WandBotCorrectnessEvaluator:
             if query is None or response is None or reference is None:
                 raise ValueError("query, response, and reference must be provided")
 
-            user_prompt = self.user_template.format(
+            judge_prompt = self.user_template.format(
                 query=query,
                 generated_answer=response,
                 reference_answer=reference,
@@ -173,7 +173,7 @@ class WandBotCorrectnessEvaluator:
             )
 
             # Run evaluation
-            eval_response = await self._get_completion(system_prompt=self.system_template, user_prompt=user_prompt)
+            eval_response = await self._get_completion(system_prompt=self.system_template, user_prompt=judge_prompt)
     
             if isinstance(eval_response, LLMError):
                 return CorrectnessEvaluationResult(
