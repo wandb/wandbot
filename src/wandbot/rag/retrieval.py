@@ -163,7 +163,7 @@ class FusionRetrievalEngine:
             fused_context_deduped = self.dedupe_retrieved_results(fused_context)
             logger.info(f"RETRIEVAL-ENGINE: Deduped {len_fused_context - len(fused_context_deduped)} duplicate documents.")
             
-            # Rerank results
+            # Rerank results with fixed top_k
             try:
                 if use_async:
                     context, api_status = await self._async_rerank_results(

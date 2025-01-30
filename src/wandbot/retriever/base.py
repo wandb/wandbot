@@ -20,7 +20,7 @@ class VectorStore:
         self.vector_store_config = vector_store_config
         self.chat_config = chat_config
         try:
-            self.query_embedding_function = EmbeddingModel(
+            self.query_embedding_model = EmbeddingModel(
                 provider = self.vector_store_config.embeddings_provider,
                 model_name = self.vector_store_config.embeddings_model_name,
                 dimensions = self.vector_store_config.embeddings_dimensions,
@@ -32,7 +32,7 @@ class VectorStore:
         
         try:
             self.chroma_vectorstore = ChromaVectorStore(
-                embedding_function=self.query_embedding_function,
+                embedding_model=self.query_embedding_model,
                 vector_store_config=self.vector_store_config,
                 chat_config=self.chat_config
             )   
@@ -65,6 +65,7 @@ class VectorStore:
         filter_params = filter_params or {}
 
         if self.chat_config.search_type == "mmr":
+            # Use fixed parameters for MMR as per retrieval_implementation.md
             results = self.chroma_vectorstore.max_marginal_relevance_search(
                 query_texts=query_texts,
                 top_k=self.chat_config.top_k_per_query,
@@ -73,6 +74,7 @@ class VectorStore:
                 filter=filter_params.get("filter"),
                 where_document=filter_params.get("where_document")
             )
+            logger.debug(f"RETRIEVER: MMR search completed with {len(results)} results")
         else: 
             results = self.chroma_vectorstore.similarity_search(
                 query_texts=query_texts,
@@ -80,6 +82,7 @@ class VectorStore:
                 filter=filter_params.get("filter"),
                 where_document=filter_params.get("where_document")
             )
+            logger.debug(f"RETRIEVER: Similarity search completed with {len(results)} results")
 
         return results
 
