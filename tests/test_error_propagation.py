@@ -66,11 +66,7 @@ def vector_store(embedding_model, vector_store_config, chat_config):
 def retrieval_engine(vector_store, chat_config):
     return FusionRetrievalEngine(
         vector_store=vector_store,
-        top_k=chat_config.top_k,
-        search_type=chat_config.search_type,
-        english_reranker_model=chat_config.english_reranker_model,
-        multilingual_reranker_model=chat_config.multilingual_reranker_model,
-        do_web_search=chat_config.do_web_search
+        chat_config=chat_config
     )
 
 @pytest.fixture
@@ -120,7 +116,7 @@ def test_invalid_embedding_model(vector_store_config, chat_config):
     assert api_status.error_info.file_path is not None
 
 @pytest.mark.asyncio
-async def test_successful_reranking(retrieval_engine):
+async def test_successful_reranking(retrieval_engine, chat_config):
     """Test successful reranking with API status"""
     docs = [
         Document(page_content="test doc 1", metadata={"id": "1"}),
@@ -130,7 +126,7 @@ async def test_successful_reranking(retrieval_engine):
     reranked_docs, api_status = await retrieval_engine._async_rerank_results(
         query="test query",
         context=docs,
-        top_k=2,
+        top_k=chat_config.top_k,
         language="en"
     )
     
@@ -138,14 +134,14 @@ async def test_successful_reranking(retrieval_engine):
     assert isinstance(api_status, APIStatus)
     assert api_status.success
     assert api_status.error_info is None
-    assert api_status.component == "reranker"
+    assert api_status.component == "reranker_api"
 
 @pytest.mark.asyncio
 async def test_invalid_reranker_model(retrieval_engine, chat_config):
     """Test error propagation with invalid reranker model"""
     # Save original model name
-    original_model = retrieval_engine.english_reranker_model
-    retrieval_engine.english_reranker_model = "invalid-model"
+    original_model = chat_config.english_reranker_model
+    chat_config.english_reranker_model = "invalid-model"
     
     docs = [
         Document(page_content="test doc 1", metadata={"id": "1"}),
@@ -160,21 +156,21 @@ async def test_invalid_reranker_model(retrieval_engine, chat_config):
     )
     
     # Restore original model name
-    retrieval_engine.english_reranker_model = original_model
+    chat_config.english_reranker_model = original_model
     
     assert len(reranked_docs) == 0  # Empty list returned on error
     assert isinstance(api_status, APIStatus)
     assert not api_status.success
     assert api_status.error_info is not None
-    assert api_status.component == "reranker"
+    assert api_status.component == "reranker_api"
     assert api_status.error_info.stacktrace is not None
     assert api_status.error_info.file_path is not None
 
 def test_error_propagation_in_retrieval(retrieval_engine, chat_config):
     """Test error propagation through the retrieval pipeline using MMR search"""
     # Save original model name
-    original_model = retrieval_engine.english_reranker_model
-    retrieval_engine.english_reranker_model = "invalid-model"
+    original_model = chat_config.english_reranker_model
+    chat_config.english_reranker_model = "invalid-model"
     
     inputs = {
         "standalone_query": "test query",
@@ -190,7 +186,7 @@ def test_error_propagation_in_retrieval(retrieval_engine, chat_config):
     )
     
     # Restore original model name
-    retrieval_engine.english_reranker_model = original_model
+    chat_config.english_reranker_model = original_model
     
     # Check API status objects are properly propagated
     assert "_embedding_status" in results
@@ -203,8 +199,8 @@ def test_error_propagation_in_retrieval(retrieval_engine, chat_config):
 def test_error_propagation_in_similarity_search(retrieval_engine, chat_config):
     """Test error propagation through the retrieval pipeline using similarity search"""
     # Save original model name
-    original_model = retrieval_engine.english_reranker_model
-    retrieval_engine.english_reranker_model = "invalid-model"
+    original_model = chat_config.english_reranker_model
+    chat_config.english_reranker_model = "invalid-model"
 
     inputs = {
         "standalone_query": "test query",
@@ -218,7 +214,7 @@ def test_error_propagation_in_similarity_search(retrieval_engine, chat_config):
     )
 
     # Restore original model name
-    retrieval_engine.english_reranker_model = original_model
+    chat_config.english_reranker_model = original_model
 
     # Check that we got results for our query
     assert inputs["standalone_query"] in results

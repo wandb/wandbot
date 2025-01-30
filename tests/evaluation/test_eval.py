@@ -167,7 +167,7 @@ async def test_get_record_api_error():
         )
         
         assert result["has_error"]
-        assert "Error getting answer from API" in result["error_message"]
+        assert "Error getting response from wandbotAPI" in result["error_message"]
         assert result["generated_answer"] == ""
 
 def test_parse_text_to_json():

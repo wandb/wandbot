@@ -345,10 +345,10 @@ class QueryEnhancer:
 
     @retry(
         retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(retry_chat_config.query_enhancer_max_retries),
-        wait=wait_exponential(multiplier=retry_chat_config.query_enhancer_retry_multiplier,
-                               min=retry_chat_config.query_enhancer_retry_min_wait, 
-                               max=retry_chat_config.query_enhancer_retry_max_wait),
+        stop=stop_after_attempt(retry_chat_config.llm_max_retries),
+        wait=wait_exponential(multiplier=retry_chat_config.llm_retry_multiplier,
+                               min=retry_chat_config.llm_retry_min_wait, 
+                               max=retry_chat_config.llm_retry_max_wait),
         before_sleep=lambda retry_state: (
             before_sleep_log(logger, log_level=logging.WARNING)(retry_state),
             logger.warning(
