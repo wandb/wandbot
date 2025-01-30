@@ -86,15 +86,11 @@ class VectorStore:
     async def _async_retrieve(
         self,
         query_texts: List[str],
-        search_type: str = "mmr",
-        search_params: dict = None,
         filter_params: dict = None
     ) -> Dict[str, List[Document]]:
         """Async version of retrieve that returns the same dictionary structure."""
         return await asyncio.to_thread(
             self.retrieve,
             query_texts=query_texts,
-            search_type=search_type,
-            search_params=search_params,
             filter_params=filter_params,
         )
