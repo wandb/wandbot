@@ -27,7 +27,7 @@ langchain-experimental >= 0.0.60
 
 # chromadb>=0.6.0
 chromadb == 0.4.23
-weave>=0.51.29
+weave>=0.51.32
 wandb[workspaces]>=0.19.0
 fasttext-wheel
 tree-sitter-languages>=1.7.1
