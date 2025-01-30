@@ -140,26 +140,7 @@ class FusionRetrievalEngine:
                     avoid=not self.chat_config.do_web_search
                 ))
 
-            def flatten_retrieved_results(results: Dict[str, Any]) -> tuple[List[Document], Any]:
-                embedding_status = results.get("_embedding_status")
-                docs = [results[k] for k in results.keys() if not k.startswith('_')]  # Skip metadata keys
-                if isinstance(docs, list) and all(isinstance(d, list) for d in docs):
-                    docs = [item for sublist in docs for item in sublist]  # flattens to List[Tuple[Document, float]]
-                    # Convert tuples to Documents if needed
-                    processed_docs = []
-                    for item in docs:
-                        if isinstance(item, Document):
-                            processed_docs.append(item)
-                        elif isinstance(item, tuple) and len(item) == 2:
-                            doc, score = item
-                            if isinstance(doc, Document):
-                                if 'relevance_score' not in doc.metadata:
-                                    doc.metadata['relevance_score'] = score
-                                processed_docs.append(doc)
-                    return processed_docs, embedding_status
-                return docs if isinstance(docs, list) else [docs], embedding_status
-            
-            docs_context, embedding_status = flatten_retrieved_results(docs_context)
+            docs_context, embedding_status = self._flatten_retrieved_results(docs_context)
 
             logger.debug(f"RETRIEVAL-ENGINE: First retrieved document from vector store:\n{docs_context[0]}\n")
             logger.info(f"RETRIEVAL-ENGINE: Retrieved {len(docs_context)} documents from vector store.")
@@ -188,11 +169,12 @@ class FusionRetrievalEngine:
                         top_k=self.chat_config.top_k,
                         language=inputs["language"]
                     )
-                if api_status.has_error:
+
+                if not api_status.success:
                     err_msg = f"FUSION-RETRIEVAL: Reranker failed: {api_status.component}, \
 {api_status.error_info.model_dump_json(indent=4)}"
                     logger.error(err_msg)
-                    context = [f"Error: {err_msg}"]  # Fallback to non-reranked results
+                    context = [f"Error: {err_msg}"]
                     raise Exception(err_msg)  # Raise for weave tracing
             except Exception as e:
                 error_info = ErrorInfo(
@@ -200,7 +182,8 @@ class FusionRetrievalEngine:
                     has_error=True,
                     error_message=str(e),
                     error_type=type(e).__name__,
-                    stacktrace=''.join(traceback.format_exc())
+                    stacktrace=''.join(traceback.format_exc()),
+                    file_path=get_error_file_path(sys.exc_info()[2])
                 )
                 err_msg = f"FUSION-RETRIEVAL: Reranker failed: {error_info.component}, \
 {error_info.model_dump_json(indent=4)}"
@@ -239,4 +222,23 @@ class FusionRetrievalEngine:
 
     async def __acall__(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return await self._run_retrieval_common(inputs, use_async=True)
+    
+    def _flatten_retrieved_results(self, results: Dict[str, Any]) -> tuple[List[Document], Any]:
+        embedding_status = results.get("_embedding_status")
+        docs = [results[k] for k in results.keys() if not k.startswith('_')]  # Skip metadata keys
+        if isinstance(docs, list) and all(isinstance(d, list) for d in docs):
+            docs = [item for sublist in docs for item in sublist]  # flattens to List[Tuple[Document, float]]
+            # Convert tuples to Documents if needed
+            processed_docs = []
+            for item in docs:
+                if isinstance(item, Document):
+                    processed_docs.append(item)
+                elif isinstance(item, tuple) and len(item) == 2:
+                    doc, score = item
+                    if isinstance(doc, Document):
+                        if 'relevance_score' not in doc.metadata:
+                            doc.metadata['relevance_score'] = score
+                        processed_docs.append(doc)
+            return processed_docs, embedding_status
+        return docs if isinstance(docs, list) else [docs], embedding_status
 
