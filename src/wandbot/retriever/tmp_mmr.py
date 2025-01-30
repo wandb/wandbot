@@ -267,7 +267,7 @@ def debug_max_marginal_relevance_search_by_vector(
     return selected_results
 
 @weave.op
-async def debug_run_mmr_batch(query_embed, doc_embed, docs, metadatas, distances, top_k, lambda_mult):
+async def debug_run_mmr_batch(query, query_embed, doc_embed, docs, metadatas, distances, top_k, lambda_mult):
     # print(f"Running debug_run_mmr_batch, {len(docs)} received")
     retrieved_results = {
         "documents": docs,
