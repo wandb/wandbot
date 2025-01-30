@@ -53,16 +53,16 @@ class ChatConfig(BaseSettings):
     llm_max_retries: int = 3
     llm_retry_min_wait: int = 4  # minimum seconds to wait between retries
     llm_retry_max_wait: int = 60  # maximum seconds to wait between retries
-    llm_retry_multiplier: int = 1  # multiplier for exponential backoff
+    llm_retry_multiplier: float = 1  # multiplier for exponential backoff
 
     # Embedding Model retry settings
     embedding_max_retries: int = 3
     embedding_retry_min_wait: int = 4
     embedding_retry_max_wait: int = 60
-    embedding_retry_multiplier: int = 1
+    embedding_retry_multiplier: float = 1
 
     # Reranker retry settings
     reranker_max_retries: int = 3
     reranker_retry_min_wait: int = 0.5
     reranker_retry_max_wait: int = 120
-    reranker_retry_multiplier: int = 2
+    reranker_retry_multiplier: float = 2
