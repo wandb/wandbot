@@ -1,5 +1,6 @@
 import enum
 import json
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
@@ -10,7 +11,8 @@ from tenacity import (
     stop_after_attempt, 
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log
+    before_sleep_log,
+    after_log
 )
 
 from wandbot.configs.chat_config import ChatConfig
@@ -20,8 +22,7 @@ from wandbot.schema.api_status import APIStatus
 
 
 logger = get_logger(__name__)
-
-chat_config = ChatConfig()
+retry_chat_config = ChatConfig()
 
 BOT_NAME_PATTERN = re.compile(r"<@U[A-Z0-9]+>|@[a-zA-Z0-9]+")
 
@@ -344,11 +345,20 @@ class QueryEnhancer:
 
     @retry(
         retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=60),
-        before_sleep=before_sleep_log(logger, log_level=10),
-        reraise=True
+        stop=stop_after_attempt(retry_chat_config.query_enhancer_max_retries),
+        wait=wait_exponential(multiplier=retry_chat_config.query_enhancer_retry_multiplier,
+                               min=retry_chat_config.query_enhancer_retry_min_wait, 
+                               max=retry_chat_config.query_enhancer_retry_max_wait),
+        before_sleep=lambda retry_state: (
+            before_sleep_log(logger, log_level=logging.WARNING)(retry_state),
+            logger.warning(
+                f"Attempt {retry_state.attempt_number} failed. Retrying in {retry_state.next_action.sleep} seconds..."
+            )
+        )[1],
+        reraise=True,
+        after=after_log(logger, logging.ERROR)
     )
+    @weave.op
     async def _try_enhance_query(
         self,
         model: LLMModel,

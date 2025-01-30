@@ -33,7 +33,6 @@ class BaseEmbeddingModel:
         self.timeout = timeout
 
     @weave.op
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=120), reraise=True)
     def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
         raise NotImplementedError("Subclasses must implement embed method")
 
