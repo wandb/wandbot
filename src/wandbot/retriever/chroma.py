@@ -6,19 +6,16 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
 """
-import asyncio
 import weave
 from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 
 import chromadb
 from chromadb.config import Settings
-from wandbot.retriever.tmp_mmr import debug_max_marginal_relevance_search_by_vector
 
-from wandbot.retriever.utils import maximal_marginal_relevance
 from wandbot.utils import get_logger
-from wandbot.models.embedding import EmbeddingModel
 from wandbot.schema.document import Document
+from wandbot.retriever.mmr import max_marginal_relevance_search_by_vector
 
 logger = get_logger(__name__)
 
@@ -175,19 +172,18 @@ of lengths: {[len(r) for r in res['documents']]}")
         results = []
         for i, query_embed in enumerate(query_embeddings):
             # Structure results for this specific query
-            query_results = {
-                "documents": [retrieved_results["documents"][i]],  # Add extra dimension for this query's docs
-                "metadatas": [retrieved_results["metadatas"][i]],
-                "distances": [retrieved_results["distances"][i]],
-                "embeddings": [retrieved_results["embeddings"][i]]
+            retrieved_results_dict = {
+                "documents": retrieved_results["documents"][i],  # Add extra dimension for this query's docs
+                "metadatas": retrieved_results["metadatas"][i],
+                "distances": retrieved_results["distances"][i],
+                "embeddings": retrieved_results["embeddings"][i]
             }
             
             # Run MMR for this query
-            mmr_results = debug_max_marginal_relevance_search_by_vector(
-                results=query_results,
+            mmr_results = max_marginal_relevance_search_by_vector(
+                retrieved_results=retrieved_results_dict,
                 embedding=query_embed,
-                k=top_k,              # Final number of documents to return
-                fetch_k=fetch_k,      # Must match n_results from ChromaDB query
+                top_k=top_k,              # Final number of documents to return
                 lambda_mult=lambda_mult  # Balance between relevance and diversity
             )
             results.append(mmr_results)
