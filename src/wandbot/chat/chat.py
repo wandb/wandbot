@@ -130,7 +130,8 @@ class Chat:
                             file_path=get_error_file_path(sys.exc_info()[2]),
                             component="translation"
                         )
-                        api_call_statuses["translation"] = error_info.model_dump()
+                        api_call_statuses["chat_success"] = False
+                        api_call_statuses["chat_error_info"] = error_info.model_dump()
                         # Create error response preserving translation error context
                         return ChatResponse(
                             system_prompt="",
@@ -174,11 +175,21 @@ class Chat:
                             file_path=get_error_file_path(sys.exc_info()[2]),
                             component="translation"
                         )
-                        api_call_statuses["translation"] = error_info.model_dump()
+                        api_call_statuses["chat_success"] = False
+                        api_call_statuses["chat_error_info"] = error_info.model_dump()
                         # Return response with translation error but preserve original answer
                         result_dict["answer"] = f"Translation error: {str(e)}\nOriginal answer: {result_dict['answer']}"
 
                 # Update with final metadata
+                api_call_statuses["chat_success"] = True
+                api_call_statuses["chat_error_info"] = ErrorInfo(
+                    has_error=False,
+                    error_message="",
+                    error_type="",
+                    stacktrace="",
+                    file_path="",
+                    component="chat"
+                ).model_dump()
                 result_dict.update({
                     "application": chat_request.application,
                     "api_call_statuses": api_call_statuses,
@@ -198,7 +209,8 @@ class Chat:
                     file_path=get_error_file_path(sys.exc_info()[2]),
                     component="chat"
                 )
-                api_call_statuses["chat"] = error_info.model_dump()
+                api_call_statuses["chat_success"] = False
+                api_call_statuses["chat_error_info"] = error_info.model_dump()
                 
                 return ChatResponse(
                     system_prompt="",
