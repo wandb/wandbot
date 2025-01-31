@@ -77,8 +77,8 @@ class FusionRetrievalEngine:
             )
             logger.info(f"FUSION-RETRIEVAL: Reranked {len(results.results)} documents.")
         except Exception as e:
-            error = f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n"
-            logger.error(error)
+            error_message = f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n"
+            logger.error(error_message)
             error_info = ErrorInfo(
                 component="reranker_api",
                 has_error=True,
@@ -87,6 +87,7 @@ class FusionRetrievalEngine:
                 stacktrace=''.join(traceback.format_exc()),
                 file_path=get_error_file_path(sys.exc_info()[2])
             )
+            raise Exception(error_message)
             return [], APIStatus(
                 component="reranker_api",
                 success=False,
@@ -127,6 +128,17 @@ class FusionRetrievalEngine:
     @weave.op
     async def _run_retrieval_common(self, inputs: Dict[str, Any], use_async: bool) -> Dict[str, Any]:
         """Single function containing the entire retrieval logic."""
+        if not isinstance(inputs, dict):
+            raise TypeError(f"Expected inputs to be a dictionary, got {type(inputs)}")
+        if "all_queries" not in inputs:
+            raise ValueError("Missing required key 'all_queries' in retrieval inputs")
+        if not isinstance(inputs["all_queries"], (list, tuple)):
+            raise TypeError(f"Expected 'all_queries' to be a list or tuple, got {type(inputs['all_queries'])}")
+        if "standalone_query" not in inputs:
+            raise ValueError("Missing required key 'standalone_query' in retrieval inputs")
+        if not isinstance(inputs["standalone_query"], str):
+            raise TypeError(f"Expected 'standalone_query' to be a string, got {type(inputs['standalone_query'])}")
+
         try:
             if use_async:
                 docs_context, web_search_results = await asyncio.gather(

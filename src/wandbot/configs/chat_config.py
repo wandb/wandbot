@@ -62,7 +62,7 @@ class ChatConfig(BaseSettings):
     embedding_retry_multiplier: float = 1
 
     # Reranker retry settings
-    reranker_max_retries: int = 3
-    reranker_retry_min_wait: float = 0.5
-    reranker_retry_max_wait: float = 120
-    reranker_retry_multiplier: float = 2
+    reranker_max_retries: int = 5
+    reranker_retry_min_wait: float = 2.0
+    reranker_retry_max_wait: float = 180
+    reranker_retry_multiplier: float = 2.5
