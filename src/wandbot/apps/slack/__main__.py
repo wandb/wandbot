@@ -19,7 +19,7 @@ from slack_bolt.async_app import AsyncApp
 from slack_sdk.web import SlackResponse
 
 from wandbot.api.client import AsyncAPIClient
-from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
+from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig, SlackAppKoConfig
 from wandbot.apps.slack.formatter import MrkdwnFormatter
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
@@ -34,13 +34,15 @@ parser.add_argument(
     default="en",
     help="Language of the bot",
     type=str,
-    choices=["en", "ja"],
+    choices=["en", "ja", "ko"],
 )
 
 args = parser.parse_args()
 
 if args.language == "ja":
     config = SlackAppJaConfig()
+elif args.language == "ko":
+    config = SlackAppKoConfig()
 else:
     config = SlackAppEnConfig()
 

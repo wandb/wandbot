@@ -65,6 +65,7 @@ async def get_eval_record(
     return {
         "system_prompt": response["system_prompt"],
         "generated_answer": response["answer"],
+        "retrieved_contexts": response["source_documents"],
         "retrieved_contexts_individual": parse_text_to_json(response["source_documents"]),
         "model": response["model"],
         "total_tokens": response["total_tokens"],
@@ -117,5 +118,7 @@ evaluation = Evaluation(
     dataset=question_rows, scorers=[get_answer_correctness]
 )
 if __name__ == "__main__":
+    # import asyncio
+    # print(asyncio.run(EvaluatorModel().predict("안녕하세요")))
     with weave.attributes({'evaluation_strategy_name': config.evaluation_strategy_name}):
         asyncio.run(evaluation.evaluate(EvaluatorModel()))

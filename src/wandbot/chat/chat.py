@@ -159,6 +159,78 @@ class Chat:
             top_p=1
         )
         return response.choices[0].message.content
+    
+    @weave.op()
+    def _translate_ko_to_en(self, text: str) -> str:
+        """
+        Translates Korean text to English using OpenAI's GPT-4.
+
+        Args:
+            text: The Korean text to be translated.
+
+        Returns:
+            The translated text in English.
+        """
+        client = OpenAI()
+        response = client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"You are a professional translator. \n\n\
+                    Translate the user's question about Weights & Biases into English according to the specified rules. \n\
+                    Rule of translation. \n\
+                    - Maintain the original nuance\n\
+                    - Keep code unchanged.\n\
+                    - Only return the English translation without any additional explanation"
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            temperature=0,
+            max_tokens=1000,
+            top_p=1
+        )
+        return response.choices[0].message.content
+    
+    @weave.op()
+    def _translate_en_to_ko(self, text: str) -> str:
+        """
+        Translates English text to Korean using OpenAI's GPT-4.
+
+        Args:
+            text: The English text to be translated.
+
+        Returns:
+            The translated text in Korean.
+        """
+        client = OpenAI()
+        response = client.chat.completions.create(
+                        model="gpt-4o-2024-08-06",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"You are a professional translator. \n\n\
+                    Translate the user's text into Korean according to the specified rules. \n\
+                    Rule of translation. \n\
+                    - Maintain the original nuance\n\
+                    - Use 'run', 'reference artifacts' and 'lineage' in English where appropriate, as it's a term used in Wandb.\n\
+                    - Include specific terms in English where appropriate\n\
+                    - Keep code unchanged.\n\
+                    - Only return the Korean translation without any additional explanation"
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            temperature=0,
+            max_tokens=1000,
+            top_p=1
+        )
+        return response.choices[0].message.content
 
     @weave.op()
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
@@ -181,6 +253,15 @@ class Chat:
                     application=chat_request.application,
                     language="en"
                 )
+            if original_language == "ko":
+                translated_question = self._translate_ko_to_en(chat_request.question)
+                chat_request.language = "en"
+                chat_request = ChatRequest(
+                    question=translated_question,
+                    chat_history=chat_request.chat_history,
+                    application=chat_request.application,
+                    language="en"
+                )
                 
             result = self._get_answer(
                 chat_request.question, chat_request.chat_history or []
@@ -190,6 +271,8 @@ class Chat:
 
             if original_language == "ja":
                 result_dict["answer"] = self._translate_en_to_ja(result_dict["answer"])
+            elif original_language == "ko":
+                result_dict["answer"] = self._translate_en_to_ko(result_dict["answer"])
 
             usage_stats = {
                 "total_tokens": result.total_tokens,

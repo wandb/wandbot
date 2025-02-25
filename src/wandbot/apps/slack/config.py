@@ -54,6 +54,25 @@ JA_FALLBACK_WARNING_MESSAGE = (
     "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
 )
 
+KO_INTRO_MESSAGE = (
+    "안녕하세요 <@{user}>:\n\n"
+    "Wandbot는 현재 알파 테스트 중이며, 자주 업데이트됩니다. \n"
+    "사용 시 개인 정보를 입력하지 않도록 주의해주십시오. 답변을 생성하고 있습니다... "
+)
+
+
+KO_OUTRO_MESSAGE = (
+    "🤖 여전히 도움이 필요하시면 질문을 조금 바꿔서 다시 시도해 보시거나, "
+    "또는 Weights & Biases 지원팀(support@wandb.com)에 문의해 주세요. \n\n"
+    "이 답변이 도움이 되었나요? 아래 버튼을 눌러 알려주세요!"
+)
+
+KO_ERROR_MESSAGE = "「오류가 발생했습니다. 잠시 후 다시 시도해 주세요.」"
+
+KO_FALLBACK_WARNING_MESSAGE = (
+    "**경고: {model}** 에 폴백합니다. 이 결과는 **gpt-4** 보다 나을 수도 있지만 좋지 않을 수도 있습니다.\n\n"
+)
+
 
 class SlackAppEnConfig(BaseSettings):
     APPLICATION: str = Field("Slack_EN")
@@ -89,6 +108,26 @@ class SlackAppJaConfig(BaseSettings):
     WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
     include_sources: bool = True
     bot_language: str = "ja"
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
+
+
+class SlackAppKoConfig(BaseSettings):
+    APPLICATION: str = Field("Slack_KO")
+    SLACK_APP_TOKEN: str = Field(..., validation_alias="SLACK_KO_APP_TOKEN")
+    SLACK_BOT_TOKEN: str = Field(..., validation_alias="SLACK_KO_BOT_TOKEN")
+    SLACK_SIGNING_SECRET: str = Field(
+        ..., validation_alias="SLACK_KO_SIGNING_SECRET"
+    )
+    INTRO_MESSAGE: str = Field(KO_INTRO_MESSAGE)
+    OUTRO_MESSAGE: str = Field(KO_OUTRO_MESSAGE)
+    ERROR_MESSAGE: str = Field(KO_ERROR_MESSAGE)
+    WARNING_MESSAGE: str = Field(KO_FALLBACK_WARNING_MESSAGE)
+    WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
+    include_sources: bool = True
+    bot_language: str = "ko"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="allow"
