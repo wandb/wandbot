@@ -8,14 +8,16 @@ import logging
 import requests
 from weave import Evaluation
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, after_log
+from pathlib import Path
+from dotenv import load_dotenv
 
 from wandbot.utils import get_logger
 from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator, CorrectnessEvaluationResult
 from wandbot.evaluation.eval_config import get_eval_config, EvalConfig
-from dotenv import load_dotenv
 
-dot_env_path = os.path.join(os.path.dirname(__file__), '../../../../.env')
-load_dotenv(dotenv_path=dot_env_path, override=True)
+# Load environment variables from .env in project root
+ENV_PATH = Path(__file__).parent.parent.parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 logger = get_logger(__name__)
 

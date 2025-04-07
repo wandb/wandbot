@@ -7,13 +7,15 @@ from wandbot.database.models import Base
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from pathlib import Path
 
 from wandbot.configs.app_config import AppConfig
 
 app_config = AppConfig()
 
-dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
-load_dotenv(dotenv_path, override=True)
+# Load environment variables from .env in project root
+ENV_PATH = Path(__file__).parent.parent.parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 logger = get_logger(__name__)
 

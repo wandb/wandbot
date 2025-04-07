@@ -69,10 +69,13 @@ class RAGPipeline:
             chat_config=chat_config,
         )
         self.response_synthesizer = ResponseSynthesizer(
-            model=chat_config.response_synthesizer_model,
-            temperature=chat_config.response_synthesizer_temperature,
-            fallback_model=chat_config.response_synthesizer_fallback_model,
+            primary_provider=chat_config.response_synthesizer_provider,
+            primary_model_name=chat_config.response_synthesizer_model,
+            primary_temperature=chat_config.response_synthesizer_temperature,
+            fallback_provider=chat_config.response_synthesizer_fallback_provider,
+            fallback_model_name=chat_config.response_synthesizer_fallback_model,
             fallback_temperature=chat_config.response_synthesizer_fallback_temperature,
+            max_retries=chat_config.llm_max_retries
         )
 
     async def __acall__(
@@ -94,7 +97,7 @@ class RAGPipeline:
         retrieval_result = await self.retrieval_engine.__acall__(enhanced_query)
 
         # with get_openai_callback() as response_cb, Timer() as response_tb:
-        response = self.response_synthesizer(retrieval_result)
+        response = await self.response_synthesizer(retrieval_result)
         # or if it is truly async, do:
         # response = await self.response_synthesizer.__acall__(retrieval_results)
 
