@@ -10,6 +10,7 @@ import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
 from wandbot.utils import get_logger, ErrorInfo, get_error_file_path
 from wandbot.schema.document import Document
@@ -17,8 +18,9 @@ from wandbot.schema.api_status import APIStatus
 
 logger = get_logger(__name__)
 
-dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
-load_dotenv(dotenv_path)
+# Load environment variables from .env in project root
+ENV_PATH = Path(__file__).parent.parent.parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 
 class WebSearchResults(BaseModel):
