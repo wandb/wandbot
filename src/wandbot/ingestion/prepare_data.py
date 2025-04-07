@@ -14,14 +14,14 @@ Typical usage example:
     load(project="my_project", entity="my_entity", result_artifact_name="raw_dataset")
 """
 
+import datetime
 import json
+import logging
 import os
 import pathlib
 from multiprocessing import Pool, cpu_count
 from typing import Any, Dict, Iterator, List
 from urllib.parse import urljoin, urlparse
-import logging
-import datetime
 
 import nbformat
 import pandas as pd
@@ -40,25 +40,25 @@ from wandbot.configs.ingestion_config import (
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     FCReportsStoreConfig,
+    IngestionConfig,
     SDKCodeStoreConfig,
     SDKTestsStoreConfig,
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
-    WeaveCookbookStoreConfig,
     WeaveDocStoreConfig,
-    WeaveExamplesStoreConfig,
-    IngestionConfig,
 )
 from wandbot.ingestion.utils import (
     clean_contents,
     extract_frontmatter,
     fetch_git_repo,
 )
-from wandbot.utils import get_logger
 from wandbot.schema.document import Document
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 ingestion_config = IngestionConfig()
 
@@ -219,9 +219,7 @@ class DocodileDataLoader(DataLoader):
                 file_loc = file_path.relative_to((base_path / "ref")).parent
             elif relative_path.parts[0] == "tutorials":
                 chapter = "tutorials"
-                slug = self.extract_slug(
-                    (base_path / "tutorials") / "_index.md"
-                )
+                slug = self.extract_slug((base_path / "tutorials") / "_index.md")
                 file_loc = file_path.relative_to((base_path / "tutorials")).parent
             else:
                 # Fallback or handle other top-level directories if necessary
@@ -232,16 +230,17 @@ class DocodileDataLoader(DataLoader):
                 file_name = ""
 
         except Exception as e:
-            logger.debug(f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL.")
+            logger.debug(
+                f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL."
+            )
             # Fallback logic: use relative path directly if slug extraction fails
             chapter = relative_path.parts[0] if relative_path.parts else ""
             file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
             file_name = file_path.stem if file_path.name not in ("_index.md",) else ""
 
-
         site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
         # Clean up potential double slashes or leading/trailing slashes from fallback paths
-        site_relative_path = '/'.join(filter(None, str(site_relative_path).split('/')))
+        site_relative_path = "/".join(filter(None, str(site_relative_path).split("/")))
 
         site_url = urljoin(
             str(self.config.data_source.remote_path), str(site_relative_path)
@@ -262,11 +261,12 @@ class DocodileDataLoader(DataLoader):
             A Document object.
         """
         local_paths = self._get_local_paths()
-        logger.info(f"Found {len(local_paths)} potential document files for {self.config.name}")
+        logger.info(
+            f"Found {len(local_paths)} potential document files for {self.config.name}"
+        )
         document_files = {
             local_path: self.generate_site_url(
-                self.config.data_source.local_path
-                / self.config.data_source.base_path,
+                self.config.data_source.local_path / self.config.data_source.base_path,
                 local_path,
             )
             for local_path in local_paths
@@ -294,7 +294,9 @@ class DocodileDataLoader(DataLoader):
                 try:
                     document.metadata["description"] = self.extract_description(f_name)
                 except Exception as e_desc:
-                    logger.warning(f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description.")
+                    logger.warning(
+                        f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description."
+                    )
                     document.metadata["description"] = ""
 
                 # Attempt to extract tags (handles frontmatter errors if underlying functions use it)
@@ -303,17 +305,24 @@ class DocodileDataLoader(DataLoader):
                     # or could fail for other reasons. If it directly uses frontmatter, this is necessary.
                     document.metadata["tags"] = self.extract_tags(source_url)
                 except Exception as e_tags:
-                    logger.warning(f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags.")
-                    document.metadata["tags"] = ["Documentation"] # Or provide a suitable default
+                    logger.warning(
+                        f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
+                    )
+                    document.metadata["tags"] = [
+                        "Documentation"
+                    ]  # Or provide a suitable default
 
                 yield document
 
             except Exception as e_load:
                 # Catch broader errors during file loading or initial processing
                 logger.warning(
-                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}", exc_info=True
+                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}",
+                    exc_info=True,
                 )
-        logger.info(f"Processed {len(document_files)} document files for {self.config.name}")
+        logger.info(
+            f"Processed {len(document_files)} document files for {self.config.name}"
+        )
 
 
 class WeaveDocsDataLoader(DocodileDataLoader):
@@ -412,9 +421,7 @@ class CodeDataLoader(DataLoader):
                 ]
                 yield document
             except Exception as e:
-                logger.warning(
-                    f"Failed to load code in {f_name} with error {e}"
-                )
+                logger.warning(f"Failed to load code in {f_name} with error {e}")
 
 
 class FCReportsDataLoader(DataLoader):
@@ -515,9 +522,7 @@ class FCReportsDataLoader(DataLoader):
             md_content += "#" * block["level"] + " "
             for child in block["children"]:
                 if "url" in child:
-                    md_content += (
-                        f"[{child['children'][0]['text']}]({child['url']})"
-                    )
+                    md_content += f"[{child['children'][0]['text']}]({child['url']})"
                 else:
                     md_content += child.get("text", "")
             md_content += "\n\n"
@@ -533,9 +538,7 @@ class FCReportsDataLoader(DataLoader):
                                     "inlineCode" in text_block
                                     and text_block["inlineCode"]
                                 ):
-                                    md_content += (
-                                        f"`{text_block.get('text', '')}`"
-                                    )
+                                    md_content += f"`{text_block.get('text', '')}`"
                                 else:
                                     md_content += text_block.get("text", "")
                         else:
@@ -618,9 +621,9 @@ class FCReportsDataLoader(DataLoader):
     def extract_fc_report_ids(fc_spec_df):
         fc_spec = json.loads(fc_spec_df["spec"].values[0])
         reports_metadata = fc_spec["reportIDsWithTagV2IDs"]
-        df = pd.json_normalize(
-            reports_metadata, "tagIDs", ["id", "authors"]
-        ).rename(columns={0: "tagID", "id": "reportID"})
+        df = pd.json_normalize(reports_metadata, "tagIDs", ["id", "authors"]).rename(
+            columns={0: "tagID", "id": "reportID"}
+        )
 
         # Drop duplicates on 'reportID' column
         df = df.drop_duplicates(subset="reportID")
@@ -698,9 +701,7 @@ class FCReportsDataLoader(DataLoader):
         fc_spec_df = self.get_fully_connected_spec()
         fc_ids_df = self.extract_fc_report_ids(fc_spec_df)
 
-        logger.debug(
-            f"Before filtering, there are {len(report_ids_df)} reports"
-        )
+        logger.debug(f"Before filtering, there are {len(report_ids_df)} reports")
 
         report_ids_df = report_ids_df.merge(
             fc_ids_df,
@@ -772,12 +773,8 @@ class FCReportsDataLoader(DataLoader):
                 )
             except UnicodeDecodeError:
                 # fix escape characters with raw_unicode_escape
-                content = self.clean_invalid_unicode_escapes(
-                    row_dict["content"]
-                )
-                content = content.encode("raw_unicode_escape").decode(
-                    "unicode_escape"
-                )
+                content = self.clean_invalid_unicode_escapes(row_dict["content"])
+                content = content.encode("raw_unicode_escape").decode("unicode_escape")
 
             output = {
                 "content": content,
@@ -846,9 +843,7 @@ class FCReportsDataLoader(DataLoader):
                     "file_type": ".md",
                     "description": parsed_row["description"],
                     "tags": ["Fully Connected", "Report"]
-                    + self.extract_tags(
-                        parsed_row["source"], parsed_row["content"]
-                    ),
+                    + self.extract_tags(parsed_row["source"], parsed_row["content"]),
                 },
             )
             yield document
@@ -883,7 +878,9 @@ def get_loader_from_config(config: DataStoreConfig) -> DataLoader:
 
     loader_class = SOURCE_TYPE_TO_LOADER_MAP.get(source_type)
     if loader_class:
-        logging.info(f"Using loader {loader_class.__name__} for source type {source_type}")
+        logging.info(
+            f"Using loader {loader_class.__name__} for source type {source_type}"
+        )
         return loader_class(config)
     else:
         logging.error(f"No loader found for source type {source_type}")
@@ -925,7 +922,9 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
         logging.info(f"Successfully completed data loading for config: {config.name}")
         return docstore_dir
     except Exception as e:
-        logging.error(f"Failed loading data for config {config.name}: {e}", exc_info=True)
+        logging.error(
+            f"Failed loading data for config {config.name}: {e}", exc_info=True
+        )
         # Reraise the exception so the multiprocessing pool knows about the failure
         raise
 
@@ -955,7 +954,7 @@ def load(
     logging.info(f"Initialized Wandb run: {run.url}")
 
     # Generate a timestamp string for this run
-    timestamp_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     timestamped_cache_root = ingestion_config.cache_dir / timestamp_str
     logging.info(f"Using timestamped cache root: {timestamped_cache_root}")
 
@@ -976,16 +975,22 @@ def load(
 
     # Filter for the specific config we want to debug
     configs_to_process = [
-        config for config in all_configs if isinstance(config, DocodileEnglishStoreConfig)
+        config
+        for config in all_configs
+        if isinstance(config, DocodileEnglishStoreConfig)
     ]
     configs_to_process = all_configs
 
     # Update docstore_dir for each config to include the timestamp
     for config in configs_to_process:
         original_docstore_name = config.docstore_dir.name
-        original_parent_name = config.docstore_dir.parent.name # Should be 'raw_data'
-        config.docstore_dir = timestamped_cache_root / original_parent_name / original_docstore_name
-        logging.debug(f"Updated docstore_dir for {config.name} to {config.docstore_dir}")
+        original_parent_name = config.docstore_dir.parent.name  # Should be 'raw_data'
+        config.docstore_dir = (
+            timestamped_cache_root / original_parent_name / original_docstore_name
+        )
+        logging.debug(
+            f"Updated docstore_dir for {config.name} to {config.docstore_dir}"
+        )
 
     # Use multiprocessing to load data in parallel
     num_processes = max(1, cpu_count() // 2)
@@ -1013,8 +1018,8 @@ def load(
             # No need to rename locally.
             # We need the original config name for the artifact structure.
             # Assuming the structure is timestamped_cache_root / 'raw_data' / config_name
-            artifact_entry_name = docstore_path.name # e.g., English_Documentation
-            artifact_base_dir = docstore_path.parent.name # e.g., raw_data
+            artifact_entry_name = docstore_path.name  # e.g., English_Documentation
+            artifact_base_dir = docstore_path.parent.name  # e.g., raw_data
             artifact_full_name = f"{artifact_base_dir}/{artifact_entry_name}"
 
             # The path already includes the timestamp. Rename for artifact clarity (remove run_id if needed).
@@ -1023,23 +1028,34 @@ def load(
             # logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
             # docstore_path.rename(unique_local_path)
 
-            logging.info(f"Adding directory {docstore_path} to artifact {result_artifact_name} as {artifact_full_name}")
+            logging.info(
+                f"Adding directory {docstore_path} to artifact {result_artifact_name} as {artifact_full_name}"
+            )
             artifact.add_dir(
-                str(docstore_path), # Use the final timestamped path
+                str(docstore_path),  # Use the final timestamped path
                 name=artifact_full_name,  # Use structure like 'raw_data/English_Documentation'
             )
             added_to_artifact.append(artifact_full_name)
             completed_count += 1
-            logging.info(f"Progress: {completed_count}/{total_configs} configurations processed and added.")
+            logging.info(
+                f"Progress: {completed_count}/{total_configs} configurations processed and added."
+            )
         except Exception as e:
-            logging.error(f"Failed to add directory {docstore_path} to artifact: {e}", exc_info=True)
+            logging.error(
+                f"Failed to add directory {docstore_path} to artifact: {e}",
+                exc_info=True,
+            )
 
     logging.info(f"Successfully added directories to artifact: {added_to_artifact}")
 
     if completed_count < total_configs:
-         logging.warning(f"Only {completed_count} out of {total_configs} configurations completed successfully and added to artifact.")
+        logging.warning(
+            f"Only {completed_count} out of {total_configs} configurations completed successfully and added to artifact."
+        )
     else:
-        logging.info(f"All {total_configs} configurations processed successfully and added to artifact.")
+        logging.info(
+            f"All {total_configs} configurations processed successfully and added to artifact."
+        )
 
     logging.info(f"Logging artifact {result_artifact_name} to Wandb.")
     run.log_artifact(artifact)
