@@ -711,7 +711,7 @@ class FCReportsDataLoader(DataLoader):
                     escape_sequence, "  "
                 )  # replace with a space or any character of your choice
                 text = text.replace(
-                    "\ ", " "
+                    r"\ ", " "
                 )  # in case an invalid escape sequence was created above
         return text
 
