@@ -121,11 +121,12 @@ def load(
     result_artifact.add_dir(
         local_path=str(config.vectordb_index_dir),
     )
+    
     logger.info("Logging result artifact to W&B...")
-    run.log_artifact(result_artifact, aliases=["chroma_index", "latest"])
-    logger.info("Result artifact logged successfully.")
-
+    run.log_artifact(result_artifact, aliases=["latest"])
     run.finish()
+
+    logger.info("Result artifact logged successfully.")
     final_artifact_path = f"{entity}/{project}/{ingestion_config.vectorstore_index_artifact_name}:latest"
     logger.info(f"Vector store creation finished. Final artifact: {final_artifact_path}")
     return final_artifact_path
