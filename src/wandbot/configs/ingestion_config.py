@@ -192,27 +192,14 @@ class WeaveCodeStoreConfig(DataStoreConfig):
         file_patterns=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("weave_sdk_code")
-
-
-class WeaveExamplesStoreConfig(DataStoreConfig):
-    name: str = "Weave Examples"
-    source_type: str = "code"
-    data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/tree/master/",
-        repo_path="https://github.com/wandb/weave",
-        base_path="examples",
-        file_patterns=["*.py", "*.ipynb"],
-        is_git_repo=True,
-    )
-    docstore_dir: pathlib.Path = pathlib.Path("weave_examples")
+    docstore_dir: pathlib.Path = pathlib.Path("weave_code_and_examples")
 
 
 class WeaveDocStoreConfig(DataStoreConfig):
     name: str = "Weave Documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
-        remote_path="https://wandb.github.io/weave/",
+        remote_path="https://github.com/wandb/weave",
         repo_path="https://github.com/wandb/weave",
         base_path="docs/docs",
         file_patterns=[
@@ -223,20 +210,6 @@ class WeaveDocStoreConfig(DataStoreConfig):
     )
     language: str = "en"
     docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
-
-
-class WeaveCookbookStoreConfig(DataStoreConfig):
-    name: str = "Weave Cookbooks"
-    source_type: str = "notebook"
-    data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave/tree/master/",
-        repo_path="https://github.com/wandb/weave",
-        base_path="docs/notebooks",
-        file_patterns=["*.ipynb"],
-        is_git_repo=True,
-    )
-    language: str = "en"
-    docstore_dir: pathlib.Path = pathlib.Path("weave_cookbooks")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):

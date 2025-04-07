@@ -29,6 +29,9 @@ Typical usage example:
 import pathlib
 import re
 import subprocess
+import tempfile
+import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -37,9 +40,10 @@ import giturlparse
 import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
-from git import Repo
+from git import Repo, InvalidGitRepositoryError
 
 from wandbot.utils import get_logger
+from wandbot.configs.ingestion_config import DataSource
 
 logger = get_logger(__name__)
 
@@ -125,24 +129,51 @@ def fetch_git_repo(paths: Any, id_file: Path) -> Dict[str, str]:
     """
     git_command = get_git_command(id_file)
 
-    if paths.local_path.is_dir():
-        repo = Repo(paths.local_path)
-        logger.debug(
-            f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
-        )
-        with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
-            if paths.branch is not None:
-                repo.git.checkout(paths.branch)
-            repo.remotes.origin.pull()
-    else:
-        remote_url = giturlparse.parse(f"{paths.repo_path}").urls.get("ssh")
+    git_ssh_command_env = os.environ.copy()
+    git_ssh_command_env["GIT_SSH_COMMAND"] = git_command
 
-        logger.debug(f"Cloning {remote_url} to {paths.local_path}")
-        repo = Repo.clone_from(
-            remote_url, paths.local_path, env=dict(GIT_SSH_COMMAND=git_command)
+    # Ensure the base cache directory exists
+    paths.local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if paths.local_path.is_dir():
+        try:
+            repo = Repo(paths.local_path)
+            logger.debug(
+                f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
+            )
+            with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
+                if paths.branch is not None:
+                    repo.git.checkout(paths.branch)
+                repo.remotes.origin.pull()
+        except InvalidGitRepositoryError:
+            logger.warning(
+                f"Folder {paths.local_path} already exists but is not a valid git repo."
+                f" Removing it and attempting to clone again."
+            )
+            try:
+                shutil.rmtree(paths.local_path) # Remove the invalid directory
+            except OSError as e:
+                logger.error(f"Failed to remove existing directory {paths.local_path}: {e}")
+                raise # Re-raise if removal fails
+
+            # Now clone into the (now non-existent) path
+            logger.info(f"Cloning {paths.repo_path} into {paths.local_path}...")
+            Repo.clone_from(
+                url=paths.repo_path,
+                to_path=paths.local_path,
+                env=git_ssh_command_env,
+                branch=paths.branch,
+            )
+            repo = Repo(paths.local_path) # Initialize repo object after successful clone
+    else:
+        logger.info(f"Cloning {paths.repo_path} into {paths.local_path}...")
+        Repo.clone_from(
+            url=paths.repo_path,
+            to_path=paths.local_path,
+            env=git_ssh_command_env,
+            branch=paths.branch,
         )
-        if paths.branch is not None:
-            repo.git.checkout(paths.branch)
+        repo = Repo(paths.local_path)
     return fetch_repo_metadata(repo)
 
 
