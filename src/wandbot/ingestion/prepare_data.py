@@ -734,8 +734,12 @@ class FCReportsDataLoader(DataLoader):
 
         reports_df = self.cleanup_reports_df(reports_df)
 
+        # Ensure the target directory exists before saving
+        target_path = self.config.data_source.local_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
         reports_df.to_json(
-            self.config.data_source.local_path, lines=True, orient="records"
+            target_path, lines=True, orient="records"
         )
 
         return self.config.data_source.local_path

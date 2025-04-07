@@ -34,13 +34,14 @@ import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
+import filelock
 
 import frontmatter
 import giturlparse
 import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
-from git import Repo, InvalidGitRepositoryError
+from git import Repo, InvalidGitRepositoryError, GitCommandError
 
 from wandbot.utils import get_logger
 from wandbot.configs.ingestion_config import DataSource
@@ -57,9 +58,10 @@ def get_git_command(id_file: Path) -> str:
     Returns:
         The git command with the id file.
     """
-    assert id_file.is_file()
+    if not id_file.is_file():
+        raise FileNotFoundError(f"SSH key file not found: {id_file}")
 
-    git_command = f"ssh -v -i /{id_file}"
+    git_command = f"ssh -v -i {id_file.resolve()}"  # Use resolve() for absolute path
     return git_command
 
 
@@ -103,78 +105,171 @@ def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
     Returns:
         The metadata of the git repository.
     """
-    head_commit = repo.head.commit
+    try:
+        head_commit = repo.head.commit
+        return dict(
+            commit_summary=head_commit.summary,
+            commit_message=head_commit.message,
+            commit_author=str(head_commit.author),
+            commit_time=head_commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            commit_hash=head_commit.hexsha,
+            commit_stats=head_commit.stats.total,
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch metadata from repo at {repo.working_dir}: {e}")
+        return {
+            "commit_summary": "Error",
+            "commit_message": "Error fetching metadata",
+            "commit_author": "N/A",
+            "commit_time": "N/A",
+            "commit_hash": "N/A",
+            "commit_stats": {},
+        }
 
-    return dict(
-        commit_summary=head_commit.summary,
-        commit_message=head_commit.message,
-        commit_author=str(head_commit.author),
-        commit_time=head_commit.committed_datetime.strftime(
-            "%Y-%m-%d %H:%M:%S"
-        ),
-        commit_hash=head_commit.hexsha,
-        commit_stats=head_commit.stats.total,
-    )
 
+def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
+    """Fetch the git repository, optimizing for single clone per repo URL.
 
-def fetch_git_repo(paths: Any, id_file: Path) -> Dict[str, str]:
-    """Fetch the git repository.
+    Clones the repository if it doesn't exist locally, otherwise fetches updates
+    and checks out the specified branch. Assumes configurations for the same
+    repo_path use the same local_path.
+    Uses file locking to prevent race conditions during concurrent access.
 
     Args:
-        paths: The paths of the git repository.
-        id_file: The path to the id file.
+        paths: The DataSource configuration containing repo_path, local_path, branch, etc.
+        id_file: The path to the id file (SSH key).
 
     Returns:
-        The metadata of the git repository.
+        The metadata of the git repository after checkout.
     """
     git_command = get_git_command(id_file)
-
     git_ssh_command_env = os.environ.copy()
     git_ssh_command_env["GIT_SSH_COMMAND"] = git_command
 
-    # Ensure the base cache directory exists
-    paths.local_path.parent.mkdir(parents=True, exist_ok=True)
+    local_repo_path = paths.local_path
+    repo_url = paths.repo_path
+    # Use 'main' as default if branch is not specified or None
+    branch = paths.branch if paths.branch else "main"
 
-    if paths.local_path.is_dir():
-        try:
-            repo = Repo(paths.local_path)
-            logger.debug(
-                f"Repo {paths.local_path} already exists... Pulling changes from {repo.remotes.origin.url}"
-            )
-            with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
-                if paths.branch is not None:
-                    repo.git.checkout(paths.branch)
-                repo.remotes.origin.pull()
-        except InvalidGitRepositoryError:
-            logger.warning(
-                f"Folder {paths.local_path} already exists but is not a valid git repo."
-                f" Removing it and attempting to clone again."
-            )
-            try:
-                shutil.rmtree(paths.local_path) # Remove the invalid directory
-            except OSError as e:
-                logger.error(f"Failed to remove existing directory {paths.local_path}: {e}")
-                raise # Re-raise if removal fails
+    # Define a lock file path based on the local repo path
+    lock_path = local_repo_path.parent / f"{local_repo_path.name}.lock"
 
-            # Now clone into the (now non-existent) path
-            logger.info(f"Cloning {paths.repo_path} into {paths.local_path}...")
-            Repo.clone_from(
-                url=paths.repo_path,
-                to_path=paths.local_path,
-                env=git_ssh_command_env,
-                branch=paths.branch,
-            )
-            repo = Repo(paths.local_path) # Initialize repo object after successful clone
-    else:
-        logger.info(f"Cloning {paths.repo_path} into {paths.local_path}...")
-        Repo.clone_from(
-            url=paths.repo_path,
-            to_path=paths.local_path,
-            env=git_ssh_command_env,
-            branch=paths.branch,
-        )
-        repo = Repo(paths.local_path)
-    return fetch_repo_metadata(repo)
+    # Ensure the parent directory for the clone exists
+    local_repo_path.parent.mkdir(parents=True, exist_ok=True)
+
+    repo = None
+    repo_metadata = {}
+
+    try:
+        # Acquire lock for this specific repository path
+        with filelock.FileLock(str(lock_path)):
+            logger.info(f"Acquired lock for {local_repo_path}")
+
+            if local_repo_path.is_dir():
+                try:
+                    repo = Repo(local_repo_path)
+                    logger.info(
+                        f"Repo {local_repo_path} already exists. Fetching updates for {repo_url}"
+                    )
+                    with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
+                        origin = repo.remotes.origin
+                        # Check and configure fetch refspec if missing
+                        if not origin.config_reader.has_option('fetch'):
+                            logger.warning(f"Missing fetch refspec for remote 'origin' in {local_repo_path}. Configuring default.")
+                            with origin.config_writer as writer:
+                                writer.set("fetch", "+refs/heads/*:refs/remotes/origin/*")
+
+                        # Fetch all remote branches refs without checking out/merging
+                        logger.info(f"Fetching updates for {local_repo_path}...")
+                        origin.fetch(prune=True)
+                        logger.info(f"Fetch complete for {local_repo_path}.")
+
+                except InvalidGitRepositoryError:
+                    logger.warning(
+                        f"Folder {local_repo_path} exists but is not a valid git repo. Removing it."
+                    )
+                    try:
+                        shutil.rmtree(local_repo_path)
+                    except OSError as e:
+                        logger.error(f"Failed to remove existing directory {local_repo_path}: {e}")
+                        raise
+                    repo = None # Force clone below
+
+            if repo is None:
+                logger.info(f"Cloning {repo_url} (branch: {branch}) into {local_repo_path}...")
+                # Initial clone - try cloning the specific branch directly first for efficiency
+                try:
+                     repo = Repo.clone_from(
+                         url=repo_url,
+                         to_path=local_repo_path,
+                         env=git_ssh_command_env,
+                         branch=branch,
+                         # depth=1 # Optional: Uncomment for shallow clone if full history isn't needed
+                     )
+                     logger.info(f"Successfully cloned branch '{branch}' of {repo_url}")
+                except GitCommandError as e:
+                    # If cloning a specific branch fails (e.g., during first setup or transient error)
+                    # Fallback: Clone default branch first, then checkout desired branch
+                    logger.warning(f"Failed to clone branch '{branch}' directly for {repo_url}. "
+                                   f"Cloning default branch and then checking out '{branch}'. Error: {e}")
+                    # Check if clone dir exists from failed attempt and remove if necessary
+                    if local_repo_path.exists():
+                        logger.warning(f"Removing potentially incomplete directory {local_repo_path} before retrying.")
+                        shutil.rmtree(local_repo_path)
+
+                    repo = Repo.clone_from(
+                        url=repo_url,
+                        to_path=local_repo_path,
+                        env=git_ssh_command_env,
+                        # Don't specify branch here, clones default (usually 'main' or 'master')
+                        # depth=1 # Optional: Uncomment for shallow clone
+                    )
+                    logger.info(f"Successfully cloned default branch of {repo_url}. Will checkout '{branch}' next.")
+                    # We'll checkout the desired branch in the next step
+
+                # Now checkout and pull the desired branch
+                with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
+                    logger.info(f"Checking out branch: {branch} in {local_repo_path}")
+                    try:
+                        repo.git.checkout(branch)
+                        logger.info(f"Successfully checked out branch: {branch}")
+                    except GitCommandError as e:
+                        # Try fetching again and then checkout, branch might be new
+                        logger.warning(f"Initial checkout of branch '{branch}' failed: {e}. Fetching again and retrying checkout.")
+                        try:
+                            repo.remotes.origin.fetch()
+                            repo.git.checkout(branch)
+                            logger.info(f"Successfully checked out branch: {branch} after second attempt.")
+                        except GitCommandError as e_retry:
+                             logger.error(f"Failed to checkout branch '{branch}' even after fetching again in {local_repo_path}: {e_retry}. "
+                                          f"Proceeding with current branch '{repo.active_branch.name}'.")
+                             branch = repo.active_branch.name # Update branch variable to reflect reality
+
+                    # Pull the latest changes for the target branch (either original or fallback)
+                    logger.info(f"Pulling latest changes for branch: {branch} in {local_repo_path}")
+                    try:
+                        repo.remotes.origin.pull(branch)
+                        logger.info(f"Successfully pulled changes for branch: {branch}")
+                    except GitCommandError as e:
+                         logger.error(f"Failed to pull changes for branch '{branch}' in {local_repo_path}: {e}")
+                         # Proceed with current state, metadata will reflect this
+
+                # Fetch metadata *inside* the lock
+                repo_metadata = fetch_repo_metadata(repo)
+                logger.info(f"Releasing lock for {local_repo_path}")
+
+    except FileNotFoundError as e:
+        logger.error(f"SSH Key file error: {e}")
+        raise # Reraise critical error
+    except filelock.Timeout:
+        logger.error(f"Could not acquire lock for {local_repo_path} within timeout period.")
+        # Return empty metadata or raise an error, depending on desired behavior
+        raise TimeoutError(f"Failed to acquire lock for git repo: {local_repo_path}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during git operations for {repo_url} at {local_repo_path}: {e}")
+        raise # Reraise unexpected errors
+
+    return repo_metadata
 
 
 def concatenate_cells(

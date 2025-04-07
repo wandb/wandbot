@@ -45,9 +45,39 @@ class ChromaVectorStore:
         self.vector_store_config = vector_store_config
         self.chat_config = chat_config
         self.override_relevance_score_fn = override_relevance_score_fn
-        self.chroma_vectorstore_client = chromadb.PersistentClient(
-            path=str(self.vector_store_config.vectordb_index_dir),
-            settings=Settings(anonymized_telemetry=False))
+
+        # Initialize ChromaDB client based on mode
+        if self.vector_store_config.vector_store_mode == "local":
+            logger.info(f"Initializing vector store in local mode from: {self.vector_store_config.vectordb_index_dir}")
+            self.chroma_vectorstore_client = chromadb.PersistentClient(
+                path=str(self.vector_store_config.vectordb_index_dir),
+                settings=Settings(anonymized_telemetry=False)
+            )
+        elif self.vector_store_config.vector_store_mode == "hosted":
+            logger.info(f"Initializing vector store in hosted mode: {self.vector_store_config.vector_store_host}:{self.vector_store_config.vector_store_port}")
+            if not self.vector_store_config.vector_store_host or not self.vector_store_config.vector_store_port:
+                raise ValueError("vector_store_host and vector_store_port must be set in VectorStoreConfig for hosted mode")
+            
+            client_settings = Settings(anonymized_telemetry=False)
+            
+            # Configure authentication if token is provided
+            auth_token = self.vector_store_config.vector_store_auth_token
+            if auth_token:
+                logger.info("Configuring ChromaDB client with token authentication.")
+                client_settings.chroma_client_auth_provider = "chromadb.auth.token.TokenAuthClientProvider"
+                client_settings.chroma_client_auth_credentials = auth_token
+            else:
+                logger.warning("No vector_store_auth_token found in config for hosted mode. Connecting without authentication.")
+
+            self.chroma_vectorstore_client = chromadb.HttpClient(
+                host=self.vector_store_config.vector_store_host,
+                port=self.vector_store_config.vector_store_port,
+                settings=client_settings
+            )
+        else:
+            raise ValueError(f"Invalid vector_store_mode: {self.vector_store_config.vector_store_mode}")
+            
+        logger.info(f"Initializing Chroma collection: {self.vector_store_config.vectordb_collection_name}")
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,

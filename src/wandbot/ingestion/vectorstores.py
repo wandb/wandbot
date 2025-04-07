@@ -51,7 +51,9 @@ def load(
     Raises:
         wandb.Error: An error occurred during the loading process.
     """
-    logger.info(f"Starting vector store creation for {entity}/{project} from artifact {source_artifact_path}")
+    logger.info(
+        f"Starting vector store creation for {entity}/{project} from artifact {source_artifact_path}"
+    )
     config: VectorStoreConfig = VectorStoreConfig()
     chat_config: ChatConfig = ChatConfig()
     ingestion_config: IngestionConfig = IngestionConfig()
@@ -59,9 +61,7 @@ def load(
         project=project, entity=entity, job_type="create_vectorstore"
     )
     logger.info(f"Using source artifact: {source_artifact_path}")
-    artifact: wandb.Artifact = run.use_artifact(
-        source_artifact_path, type="dataset"
-    )
+    artifact: wandb.Artifact = run.use_artifact(source_artifact_path, type="dataset")
     logger.info("Downloading source artifact...")
     artifact_dir: str = artifact.download()
     logger.info(f"Source artifact downloaded to: {artifact_dir}")
@@ -107,26 +107,43 @@ def load(
     logger.info(f"Adding documents to Chroma in batches of {config.batch_size}...")
     for batch_idx in trange(0, len(transformed_documents), config.batch_size):
         batch = transformed_documents[batch_idx : batch_idx + config.batch_size]
-        logger.debug(f"Adding batch {batch_idx // config.batch_size + 1} (size: {len(batch)}) to Chroma.")
+        logger.debug(
+            f"Adding batch {batch_idx // config.batch_size + 1} (size: {len(batch)}) to Chroma."
+        )
         chroma_client.add_documents(batch)
     logger.info("Finished adding documents to Chroma.")
 
-    logger.info(f"Creating result artifact: {ingestion_config.vectorstore_index_artifact_name}")
+    logger.info(
+        f"Creating result artifact: {ingestion_config.vectorstore_index_artifact_name}"
+    )
     result_artifact = wandb.Artifact(
         name=ingestion_config.vectorstore_index_artifact_name,
         type=ingestion_config.vectorstore_index_artifact_type,
     )
 
-    logger.info(f"Adding vector store directory '{config.vectordb_index_dir}' to artifact.")
+    logger.info(
+        f"Adding vector store directory '{config.vectordb_index_dir}' to artifact."
+    )
     result_artifact.add_dir(
         local_path=str(config.vectordb_index_dir),
     )
-    
+
     logger.info("Logging result artifact to W&B...")
-    run.log_artifact(result_artifact, aliases=["latest"])
+    # Define aliases including embedding model details
+    aliases = [
+        "latest",
+        f"embed-model-{config.embeddings_model_name}",
+        f"embed-dim-{config.embeddings_dimensions}",
+    ]
+
+    run.log_artifact(result_artifact, aliases=aliases)
     run.finish()
 
     logger.info("Result artifact logged successfully.")
-    final_artifact_path = f"{entity}/{project}/{ingestion_config.vectorstore_index_artifact_name}:latest"
-    logger.info(f"Vector store creation finished. Final artifact: {final_artifact_path}")
+    final_artifact_path = (
+        f"{entity}/{project}/{ingestion_config.vectorstore_index_artifact_name}:latest"
+    )
+    logger.info(
+        f"Vector store creation finished. Final artifact: {final_artifact_path}"
+    )
     return final_artifact_path
