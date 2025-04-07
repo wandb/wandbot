@@ -45,6 +45,8 @@ class DataStoreConfig(BaseModel):
     source_type: str = ""
     data_source: DataSource = DataSource()
     docstore_dir: pathlib.Path = pathlib.Path("docstore")
+    chunk_size: int = 512
+    chunk_multiplier: int = 2
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
@@ -92,6 +94,8 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
     )
     language: str = "en"
     docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_en")
+    chunk_size: int = 768 // 2
+    chunk_multiplier: int = 2
 
 
 class DocodileJapaneseStoreConfig(DataStoreConfig):

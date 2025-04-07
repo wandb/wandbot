@@ -66,22 +66,26 @@ class DocumentTransformer(BaseDocumentTransformer):
     def __init__(
         self,
         lang_detect,
-        max_size: int = 512,
+        chunk_size: int,
+        chunk_multiplier: int,
         min_size: int = 5,
         length_function=None,
     ):
         self.lang_detect = lang_detect
-        self.chunk_size = max_size
+        self.chunk_size = chunk_size
+        self.chunk_multiplier = chunk_multiplier
         self.min_size = min_size
         self.length_function = length_function
         self.markdown_transformer = MarkdownTextTransformer(
             lang_detect=lang_detect,
             chunk_size=self.chunk_size,
+            chunk_multiplier=self.chunk_multiplier,
             length_function=self.length_function,
         )
         self.code_transformer = CodeTextTransformer(
             lang_detect=self.lang_detect,
             chunk_size=self.chunk_size,
+            chunk_multiplier=self.chunk_multiplier,
             length_function=length_function,
         )
 
@@ -171,58 +175,99 @@ def load(
     artifact: wandb.Artifact = run.use_artifact(
         source_artifact_path, type="dataset"
     )
-    artifact_dir: str = artifact.download()
-
-    document_files: List[pathlib.Path] = list(
-        pathlib.Path(artifact_dir).rglob("documents.jsonl")
-    )
+    artifact_dir: pathlib.Path = pathlib.Path(artifact.download())
 
     lang_detect = FastTextLangDetect()
-    transformer = DocumentTransformer(
-        lang_detect=lang_detect,
-        max_size=512,
-        min_size=5,
-        length_function=length_function,
-    )
-
     result_artifact = wandb.Artifact(result_artifact_name, type="dataset")
 
-    for document_file in document_files:
+    # Find all unique parent directories containing documents.jsonl
+    source_directories = set()
+    for doc_file in artifact_dir.rglob("documents.jsonl"):
+        source_directories.add(doc_file.parent)
+
+    if not source_directories:
+        logger.warning(f"No directories with documents.jsonl found in artifact: {source_artifact_path}")
+        run.finish()
+        return f"{entity}/{project}/{result_artifact_name}:latest" # Return but artifact will be empty
+
+    for source_dir in source_directories:
+        logger.info(f"Processing source directory: {source_dir.name}")
+        
+        # 1. Read source-specific config
+        config_path = source_dir / "config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Config file not found for source: {config_path}"
+            )
+        with config_path.open() as f:
+            config = json.load(f)
+            if "chunk_size" not in config:
+                raise ValueError(
+                    f"'chunk_size' not found in config file: {config_path}"
+                )
+            if "chunk_multiplier" not in config:
+                raise ValueError(
+                    f"'chunk_multiplier' not found in config file: {config_path}"
+                )
+            chunk_size = config["chunk_size"]
+            chunk_multiplier = config["chunk_multiplier"]
+
+        # 2. Instantiate transformer with specific config
+        transformer = DocumentTransformer(
+            lang_detect=lang_detect,
+            chunk_size=chunk_size,
+            chunk_multiplier=chunk_multiplier,
+            min_size=5, # Consider making min_size configurable too?
+            length_function=length_function,
+        )
+
+        # 3. Load documents for this source
+        document_file = source_dir / "documents.jsonl"
         with document_file.open() as f:
             documents = [Document(**json.loads(line)) for line in f]
-            transformed_documents = process_document_file(
-                documents, transformer
-            )
-            config = json.load((document_file.parent / "config.json").open())
-            metadata = json.load(
-                (document_file.parent / "metadata.json").open()
-            )
-            cache_dir = (
-                pathlib.Path(config["data_source"]["cache_dir"]).parent
-                / "transformed_data"
-            )
+        
+        # 4. Transform documents
+        # Replacing process_document_file call with direct transformation
+        transformed_documents = transformer.transform_documents(documents)
+        transformed_documents = list(transformed_documents) # Ensure it's a list
 
-            transformed_file = (
-                cache_dir / document_file.parent.name / document_file.name
+        # 5. Prepare output paths and save results
+        metadata_path = source_dir / "metadata.json"
+        if not metadata_path.exists():
+             raise FileNotFoundError(
+                f"Metadata file not found for source: {metadata_path}"
             )
+        with metadata_path.open() as f:
+            metadata = json.load(f)
 
-            transformed_file.parent.mkdir(parents=True, exist_ok=True)
-            with transformed_file.open("w") as of:
-                for document in transformed_documents:
-                    of.write(json.dumps(document.dict()) + "\n")
+        # Determine output directory relative to a base 'transformed_data' cache
+        # Assuming config['data_source']['cache_dir'] points to the *raw* cache base
+        # e.g., data/cache/raw_data
+        raw_cache_base = pathlib.Path(config["data_source"]["cache_dir"]).parent
+        transformed_data_cache_dir = raw_cache_base / "transformed_data"
+        output_dir = transformed_data_cache_dir / source_dir.name
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-            config["chunk_size"] = 512
-            with open(transformed_file.parent / "config.json", "w") as of:
-                json.dump(config, of)
+        transformed_file = output_dir / document_file.name
+        output_config_path = output_dir / config_path.name
+        output_metadata_path = output_dir / metadata_path.name
 
-            metadata["num_transformed_documents"] = len(transformed_documents)
-            with open(transformed_file.parent / "metadata.json", "w") as of:
-                json.dump(metadata, of)
+        # Write transformed documents
+        with transformed_file.open("w") as of:
+            for document in transformed_documents:
+                of.write(json.dumps(document.dict()) + "\n")
 
-            result_artifact.add_dir(
-                str(transformed_file.parent),
-                name=document_file.parent.name,
-            )
+        # Update and write config (already contains correct chunk settings from input)
+        with output_config_path.open("w") as of:
+            json.dump(config, of)
+
+        # Update and write metadata
+        metadata["num_transformed_documents"] = len(transformed_documents)
+        with output_metadata_path.open("w") as of:
+            json.dump(metadata, of)
+
+        # 6. Add processed directory to the result artifact
+        result_artifact.add_dir(str(output_dir), name=source_dir.name)
 
     run.log_artifact(result_artifact)
     run.finish()

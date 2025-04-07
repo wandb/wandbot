@@ -445,7 +445,7 @@ source_lines:\t{definition["span"]}
 
 
 class PythonCodeTextTransformer(BaseDocumentTransformer):
-    def __init__(self, chunk_size=512):
+    def __init__(self, chunk_size: int):
         self.chunk_size = chunk_size
         self.parser = get_parser("python")
         self.language = get_language("python")
@@ -477,17 +477,19 @@ class CodeTextTransformer(BaseDocumentTransformer):
     def __init__(
         self,
         lang_detect,
-        chunk_size: int = 512,
+        chunk_size: int,
+        chunk_multiplier: int,
         length_function: Callable[[str], int] = None,
     ):
         self.lang_detect = lang_detect
         self.chunk_size: int = chunk_size
+        self.chunk_multiplier: int = chunk_multiplier
         self.length_function: Callable[[str], int] = (
             length_function if length_function is not None else len
         )
         self.lang_detect = None
         self.python_code_splitter = PythonCodeTextTransformer(
-            chunk_size=self.chunk_size * 2
+            chunk_size=self.chunk_size * self.chunk_multiplier
         )
 
     def split_documents(self, documents: List[Document]) -> List[Document]:
@@ -514,7 +516,7 @@ class CodeTextTransformer(BaseDocumentTransformer):
                     recursive_splitter = (
                         RecursiveCharacterTextSplitter.from_language(
                             language=language,
-                            chunk_size=self.chunk_size * 2,
+                            chunk_size=self.chunk_size * self.chunk_multiplier,
                             chunk_overlap=0,
                             keep_separator=True,
                             length_function=len,
@@ -526,13 +528,13 @@ class CodeTextTransformer(BaseDocumentTransformer):
             elif file_extension in [".md", ".ipynb"]:
                 chunked_documents.extend(
                     CustomMarkdownTextSplitter(
-                        chunk_size=self.chunk_size * 2
+                        chunk_size=self.chunk_size * self.chunk_multiplier
                     ).split_documents([document])
                 )
             else:
                 chunked_documents.extend(
                     TokenTextSplitter(
-                        chunk_size=self.chunk_size * 2
+                        chunk_size=self.chunk_size * self.chunk_multiplier
                     ).split_documents([document])
                 )
 
@@ -627,17 +629,19 @@ if __name__ == "__main__":
     source_document = Document(**source_document)
     print(source_document.page_content)
 
-    code_transformer = CodeTextTransformer(
-        lang_detect=lang_detect,
-        chunk_size=768 // 2,
-    )
-
-    transformed_documents = code_transformer.transform_documents(
-        [source_document]
-    )
-
-    for document in transformed_documents:
-        print(document.page_content)
-        # print(document.metadata["source_content"])
-        print(json.dumps(document.metadata, indent=2))
-        print("*" * 80)
+    # Example instantiation removed to avoid hardcoded values
+    # code_transformer = CodeTextTransformer(
+    #     lang_detect=lang_detect,
+    #     chunk_size=768 // 2,
+    #     chunk_multiplier=2,
+    # )
+    #
+    # transformed_documents = code_transformer.transform_documents(
+    #     [source_document]
+    # )
+    #
+    # for document in transformed_documents:
+    #     print(document.page_content)
+    #     # print(document.metadata["source_content"])
+    #     print(json.dumps(document.metadata, indent=2))
+    #     print("*" * 80)

@@ -6,9 +6,13 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
 """
+from wandbot.configs.chat_config import ChatConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
 import weave
 from typing import Any, Callable, Dict, List, Optional
 import numpy as np
+import uuid
 
 import chromadb
 from chromadb.config import Settings
@@ -28,8 +32,7 @@ class ChromaVectorStore:
     - Identical MMR implementation
     - Matching query parameters and filtering
     """
-    
-    def __init__(self, embedding_model, vector_store_config, chat_config, override_relevance_score_fn: Optional[Callable] = None):
+    def __init__(self, embedding_model: EmbeddingModel, vector_store_config: VectorStoreConfig, chat_config: ChatConfig, override_relevance_score_fn: Optional[Callable] = None):
         """Initialize the wrapper.
         
         Args:
@@ -49,6 +52,15 @@ class ChromaVectorStore:
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,
         )
+        if self.collection.metadata is None or self.vector_store_config.distance_key not in self.collection.metadata:
+             logger.warning(f"Collection metadata might be missing distance key '{self.vector_store_config.distance_key}'. Attempting to modify.")
+             try:
+                 current_meta = self.collection.metadata or {}
+                 current_meta[self.vector_store_config.distance_key] = self.vector_store_config.distance
+                 self.collection.modify(metadata=current_meta)
+                 logger.info(f"Successfully set collection metadata: {self.collection.metadata}")
+             except Exception as e:
+                 logger.error(f"Failed to set collection metadata: {e}. Relevance scoring might be incorrect.")
     
     @weave.op
     def query(self, 
@@ -198,6 +210,59 @@ of lengths: {[len(r) for r in res['documents']]}")
         results_dict["_embedding_status"] = api_status
         return results_dict
 
+    @weave.op
+    def add_documents(
+        self, 
+        documents: List[Document], 
+        ids: Optional[List[str]] = None, 
+        **kwargs: Any
+    ) -> List[str]:
+        """Run documents through the embeddings and add them to the vectorstore.
+
+        Args:
+            documents (List[Document]): Documents to add to the vectorstore.
+            ids (Optional[List[str]], optional): Optional list of IDs. Defaults to None.
+            kwargs (Any): Additional keyword arguments (currently ignored).
+
+        Returns:
+            List[str]: List of IDs of the added documents.
+            
+        Raises:
+            ValueError: If the number of provided IDs does not match the number of documents.
+            RuntimeError: If the embedding process fails.
+        """
+        texts_to_embed = [doc.page_content for doc in documents]
+        metadatas = [doc.metadata for doc in documents]
+        
+        # Handle IDs: Use provided, then doc.id, then generate UUIDs
+        if ids is None:
+            final_ids = [doc.id if doc.id else str(uuid.uuid4()) for doc in documents]
+        else:
+            if len(ids) != len(documents):
+                raise ValueError("Number of IDs provided does not match number of documents")
+            final_ids = ids
+
+        # Embed the documents using the stored embedding model instance
+        logger.info(f"Generating embeddings for {len(texts_to_embed)} documents...")
+        embeddings, api_status = self.embedding_model.embed(texts_to_embed)
+        
+        if not api_status.success:
+            logger.error(f"Embedding failed: {api_status.error_info.error_message}")
+            # Depending on desired behavior, either raise or return partial/empty results
+            raise RuntimeError(f"Embedding failed: {api_status.error_info.error_message}")
+            # return [] # Option: return empty list on failure
+
+        logger.info(f"Adding {len(final_ids)} documents to Chroma collection '{self.collection.name}'...")
+        # Use the native chromadb client's add method
+        self.collection.add(
+            embeddings=embeddings,
+            metadatas=metadatas,
+            documents=texts_to_embed, # Native client expects text content here
+            ids=final_ids
+        )
+        logger.info("Documents added successfully.")
+        return final_ids
+
     def _process_retrieved_results(
         self,
         documents: List[str],
@@ -211,9 +276,10 @@ of lengths: {[len(r) for r in res['documents']]}")
         for doc, meta, dist in zip(documents, metadatas, distances):
             meta = meta or {}
             score = relevance_score_fn(dist)
-            meta["relevance_score"] = score
+            meta["relevance_score"] = meta.get("relevance_score", score) 
             content = meta.get("source_content", doc)
-            processed_docs.append(Document(page_content=content, metadata=meta, id=meta.get("id")))
+            doc_id = meta.get("id", None) 
+            processed_docs.append(Document(page_content=content, metadata=meta, id=doc_id))
         return processed_docs
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
@@ -232,14 +298,28 @@ of lengths: {[len(r) for r in res['documents']]}")
 
         if metadata and self.vector_store_config.distance_key in metadata:
             distance = metadata[self.vector_store_config.distance_key]
+        else:
+             logger.warning(f"Distance key '{self.vector_store_config.distance_key}' not found in collection metadata. Defaulting to '{distance}'.")
 
         if distance == "cosine":
-            return lambda x: 1.0 - x  # Convert cosine distance to similarity
+            space = metadata.get("hnsw:space", "l2").lower() # Default to l2 if not present
+            logger.debug(f"Selecting relevance score function based on distance '{distance}' and space '{space}'")
+            if space == "cosine": # Cosine Similarity
+                 return lambda x: x
+            elif space == "ip": # Inner Product
+                 return lambda x: x
+            else: # Defaulting to L2 or if space is explicitly L2 but distance is 'cosine' (confusing)
+                 # This matches Langchain's formula for cosine distance -> similarity
+                 return lambda x: 1.0 - x  
         elif distance == "l2":
-            return lambda x: 1.0 / (1.0 + x)  # Convert L2 distance to similarity
+            # Matches Langchain's L2 normalization
+            return lambda x: 1.0 / (1.0 + x**2) # Squaring L2 distance is common
         elif distance == "ip":
-            return lambda x: x  # Inner product is already a similarity
+             # Inner product is already a similarity measure
+            return lambda x: x
         else:
+            logger.error(f"Unsupported distance metric '{distance}'. Defaulting to no normalization.")
+            # Fallback or raise error - returning raw distance if unsure
             raise ValueError(
                 "No supported normalization function"
                 f" for distance metric of type: {distance}."
@@ -248,6 +328,8 @@ of lengths: {[len(r) for r in res['documents']]}")
 
     def _convert_to_numpy(self, embeddings):
         """Convert embeddings to numpy arrays if they aren't already"""
-        if isinstance(embeddings, np.ndarray):
-            return embeddings
-        return np.array(embeddings)
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings, dtype=np.float32)
+        elif embeddings.dtype != np.float32:
+            embeddings = embeddings.astype(np.float32)
+        return embeddings

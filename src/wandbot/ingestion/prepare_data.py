@@ -21,6 +21,7 @@ from multiprocessing import Pool, cpu_count
 from typing import Any, Dict, Iterator, List
 from urllib.parse import urljoin, urlparse
 import logging
+import datetime
 
 import nbformat
 import pandas as pd
@@ -912,6 +913,12 @@ def load(
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
     logging.info(f"Initialized Wandb run: {run.url}")
 
+    # Create unique suffix for local cache directories
+    run_id = run.id
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    unique_suffix = f"_{run_id}_{timestamp}"
+    logging.info(f"Using unique suffix for local cache: {unique_suffix}")
+
     artifact = wandb.Artifact(
         result_artifact_name,
         type="dataset",
@@ -940,32 +947,47 @@ def load(
     logging.info(f"Starting multiprocessing pool with {num_processes} processes.")
     pool = Pool(num_processes)
 
-    results = pool.imap_unordered(load_from_config, configs)
-    completed_count = 0
-    total_configs = len(configs)
-
-    for docstore_path in results:
-        if docstore_path: # Check if the result is valid (not None due to an error)
-            logging.info(f"Adding directory {docstore_path} to artifact {result_artifact_name}")
-            artifact.add_dir(
-                str(docstore_path),
-                name=docstore_path.name,
-            )
-            completed_count += 1
-            logging.info(f"Progress: {completed_count}/{total_configs} configurations processed.")
+    # Collect results first - these paths are the *non-unique* paths used by workers
+    worker_results = []
+    for result in pool.imap_unordered(load_from_config, configs):
+        if result:
+            worker_results.append(result)
         else:
-            # Logging for errors is handled within load_from_config
-            pass
-
-
+             # Log error, maybe raise later if needed?
+             logging.error("A worker process failed to load data.")
+             
     pool.close()
     pool.join()
     logging.info("Multiprocessing pool finished.")
 
+    # Now rename local directories and add to artifact
+    completed_count = 0
+    total_configs = len(configs)
+    added_to_artifact = []
+
+    for docstore_path in worker_results:
+        try:
+            unique_local_path = docstore_path.parent / f"{docstore_path.name}{unique_suffix}"
+            logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
+            docstore_path.rename(unique_local_path)
+
+            logging.info(f"Adding directory {unique_local_path} to artifact {result_artifact_name} as {docstore_path.name}")
+            artifact.add_dir(
+                str(unique_local_path),
+                name=docstore_path.name,  # Use original name in artifact
+            )
+            added_to_artifact.append(docstore_path.name)
+            completed_count += 1
+            logging.info(f"Progress: {completed_count}/{total_configs} configurations processed and added.")
+        except Exception as e:
+            logging.error(f"Failed to rename or add directory {docstore_path} to artifact: {e}", exc_info=True)
+
+    logging.info(f"Successfully added directories to artifact: {added_to_artifact}")
+
     if completed_count < total_configs:
-         logging.warning(f"Only {completed_count} out of {total_configs} configurations completed successfully.")
+         logging.warning(f"Only {completed_count} out of {total_configs} configurations completed successfully and added to artifact.")
     else:
-        logging.info(f"All {total_configs} configurations processed successfully.")
+        logging.info(f"All {total_configs} configurations processed successfully and added to artifact.")
 
 
     logging.info(f"Logging artifact {result_artifact_name} to Wandb.")
