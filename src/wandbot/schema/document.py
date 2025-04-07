@@ -1,11 +1,10 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 class Document(BaseModel):
     """Class for storing a piece of text and associated metadata."""
     page_content: str = Field(description="String text content of the document")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Associated metadata")
-    type: Literal["Document"] = Field(default="Document", description="Type identifier")
     
     def __init__(self, page_content: str, metadata: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
         """Initialize with page_content as positional or named arg."""
