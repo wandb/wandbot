@@ -918,6 +918,7 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
 
         metadata_path = docstore_dir / "metadata.json"
         logging.info(f"Writing metadata to {metadata_path}")
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
         with metadata_path.open("w") as f:
             json.dump(loader.metadata, f)
 
@@ -953,6 +954,11 @@ def load(
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
     logging.info(f"Initialized Wandb run: {run.url}")
 
+    # Generate a timestamp string for this run
+    timestamp_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    timestamped_cache_root = ingestion_config.cache_dir / timestamp_str
+    logging.info(f"Using timestamped cache root: {timestamped_cache_root}")
+
     # Define all configurations
     all_configs: List[DataStoreConfig] = [
         DocodileEnglishStoreConfig(),
@@ -976,6 +982,13 @@ def load(
     ]
     configs_to_process = all_configs
 
+    # Update docstore_dir for each config to include the timestamp
+    for config in configs_to_process:
+        original_docstore_name = config.docstore_dir.name
+        original_parent_name = config.docstore_dir.parent.name # Should be 'raw_data'
+        config.docstore_dir = timestamped_cache_root / original_parent_name / original_docstore_name
+        logging.debug(f"Updated docstore_dir for {config.name} to {config.docstore_dir}")
+
     # Use multiprocessing to load data in parallel
     num_processes = max(1, cpu_count() // 2)
     pool = Pool(num_processes)
@@ -998,20 +1011,30 @@ def load(
 
     for docstore_path in results:
         try:
-            unique_local_path = docstore_path.parent / f"{docstore_path.name}_{run.id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}"
-            logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
-            docstore_path.rename(unique_local_path)
+            # The docstore_path is already in the correct timestamped location.
+            # No need to rename locally.
+            # We need the original config name for the artifact structure.
+            # Assuming the structure is timestamped_cache_root / 'raw_data' / config_name
+            artifact_entry_name = docstore_path.name # e.g., English_Documentation
+            artifact_base_dir = docstore_path.parent.name # e.g., raw_data
+            artifact_full_name = f"{artifact_base_dir}/{artifact_entry_name}"
 
-            logging.info(f"Adding directory {unique_local_path} to artifact {result_artifact_name} as {docstore_path.name}")
+            # The path already includes the timestamp. Rename for artifact clarity (remove run_id if needed).
+            # Keep the original logic for adding to artifact for now.
+            # unique_local_path = docstore_path.parent / f"{docstore_path.name}_{run.id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}"
+            # logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
+            # docstore_path.rename(unique_local_path)
+
+            logging.info(f"Adding directory {docstore_path} to artifact {result_artifact_name} as {artifact_full_name}")
             artifact.add_dir(
-                str(unique_local_path),
-                name=docstore_path.name,  # Use original name in artifact
+                str(docstore_path), # Use the final timestamped path
+                name=artifact_full_name,  # Use structure like 'raw_data/English_Documentation'
             )
-            added_to_artifact.append(docstore_path.name)
+            added_to_artifact.append(artifact_full_name)
             completed_count += 1
             logging.info(f"Progress: {completed_count}/{total_configs} configurations processed and added.")
         except Exception as e:
-            logging.error(f"Failed to rename or add directory {docstore_path} to artifact: {e}", exc_info=True)
+            logging.error(f"Failed to add directory {docstore_path} to artifact: {e}", exc_info=True)
 
     logging.info(f"Successfully added directories to artifact: {added_to_artifact}")
 
