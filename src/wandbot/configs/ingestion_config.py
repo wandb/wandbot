@@ -89,9 +89,9 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/",
-        repo_path="https://github.com/wandb/docodile",
-        base_path="docs",
-        file_patterns=["*.md"],
+        repo_path="https://github.com/wandb/docs",
+        base_path="content",
+        file_patterns=["*.md", "*.mdx"],
         is_git_repo=True,
     )
     language: str = "en"
@@ -104,10 +104,10 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
     name: str = "Japanese Documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
-        remote_path="https://docs.wandb.ai/ja/",
-        repo_path="https://github.com/wandb/docodile",
+        remote_path="https://github.com/wandb/docs/",
+        repo_path="https://github.com/wandb/docs/",
         base_path="docs",
-        file_patterns=["*.md"],
+        file_patterns=["*.md", "*.mdx"],
         is_git_repo=True,
         branch="japanese_docs",
     )
@@ -119,8 +119,8 @@ class DocodileKoreanStoreConfig(DataStoreConfig):
     name: str = "Korean Documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
-        remote_path="https://docs.wandb.ai/ko/",
-        repo_path="https://github.com/wandb/docodile",
+        remote_path="https://github.com/wandb/docs/",
+        repo_path="https://github.com/wandb/docs/",
         base_path="docs",
         file_patterns=["*.md"],
         is_git_repo=True,
@@ -217,11 +217,26 @@ class WeaveDocStoreConfig(DataStoreConfig):
         base_path="docs/docs",
         file_patterns=[
             "*.md",
+            "*.mdx"
         ],
         is_git_repo=True,
     )
     language: str = "en"
     docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
+
+
+class WeaveCookbookStoreConfig(DataStoreConfig):
+    name: str = "Weave Cookbooks"
+    source_type: str = "notebook"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave/tree/master/",
+        repo_path="https://github.com/wandb/weave",
+        base_path="docs/notebooks",
+        file_patterns=["*.ipynb"],
+        is_git_repo=True,
+    )
+    language: str = "en"
+    docstore_dir: pathlib.Path = pathlib.Path("weave_cookbooks")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):

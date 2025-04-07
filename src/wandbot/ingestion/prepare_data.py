@@ -44,8 +44,10 @@ from wandbot.configs.ingestion_config import (
     SDKTestsStoreConfig,
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
+    WeaveCookbookStoreConfig,
     WeaveDocStoreConfig,
     WeaveExamplesStoreConfig,
+    IngestionConfig,
 )
 from wandbot.ingestion.utils import (
     clean_contents,
@@ -57,6 +59,8 @@ from wandbot.schema.document import Document
 
 logger = get_logger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+ingestion_config = IngestionConfig()
 
 
 class DataLoader(BaseLoader):
@@ -207,16 +211,16 @@ class DocodileDataLoader(DataLoader):
         try:
             if relative_path.parts[0] == "guides":
                 chapter = "guides"
-                slug = self.extract_slug((base_path / "guides") / "intro.md")
+                slug = self.extract_slug((base_path / "guides") / "_index.md")
                 file_loc = file_path.relative_to((base_path / "guides")).parent
             elif relative_path.parts[0] == "ref":
                 chapter = "ref"
-                slug = self.extract_slug((base_path / "ref") / "README.md")
+                slug = self.extract_slug((base_path / "ref") / "_index.md")
                 file_loc = file_path.relative_to((base_path / "ref")).parent
             elif relative_path.parts[0] == "tutorials":
                 chapter = "tutorials"
                 slug = self.extract_slug(
-                    (base_path / "tutorials") / "intro_to_tutorials.md"
+                    (base_path / "tutorials") / "_index.md"
                 )
                 file_loc = file_path.relative_to((base_path / "tutorials")).parent
             else:
@@ -224,15 +228,15 @@ class DocodileDataLoader(DataLoader):
                 chapter = relative_path.parts[0] if relative_path.parts else ""
                 file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
 
-            if file_path.name in ("intro.md", "README.md", "intro_to_tutorials.md"):
+            if file_path.name in ("_index.md",):
                 file_name = ""
 
         except Exception as e:
-            logger.warning(f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL.")
+            logger.debug(f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL.")
             # Fallback logic: use relative path directly if slug extraction fails
             chapter = relative_path.parts[0] if relative_path.parts else ""
             file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
-            file_name = file_path.stem if file_path.name not in ("intro.md", "README.md", "intro_to_tutorials.md") else ""
+            file_name = file_path.stem if file_path.name not in ("_index.md",) else ""
 
 
         site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
@@ -258,6 +262,7 @@ class DocodileDataLoader(DataLoader):
             A Document object.
         """
         local_paths = self._get_local_paths()
+        logger.info(f"Found {len(local_paths)} potential document files for {self.config.name}")
         document_files = {
             local_path: self.generate_site_url(
                 self.config.data_source.local_path
@@ -268,6 +273,7 @@ class DocodileDataLoader(DataLoader):
         }
 
         for f_name in document_files:
+            logger.debug(f"Processing document file: {f_name}")
             try:
                 # Load the document content first
                 document = TextLoader(str(f_name)).load()[0]
@@ -282,6 +288,7 @@ class DocodileDataLoader(DataLoader):
                 document.metadata["source"] = source_url
                 document.metadata["language"] = self.config.language
                 document.metadata["source_type"] = self.config.source_type
+                logger.debug(f"Generated source URL: {source_url} for file: {f_name}")
 
                 # Attempt to extract description (handles frontmatter errors)
                 try:
@@ -304,8 +311,9 @@ class DocodileDataLoader(DataLoader):
             except Exception as e_load:
                 # Catch broader errors during file loading or initial processing
                 logger.warning(
-                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}"
+                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}", exc_info=True
                 )
+        logger.info(f"Processed {len(document_files)} document files for {self.config.name}")
 
 
 class WeaveDocsDataLoader(DocodileDataLoader):
@@ -922,34 +930,60 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
 
 
 def load(
-    project: str,
-    entity: str,
-    result_artifact_name: str = "raw_dataset",
+    project: str | None = ingestion_config.wandb_project,
+    entity: str | None = ingestion_config.wandb_entity,
+    result_artifact_name: str = "raw_data",
 ) -> str:
-    """Load and prepare data for the Wandbot ingestion system.
+    """Loads and prepares data for the Wandbot ingestion system.
 
-    This function initializes a Wandb run, creates an artifact for the prepared dataset,
-    and loads and prepares data from different loaders. The prepared data is then saved
-    in the docstore directory and added to the artifact.
+    This function orchestrates the data loading process for various data sources
+    defined in the configuration. It initializes a Weights & Biases run,
+    loads data using the appropriate data loaders, saves the loaded documents
+    to JSONL files, and logs the resulting data as a W&B artifact.
 
     Args:
-        project: The name of the Wandb project.
-        entity: The name of the Wandb entity.
-        result_artifact_name: The name of the result artifact. Default is "raw_dataset".
+        project: The Weights & Biases project name.
+        entity: The Weights & Biases entity (user or team) name.
+        result_artifact_name: The name for the resulting W&B artifact.
 
     Returns:
-        The latest version of the prepared dataset artifact in the format
-        "{entity}/{project}/{result_artifact_name}:latest".
+        The path to the logged artifact.
     """
     logging.info(f"Starting Wandbot data ingestion for {entity}/{project}")
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
     logging.info(f"Initialized Wandb run: {run.url}")
 
-    # Create unique suffix for local cache directories
-    run_id = run.id
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    unique_suffix = f"_{run_id}_{timestamp}"
-    logging.info(f"Using unique suffix for local cache: {unique_suffix}")
+    # Define all configurations
+    all_configs: List[DataStoreConfig] = [
+        DocodileEnglishStoreConfig(),
+        DocodileJapaneseStoreConfig(),
+        DocodileKoreanStoreConfig(),
+        WeaveDocStoreConfig(),
+        WeaveCookbookStoreConfig(),
+        SDKCodeStoreConfig(),
+        SDKTestsStoreConfig(),
+        ExampleCodeStoreConfig(),
+        ExampleNotebookStoreConfig(),
+        WandbEduCodeStoreConfig(),
+        WeaveExamplesStoreConfig(),
+        WeaveCodeStoreConfig(),
+        FCReportsStoreConfig(),
+    ]
+
+    # Filter for the specific config we want to debug
+    configs_to_process = [
+        config for config in all_configs if isinstance(config, DocodileEnglishStoreConfig)
+    ]
+    configs_to_process = all_configs
+
+    # Use multiprocessing to load data in parallel
+    num_processes = max(1, cpu_count() // 2)
+    pool = Pool(num_processes)
+
+    results = pool.map(load_from_config, configs_to_process)
+
+    pool.close()
+    pool.join()
 
     artifact = wandb.Artifact(
         result_artifact_name,
@@ -958,48 +992,13 @@ def load(
     )
     logging.info(f"Created Wandb Artifact: {result_artifact_name}")
 
-    configs = [
-        DocodileEnglishStoreConfig(),
-        DocodileJapaneseStoreConfig(),
-        DocodileKoreanStoreConfig(),
-        ExampleCodeStoreConfig(),
-        ExampleNotebookStoreConfig(),
-        SDKCodeStoreConfig(),
-        SDKTestsStoreConfig(),
-        WeaveDocStoreConfig(),
-        WeaveCodeStoreConfig(),
-        WeaveExamplesStoreConfig(),
-        WandbEduCodeStoreConfig(),
-        FCReportsStoreConfig(),
-    ]
-    config_names = [cfg.name for cfg in configs]
-    logging.info(f"Processing {len(configs)} data configurations: {config_names}")
-
-    num_processes = cpu_count() - 1
-    logging.info(f"Starting multiprocessing pool with {num_processes} processes.")
-    pool = Pool(num_processes)
-
-    # Collect results first - these paths are the *non-unique* paths used by workers
-    worker_results = []
-    for result in pool.imap_unordered(load_from_config, configs):
-        if result:
-            worker_results.append(result)
-        else:
-             # Log error, maybe raise later if needed?
-             logging.error("A worker process failed to load data.")
-             
-    pool.close()
-    pool.join()
-    logging.info("Multiprocessing pool finished.")
-
-    # Now rename local directories and add to artifact
     completed_count = 0
-    total_configs = len(configs)
+    total_configs = len(configs_to_process)
     added_to_artifact = []
 
-    for docstore_path in worker_results:
+    for docstore_path in results:
         try:
-            unique_local_path = docstore_path.parent / f"{docstore_path.name}{unique_suffix}"
+            unique_local_path = docstore_path.parent / f"{docstore_path.name}_{run.id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}"
             logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
             docstore_path.rename(unique_local_path)
 
@@ -1020,7 +1019,6 @@ def load(
          logging.warning(f"Only {completed_count} out of {total_configs} configurations completed successfully and added to artifact.")
     else:
         logging.info(f"All {total_configs} configurations processed successfully and added to artifact.")
-
 
     logging.info(f"Logging artifact {result_artifact_name} to Wandb.")
     run.log_artifact(artifact)
