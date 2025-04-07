@@ -965,14 +965,12 @@ def load(
         DocodileJapaneseStoreConfig(),
         DocodileKoreanStoreConfig(),
         WeaveDocStoreConfig(),
-        WeaveCookbookStoreConfig(),
+        WeaveCodeStoreConfig(),
         SDKCodeStoreConfig(),
         SDKTestsStoreConfig(),
         ExampleCodeStoreConfig(),
         ExampleNotebookStoreConfig(),
         WandbEduCodeStoreConfig(),
-        WeaveExamplesStoreConfig(),
-        WeaveCodeStoreConfig(),
         FCReportsStoreConfig(),
     ]
 
