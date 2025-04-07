@@ -54,25 +54,36 @@ class ChromaVectorStore:
                 settings=Settings(anonymized_telemetry=False)
             )
         elif self.vector_store_config.vector_store_mode == "hosted":
-            logger.info(f"Initializing vector store in hosted mode: {self.vector_store_config.vector_store_host}:{self.vector_store_config.vector_store_port}")
-            if not self.vector_store_config.vector_store_host or not self.vector_store_config.vector_store_port:
-                raise ValueError("vector_store_host and vector_store_port must be set in VectorStoreConfig for hosted mode")
-            
-            client_settings = Settings(anonymized_telemetry=False)
-            
-            # Configure authentication if token is provided
+            host = self.vector_store_config.vector_store_host
+            tenant = self.vector_store_config.vector_store_tenant
+            database = self.vector_store_config.vector_store_database
             auth_token = self.vector_store_config.vector_store_auth_token
-            if auth_token:
-                logger.info("Configuring ChromaDB client with token authentication.")
-                client_settings.chroma_client_auth_provider = "chromadb.auth.token.TokenAuthClientProvider"
-                client_settings.chroma_client_auth_credentials = auth_token
-            else:
-                logger.warning("No vector_store_auth_token found in config for hosted mode. Connecting without authentication.")
 
+            logger.info(f"Initializing vector store in hosted mode: host={host}, tenant={tenant}, database={database}")
+
+            if not host:
+                 raise ValueError("vector_store_host must be set in VectorStoreConfig for hosted mode")
+            if not tenant:
+                 raise ValueError("vector_store_tenant must be set in VectorStoreConfig for hosted mode")
+            if not database:
+                 raise ValueError("vector_store_database must be set in VectorStoreConfig for hosted mode")
+
+            headers = {}
+            if auth_token:
+                logger.info("Adding x-chroma-token header for authentication.")
+                headers['x-chroma-token'] = auth_token
+            else:
+                # Depending on the hosted provider, lack of token might be an error
+                logger.warning("No vector_store_auth_token found in config for hosted mode. Connecting without authentication header.")
+
+            # Note: Removed Settings object approach, using direct parameters now
             self.chroma_vectorstore_client = chromadb.HttpClient(
-                host=self.vector_store_config.vector_store_host,
-                port=self.vector_store_config.vector_store_port,
-                settings=client_settings
+                host=host,
+                ssl=True,
+                tenant=tenant,
+                database=database,
+                headers=headers,
+                settings=Settings(anonymized_telemetry=False) # Keep basic settings if needed
             )
         else:
             raise ValueError(f"Invalid vector_store_mode: {self.vector_store_config.vector_store_mode}")

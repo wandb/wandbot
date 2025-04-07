@@ -107,21 +107,21 @@ class DataLoader(BaseLoader):
         return documents
 
     def _get_local_paths(self):
-        if self.config.data_source.is_git_repo:
-            self.metadata = fetch_git_repo(
-                self.config.data_source, self.config.data_source.git_id_file
-            )
-
         local_paths = []
+        search_base = (
+            self.config.data_source.local_path
+            / self.config.data_source.base_path
+        )
+        logger.info(f"Constructed search base path: {search_base.resolve()}")
+        if not search_base.is_dir():
+            logger.warning(f"Search base directory does not exist or is not a directory: {search_base}")
+            return []
+        logger.info(f"Searching for file patterns {self.config.data_source.file_patterns} in {search_base}")
         for file_pattern in self.config.data_source.file_patterns:
-            local_paths.extend(
-                list(
-                    (
-                        self.config.data_source.local_path
-                        / self.config.data_source.base_path
-                    ).rglob(file_pattern)
-                )
-            )
+            # Add logging for count per pattern
+            found_files = list(search_base.rglob(file_pattern))
+            logger.info(f"Found {len(found_files)} files matching pattern '{file_pattern}' recursively in {search_base}")
+            local_paths.extend(found_files)
         return local_paths
 
 
@@ -261,6 +261,11 @@ class DocodileDataLoader(DataLoader):
         Yields:
             A Document object.
         """
+        if self.config.data_source.is_git_repo:
+            self.metadata = fetch_git_repo(
+                self.config.data_source, self.config.data_source.git_id_file
+            )
+
         local_paths = self._get_local_paths()
         logger.info(
             f"Found {len(local_paths)} potential document files for {self.config.name}"
@@ -353,6 +358,11 @@ class CodeDataLoader(DataLoader):
         Yields:
             A Document object.
         """
+        if self.config.data_source.is_git_repo:
+            self.metadata = fetch_git_repo(
+                self.config.data_source, self.config.data_source.git_id_file
+            )
+
         local_paths = self._get_local_paths()
 
         paths = list(local_paths)
@@ -979,11 +989,11 @@ def load(
     ]
 
     # Filter for the specific config we want to debug
-    configs_to_process = [
-        config
-        for config in all_configs
-        if isinstance(config, DocodileEnglishStoreConfig)
-    ]
+    # configs_to_process = [
+    #     config
+    #     for config in all_configs
+    #     if isinstance(config, DocodileEnglishStoreConfig)
+    # ]
     configs_to_process = all_configs
 
     # Update docstore_dir for each config to include the timestamp directory

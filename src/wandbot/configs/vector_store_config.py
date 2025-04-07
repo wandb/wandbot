@@ -23,9 +23,11 @@ class VectorStoreConfig(BaseSettings):
     
     # ChromaDB Client Mode
     vector_store_mode: Literal["local", "hosted"] = "local"
-    vector_store_host: Optional[str] = None  
-    vector_store_port: Optional[int] = None  
-    vector_store_auth_token: Optional[str] = None # pulled from .env
+    # Settings for hosted mode (using direct HttpClient parameters)
+    vector_store_host: Optional[str] = "api.trychroma.com"  # e.g., 'api.trychroma.com'
+    vector_store_tenant: Optional[str] = '3c66fbfc-98ce-41ff-92ec-ef16e71c8c0a' # Tenant ID for hosted Chroma
+    vector_store_database: Optional[str] = 'wandbot-dev' # Database name for hosted Chroma
+    vector_store_auth_token: Optional[str] = None # Pulled as env variable from .env file
     
     # Embeddings settings
     embeddings_provider:str = "openai"

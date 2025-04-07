@@ -193,8 +193,9 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
                     except OSError as e:
                         logger.error(f"Failed to remove existing directory {local_repo_path}: {e}")
                         raise
-                    repo = None # Force clone below
+                    repo = None # Set repo to None to trigger clone below
 
+            # If repo is still None (either didn't exist or was invalid), clone it
             if repo is None:
                 logger.info(f"Cloning {repo_url} (branch: {branch}) into {local_repo_path}...")
                 # Initial clone - try cloning the specific branch directly first for efficiency
@@ -207,6 +208,9 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
                          # depth=1 # Optional: Uncomment for shallow clone if full history isn't needed
                      )
                      logger.info(f"Successfully cloned branch '{branch}' of {repo_url}")
+                     # If clone is successful with the specific branch, we might not need subsequent checkout/pull
+                     # unless we want to ensure it's absolutely the latest.
+                     # For simplicity and consistency, we'll proceed to checkout/pull anyway.
                 except GitCommandError as e:
                     # If cloning a specific branch fails (e.g., during first setup or transient error)
                     # Fallback: Clone default branch first, then checkout desired branch
@@ -225,38 +229,62 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
                         # depth=1 # Optional: Uncomment for shallow clone
                     )
                     logger.info(f"Successfully cloned default branch of {repo_url}. Will checkout '{branch}' next.")
-                    # We'll checkout the desired branch in the next step
+                    # We'll definitely need to checkout the desired branch in the next step
 
-                # Now checkout and pull the desired branch
-                with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
-                    logger.info(f"Checking out branch: {branch} in {local_repo_path}")
+            # --- Moved Checkout and Pull Logic Here ---
+            # Ensure repo object is valid before proceeding
+            if repo is None:
+                 raise Exception(f"Git repo object is unexpectedly None for {local_repo_path} after clone/fetch attempts.")
+
+            # Now checkout and pull the desired branch (applies after clone or fetch)
+            with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
+                active_branch_name = repo.active_branch.name
+                logger.info(f"Current active branch in {local_repo_path}: {active_branch_name}")
+                
+                # Only checkout if the active branch is different from the target branch
+                if active_branch_name != branch:
+                    logger.info(f"Checking out target branch: {branch} in {local_repo_path}")
                     try:
-                        repo.git.checkout(branch)
-                        logger.info(f"Successfully checked out branch: {branch}")
+                        # Add detail on checkout command
+                        checkout_output = repo.git.checkout(branch)
+                        logger.info(f"Successfully checked out branch: {branch}. Output: {checkout_output}")
                     except GitCommandError as e:
                         # Try fetching again and then checkout, branch might be new
                         logger.warning(f"Initial checkout of branch '{branch}' failed: {e}. Fetching again and retrying checkout.")
                         try:
-                            repo.remotes.origin.fetch()
-                            repo.git.checkout(branch)
-                            logger.info(f"Successfully checked out branch: {branch} after second attempt.")
+                            fetch_again_output = repo.remotes.origin.fetch()
+                            logger.info(f"Second fetch output: {fetch_again_output}")
+                            checkout_retry_output = repo.git.checkout(branch)
+                            logger.info(f"Successfully checked out branch: {branch} after second attempt. Output: {checkout_retry_output}")
                         except GitCommandError as e_retry:
-                             logger.error(f"Failed to checkout branch '{branch}' even after fetching again in {local_repo_path}: {e_retry}. "
-                                          f"Proceeding with current branch '{repo.active_branch.name}'.")
-                             branch = repo.active_branch.name # Update branch variable to reflect reality
+                            logger.error(f"Failed to checkout branch '{branch}' even after fetching again in {local_repo_path}: {e_retry}. "
+                                         f"Proceeding with current branch '{repo.active_branch.name}'.")
+                            # Update branch variable to reflect reality if checkout failed definitively
+                            branch = repo.active_branch.name 
+                else:
+                    logger.info(f"Repo {local_repo_path} already on target branch {branch}. Skipping checkout.")
 
-                    # Pull the latest changes for the target branch (either original or fallback)
-                    logger.info(f"Pulling latest changes for branch: {branch} in {local_repo_path}")
-                    try:
-                        repo.remotes.origin.pull(branch)
-                        logger.info(f"Successfully pulled changes for branch: {branch}")
-                    except GitCommandError as e:
-                         logger.error(f"Failed to pull changes for branch '{branch}' in {local_repo_path}: {e}")
-                         # Proceed with current state, metadata will reflect this
+                # Pull the latest changes for the target branch (now the active branch)
+                # Use the potentially updated 'branch' variable in case checkout failed and we reverted
+                current_branch_to_pull = repo.active_branch.name
+                logger.info(f"Pulling latest changes for branch: {current_branch_to_pull} in {local_repo_path}")
+                try:
+                    # Add detail on pull command
+                    pull_output = repo.remotes.origin.pull(current_branch_to_pull)
+                    logger.info(f"Successfully pulled changes for branch: {current_branch_to_pull}. Output: {pull_output}")
+                except GitCommandError as e:
+                        logger.error(f"Failed to pull changes for branch '{current_branch_to_pull}' in {local_repo_path}: {e}")
+                        # Proceed with current state, metadata will reflect this
 
-                # Fetch metadata *inside* the lock
-                repo_metadata = fetch_repo_metadata(repo)
-                logger.info(f"Releasing lock for {local_repo_path}")
+            # Fetch metadata *inside* the lock
+            repo_metadata = fetch_repo_metadata(repo)
+            # Log directory contents before releasing lock
+            try:
+                dir_contents = os.listdir(local_repo_path)
+                logger.info(f"Contents of {local_repo_path} before releasing lock: {dir_contents}")
+            except Exception as e_ls:
+                logger.error(f"Failed to list directory contents for {local_repo_path}: {e_ls}")
+            logger.info(f"Releasing lock for {local_repo_path}")
 
     except FileNotFoundError as e:
         logger.error(f"SSH Key file error: {e}")
