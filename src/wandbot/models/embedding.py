@@ -67,8 +67,34 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                         decoded_embeddings = base64.b64decode(embedding)
                         return np.frombuffer(decoded_embeddings, dtype=np.float32).tolist()
                     return embedding
-            embeddings = await asyncio.gather(*[get_single_openai_embedding(text) for text in inputs])
-            return embeddings, api_status
+            
+            # Use return_exceptions=True to handle partial failures
+            results = await asyncio.gather(*[get_single_openai_embedding(text) for text in inputs], return_exceptions=True)
+            
+            # Check if any results are exceptions
+            exceptions = [r for r in results if isinstance(r, Exception)]
+            if exceptions:
+                # Get error messages and stack traces from the actual exception objects
+                error_details = []
+                for e in exceptions:
+                    tb = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    error_details.append(f"{str(e)}\n{tb}")
+                
+                error_info = ErrorInfo(
+                    component=self.COMPONENT_NAME,
+                    has_error=True,
+                    error_message=f"Failed to embed some inputs: {'; '.join(str(e) for e in exceptions)}",
+                    error_type="PartialEmbeddingFailure",
+                    stacktrace='\n'.join(error_details),
+                    file_path=get_error_file_path(sys.exc_info()[2])
+                )
+                return None, APIStatus(
+                    component=self.COMPONENT_NAME,
+                    success=False,
+                    error_info=error_info
+                )
+            
+            return results, api_status
         except Exception as e:
             error_info = ErrorInfo(
                 component=self.COMPONENT_NAME,
@@ -86,23 +112,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
 
     def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
         inputs = [input] if isinstance(input, str) else input
-        try:
-            return asyncio.run(self._run_openai_embeddings(inputs))
-        except Exception as e:
-            logger.error(f"EMBEDDING: Error calling OpenAI embed:\n{e}")
-            error_info = ErrorInfo(
-                has_error=True,
-                error_message=str(e),
-                error_type=type(e).__name__,
-                stacktrace=''.join(traceback.format_exc()),
-                file_path=get_error_file_path(sys.exc_info()[2]),
-                component=self.COMPONENT_NAME
-            )
-            return None, APIStatus(
-                component=self.COMPONENT_NAME,
-                success=False,
-                error_info=error_info
-            )
+        return asyncio.run(self._run_openai_embeddings(inputs))
 
 class CohereEmbeddingModel(BaseEmbeddingModel):
     COMPONENT_NAME = "cohere_embedding"
@@ -126,8 +136,8 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
 
     def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
         api_status = APIStatus(component=self.COMPONENT_NAME, success=True)
-        inputs = [input] if isinstance(input, str) else input
         try:
+            inputs = [input] if isinstance(input, str) else input
             response = self.client.embed(
                 texts=inputs,
                 model=self.model_name,
@@ -143,14 +153,13 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
                 return [np.array(emb) for emb in embeddings], api_status
             return np.array(embeddings), api_status
         except Exception as e:
-            logger.error(f"EMBEDDING: Error calling Cohere embed:\n{e}")
             error_info = ErrorInfo(
+                component=self.COMPONENT_NAME,
                 has_error=True,
                 error_message=str(e),
                 error_type=type(e).__name__,
                 stacktrace=''.join(traceback.format_exc()),
-                file_path=get_error_file_path(sys.exc_info()[2]),
-                component=self.COMPONENT_NAME
+                file_path=get_error_file_path(sys.exc_info()[2])
             )
             return None, APIStatus(
                 component=self.COMPONENT_NAME,
@@ -178,24 +187,10 @@ class EmbeddingModel:
         self.model = self.PROVIDER_MAP[provider](**kwargs)
 
     def embed(self, input: Union[str, List[str]] = None) -> Tuple[List[List[float]], APIStatus]:
-        try:
-            embeddings, api_status = self.model.embed(input)
-            return embeddings, api_status
-        except Exception as e:
-            logger.error(f"EMBEDDING: Error in embedding model: {e}")
-            error_info = ErrorInfo(
-                has_error=True,
-                error_message=str(e),
-                error_type=type(e).__name__,
-                stacktrace=''.join(traceback.format_exc()),
-                file_path=get_error_file_path(sys.exc_info()[2]),
-                component=self.model.COMPONENT_NAME  # Use provider's component name
-            )
-            return None, APIStatus(
-                component=self.model.COMPONENT_NAME,  # Use provider's component name
-                success=False,
-                error_info=error_info
-            )
+        """Required interface for Chroma's EmbeddingFunction"""
+        # No try-except here - let errors propagate up
+        embeddings, api_status = self.model.embed(input)
+        return embeddings, api_status
 
     def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
         """Required interface for Chroma's EmbeddingFunction"""
