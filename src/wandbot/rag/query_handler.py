@@ -160,35 +160,27 @@ class EnhancedQuery(BaseModel):
     intents: List[Intent] = Field(
         ...,
         json_schema_extra={
-            "description": f"A list of one or more intents associated with the query. Here are the possible intents that "
+            "description": f"A list of one or more intents associated with the query (minimum 1, maximum 5). Here are the possible intents that "
             f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}"
-        },
-        min_length=1,
-        max_length=5,
+        }
     )
     keywords: List[Keyword] = Field(
         ...,
         json_schema_extra={
-            "description": "A list of diverse search terms associated with the query."
-        },
-        min_length=1,
-        max_length=5,
+            "description": "A list of diverse search terms associated with the query (minimum 1, maximum 5)."
+        }
     )
     sub_queries: List[SubQuery] = Field(
         ...,
         json_schema_extra={
-            "description": "A list of sub queries that break the query into smaller parts"
-        },
-        min_length=1,
-        max_length=5,
+            "description": "A list of sub queries that break the query into smaller parts (minimum 1, maximum 5)"
+        }
     )
     vector_search_queries: List[VectorSearchQuery] = Field(
         ...,
         json_schema_extra={
-            "description": "A list of diverse queries to search for similar documents in the vector space"
-        },
-        min_length=1,
-        max_length=5,
+            "description": "A list of diverse queries to search for similar documents in the vector space (minimum 1, maximum 5)"
+        }
     )
 
     standalone_query: str = Field(
