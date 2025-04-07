@@ -151,12 +151,14 @@ of lengths: {[len(r) for r in res['documents']]}")
         """
         # Get query embeddings using the embedding model
         query_embeddings, api_status = self.embedding_model.embed(query_texts)
-        
-        # Get initial results from ChromaDB with n_results=20
-        logger.info(f"VECTORSTORE: Fetching {fetch_k} results from ChromaDB for MMR search")
+        if not api_status.success:
+            raise RuntimeError(f"Embedding failed: {api_status.error_info.error_message}")
+            
+        # Get initial results from ChromaDB
+        logger.info(f"VECTORSTORE: Fetching {len(query_texts) * fetch_k} results from ChromaDB for MMR search")
         retrieved_results = self.query(
             query_embeddings=query_embeddings,
-            n_results=fetch_k,  # Critical: This matches fetch_k in MMR
+            n_results=fetch_k,
             filter=filter,
             where_document=where_document,
             include=['documents', 'metadatas', 'distances', 'embeddings']

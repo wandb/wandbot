@@ -75,7 +75,7 @@ class FusionRetrievalEngine:
                 top_n=top_k,
                 model=reranker_model_name
             )
-            logger.info(f"FUSION-RETRIEVAL: Reranked {len(results.results)} documents.")
+            logger.info(f"FUSION-RETRIEVAL: Reranked down to {len(results.results)} documents.")
         except Exception as e:
             error_message = f"FUSION-RETRIEVAL: Issue with rerank api:\n{e}\n"
             logger.error(error_message)
