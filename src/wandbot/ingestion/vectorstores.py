@@ -8,8 +8,7 @@ Typical usage example:
     project = "wandbot-dev"
     entity = "wandbot"
     source_artifact_path = "wandbot/wandbot-dev/raw_dataset:latest"
-    result_artifact_name = "wandbot_index"
-    load(project, entity, source_artifact_path, result_artifact_name)
+    load(project, entity, source_artifact_path)
 """
 
 import json
@@ -27,6 +26,7 @@ from wandbot.models.embedding import EmbeddingModel
 from wandbot.utils import get_logger
 from wandbot.schema.document import Document
 from wandbot.retriever.chroma import ChromaVectorStore
+from wandbot.configs.ingestion_config import IngestionConfig
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,6 @@ def load(
     project: str,
     entity: str,
     source_artifact_path: str,
-    result_artifact_name: str = "wandbot_index",
 ) -> str:
     """Load the vector store.
 
@@ -45,7 +44,6 @@ def load(
         project: The name of the project.
         entity: The name of the entity.
         source_artifact_path: The path to the source artifact.
-        result_artifact_name: The name of the resulting artifact. Defaults to "wandbot_index".
 
     Returns:
         The name of the resulting artifact.
@@ -56,6 +54,7 @@ def load(
     logger.info(f"Starting vector store creation for {entity}/{project} from artifact {source_artifact_path}")
     config: VectorStoreConfig = VectorStoreConfig()
     chat_config: ChatConfig = ChatConfig()
+    ingestion_config: IngestionConfig = IngestionConfig()
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="create_vectorstore"
     )
@@ -112,10 +111,10 @@ def load(
         chroma_client.add_documents(batch)
     logger.info("Finished adding documents to Chroma.")
 
-    logger.info(f"Creating result artifact: {result_artifact_name}")
+    logger.info(f"Creating result artifact: {ingestion_config.vectorstore_index_artifact_name}")
     result_artifact = wandb.Artifact(
-        name=result_artifact_name,
-        type="vectorstore",
+        name=ingestion_config.vectorstore_index_artifact_name,
+        type=ingestion_config.vectorstore_index_artifact_type,
     )
 
     logger.info(f"Adding vector store directory '{config.vectordb_index_dir}' to artifact.")
@@ -127,6 +126,6 @@ def load(
     logger.info("Result artifact logged successfully.")
 
     run.finish()
-    final_artifact_path = f"{entity}/{project}/{result_artifact_name}:latest"
+    final_artifact_path = f"{entity}/{project}/{ingestion_config.vectorstore_index_artifact_name}:latest"
     logger.info(f"Vector store creation finished. Final artifact: {final_artifact_path}")
     return final_artifact_path

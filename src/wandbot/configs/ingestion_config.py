@@ -26,6 +26,8 @@ logger = get_logger(__name__)
 class IngestionConfig(BaseSettings):
     wandb_project: str = Field("wandbot-dev", env="WANDB_PROJECT")
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
+    vectorstore_index_artifact_name: str = Field("chroma_index")
+    vectorstore_index_artifact_type: str = Field("vectorstore")
 
 class DataSource(BaseSettings):
     cache_dir: pathlib.Path = Field("data/cache/raw_data")
