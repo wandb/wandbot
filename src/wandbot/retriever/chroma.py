@@ -236,11 +236,12 @@ of lengths: {[len(r) for r in res['documents']]}")
         
         # Handle IDs: Use provided, then doc.id, then generate UUIDs
         if ids is None:
-            final_ids = [doc.id if doc.id else str(uuid.uuid4()) for doc in documents]
+            # final_ids = [doc.id if doc.id else str(uuid.uuid4()) for doc in documents] # Incorrect: Document has no id attribute
+            # Always generate UUIDs if no IDs are provided
+            final_ids = [str(uuid.uuid4()) for _ in documents]
         else:
             if len(ids) != len(documents):
                 raise ValueError("Number of IDs provided does not match number of documents")
-            final_ids = ids
 
         # Embed the documents using the stored embedding model instance
         logger.info(f"Generating embeddings for {len(texts_to_embed)} documents...")
