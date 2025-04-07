@@ -28,6 +28,7 @@ class IngestionConfig(BaseSettings):
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
     vectorstore_index_artifact_name: str = Field("chroma_index")
     vectorstore_index_artifact_type: str = Field("vectorstore")
+    cache_dir: pathlib.Path = Field(pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR")
 
 class DataSource(BaseSettings):
     cache_dir: pathlib.Path = Field("data/cache/raw_data")

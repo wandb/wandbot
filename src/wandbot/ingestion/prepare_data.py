@@ -46,6 +46,7 @@ from wandbot.configs.ingestion_config import (
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
     WeaveDocStoreConfig,
+    DataSource,
 )
 from wandbot.ingestion.utils import (
     clean_contents,
@@ -981,12 +982,13 @@ def load(
     ]
     configs_to_process = all_configs
 
-    # Update docstore_dir for each config to include the timestamp
+    # Update docstore_dir for each config to include the timestamp directory
     for config in configs_to_process:
         original_docstore_name = config.docstore_dir.name
-        original_parent_name = config.docstore_dir.parent.name  # Should be 'raw_data'
+        # Get the default 'raw_data' dir name from the DataSource definition
+        raw_data_dir_name = DataSource().cache_dir.name
         config.docstore_dir = (
-            timestamped_cache_root / original_parent_name / original_docstore_name
+            timestamped_cache_root / raw_data_dir_name / original_docstore_name
         )
         logging.debug(
             f"Updated docstore_dir for {config.name} to {config.docstore_dir}"
