@@ -276,7 +276,10 @@ def clean_contents(contents: str) -> str:
     cleaned_document = cleaned_document.replace("![]()", "\n")
     cleaned_document = re.sub(r"\[([^]]+)\]\([^)]+\)", r"\1", cleaned_document)
     cleaned_document = re.sub(r"\n{3,}", "\n\n", cleaned_document)
-    cleaned_document = frontmatter.loads(cleaned_document).content
+    try:
+        cleaned_document = frontmatter.loads(cleaned_document).content
+    except Exception as e:
+        logger.warning(f"Could not parse or remove frontmatter: {e}. Proceeding with raw content including potential frontmatter.")
     return cleaned_document
 
 

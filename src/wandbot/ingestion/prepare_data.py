@@ -199,29 +199,46 @@ class DocodileDataLoader(DataLoader):
             The generated site URL.
         """
         relative_path = file_path.relative_to(base_path)
-        if relative_path.parts[0] == "guides":
-            chapter = "guides"
-            slug = self.extract_slug((base_path / "guides") / "intro.md")
-            file_loc = file_path.relative_to((base_path / "guides")).parent
-        elif relative_path.parts[0] == "ref":
-            chapter = "ref"
-            slug = self.extract_slug((base_path / "ref") / "README.md")
-            file_loc = file_path.relative_to((base_path / "ref")).parent
-        elif relative_path.parts[0] == "tutorials":
-            chapter = "tutorials"
-            slug = self.extract_slug(
-                (base_path / "tutorials") / "intro_to_tutorials.md"
-            )
-            file_loc = file_path.relative_to((base_path / "tutorials")).parent
-        else:
-            chapter = ""
-            slug = ""
-            file_loc = ""
-
+        chapter = ""
+        slug = ""
+        file_loc = ""
         file_name = file_path.stem
-        if file_path.name in ("intro.md", "README.md", "intro_to_tutorials.md"):
-            file_name = ""
+
+        try:
+            if relative_path.parts[0] == "guides":
+                chapter = "guides"
+                slug = self.extract_slug((base_path / "guides") / "intro.md")
+                file_loc = file_path.relative_to((base_path / "guides")).parent
+            elif relative_path.parts[0] == "ref":
+                chapter = "ref"
+                slug = self.extract_slug((base_path / "ref") / "README.md")
+                file_loc = file_path.relative_to((base_path / "ref")).parent
+            elif relative_path.parts[0] == "tutorials":
+                chapter = "tutorials"
+                slug = self.extract_slug(
+                    (base_path / "tutorials") / "intro_to_tutorials.md"
+                )
+                file_loc = file_path.relative_to((base_path / "tutorials")).parent
+            else:
+                # Fallback or handle other top-level directories if necessary
+                chapter = relative_path.parts[0] if relative_path.parts else ""
+                file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
+
+            if file_path.name in ("intro.md", "README.md", "intro_to_tutorials.md"):
+                file_name = ""
+
+        except Exception as e:
+            logger.warning(f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL.")
+            # Fallback logic: use relative path directly if slug extraction fails
+            chapter = relative_path.parts[0] if relative_path.parts else ""
+            file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
+            file_name = file_path.stem if file_path.name not in ("intro.md", "README.md", "intro_to_tutorials.md") else ""
+
+
         site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
+        # Clean up potential double slashes or leading/trailing slashes from fallback paths
+        site_relative_path = '/'.join(filter(None, str(site_relative_path).split('/')))
+
         site_url = urljoin(
             str(self.config.data_source.remote_path), str(site_relative_path)
         )
@@ -252,27 +269,42 @@ class DocodileDataLoader(DataLoader):
 
         for f_name in document_files:
             try:
-                document = TextLoader(f_name).load()[0]
+                # Load the document content first
+                document = TextLoader(str(f_name)).load()[0]
                 contents = document.page_content
+
+                # Clean contents (already made robust)
                 document.page_content = clean_contents(contents)
-                document.metadata["file_type"] = os.path.splitext(
-                    document.metadata["source"]
-                )[-1]
-                document.metadata["source"] = document_files[
-                    pathlib.Path(document.metadata["source"])
-                ]
+
+                # Set basic metadata
+                document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
+                source_url = document_files[f_name]
+                document.metadata["source"] = source_url
                 document.metadata["language"] = self.config.language
-                document.metadata["description"] = self.extract_description(
-                    f_name
-                )
-                document.metadata["tags"] = self.extract_tags(
-                    document.metadata["source"]
-                )
                 document.metadata["source_type"] = self.config.source_type
+
+                # Attempt to extract description (handles frontmatter errors)
+                try:
+                    document.metadata["description"] = self.extract_description(f_name)
+                except Exception as e_desc:
+                    logger.warning(f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description.")
+                    document.metadata["description"] = ""
+
+                # Attempt to extract tags (handles frontmatter errors if underlying functions use it)
+                try:
+                    # Assuming extract_tags might rely on data derived from frontmatter indirectly
+                    # or could fail for other reasons. If it directly uses frontmatter, this is necessary.
+                    document.metadata["tags"] = self.extract_tags(source_url)
+                except Exception as e_tags:
+                    logger.warning(f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags.")
+                    document.metadata["tags"] = ["Documentation"] # Or provide a suitable default
+
                 yield document
-            except Exception as e:
+
+            except Exception as e_load:
+                # Catch broader errors during file loading or initial processing
                 logger.warning(
-                    f"Failed to load documentation {f_name} due to {e}"
+                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}"
                 )
 
 
