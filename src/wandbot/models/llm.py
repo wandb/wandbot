@@ -221,6 +221,10 @@ class LLMModel:
         except Exception as e:
             raise ValueError(f"Failed to initialize {provider} model: {str(e)}")
 
+    @property
+    def model_name(self) -> str:
+        return self.model.model_name
+
     async def create(self, 
                     messages: List[Dict[str, Any]], 
                     **kwargs) -> tuple[Union[str, BaseModel], APIStatus]:
