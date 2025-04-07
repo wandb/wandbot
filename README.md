@@ -194,25 +194,25 @@ Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're 
 ```
 source wandbot_venv/bin/activate
 
-python src/wandbot/evaluation/weave_eval/eval.py
+python src/wandbot/evaluation/eval.py
 ```
 
 Debugging, only running evals on 1 sample and for 1 trial:
 
 ```
-python src/wandbot/evaluation/weave_eval/eval.py  --debug --n_debug_samples=1 --n_trials=1
+python src/wandbot/evaluation/eval.py  --debug --n_debug_samples=1 --n_trials=1
 ```
 
 Evaluate on Japanese dataset:
 
 ```
-python src/wandbot/evaluation/weave_eval/eval.py  --lang ja
+python src/wandbot/evaluation/eval.py  --lang ja
 ```
 
 To only evaluate each sample once:
 
 ```
-python src/wandbot/evaluation/weave_eval/eval.py  --n_trials 1
+python src/wandbot/evaluation/eval.py  --n_trials 1
 ```
 
 
