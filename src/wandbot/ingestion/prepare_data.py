@@ -20,6 +20,7 @@ import pathlib
 from multiprocessing import Pool, cpu_count
 from typing import Any, Dict, Iterator, List
 from urllib.parse import urljoin, urlparse
+import logging
 
 import nbformat
 import pandas as pd
@@ -54,6 +55,7 @@ from wandbot.utils import get_logger
 from wandbot.schema.document import Document
 
 logger = get_logger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class DataLoader(BaseLoader):
@@ -833,29 +835,57 @@ def get_loader_from_config(config: DataStoreConfig) -> DataLoader:
     if source_type == "documentation":
         if "weave" in config.name.lower():
             source_type = "weave_documentation"
+            logging.info("Identified Weave documentation loader.")
         else:
             source_type = "wandb_documentation"
+            logging.info("Identified W&B documentation loader.")
 
-    return SOURCE_TYPE_TO_LOADER_MAP[source_type](config)
+    loader_class = SOURCE_TYPE_TO_LOADER_MAP.get(source_type)
+    if loader_class:
+        logging.info(f"Using loader {loader_class.__name__} for source type {source_type}")
+        return loader_class(config)
+    else:
+        logging.error(f"No loader found for source type {source_type}")
+        raise ValueError(f"No loader found for source type {source_type}")
 
 
 def load_from_config(config: DataStoreConfig) -> pathlib.Path:
-    loader = get_loader_from_config(config)
-    loader.config.docstore_dir.mkdir(parents=True, exist_ok=True)
+    logging.info(f"Starting data loading for config: {config.name}")
+    try:
+        loader = get_loader_from_config(config)
+        docstore_dir = loader.config.docstore_dir
+        logging.info(f"Using docstore directory: {docstore_dir}")
+        docstore_dir.mkdir(parents=True, exist_ok=True)
 
-    with (loader.config.docstore_dir / "config.json").open("w") as f:
-        f.write(loader.config.model_dump_json())
+        config_path = docstore_dir / "config.json"
+        logging.info(f"Writing config to {config_path}")
+        with config_path.open("w") as f:
+            f.write(loader.config.model_dump_json())
 
-    with (loader.config.docstore_dir / "documents.jsonl").open("w") as f:
-        for document in loader.load():
-            document_json = {
-                "page_content": document.page_content,
-                "metadata": document.metadata,
-            }
-            f.write(json.dumps(document_json) + "\n")
-    with (loader.config.docstore_dir / "metadata.json").open("w") as f:
-        json.dump(loader.metadata, f)
-    return loader.config.docstore_dir
+        documents_path = docstore_dir / "documents.jsonl"
+        logging.info(f"Starting document loading into {documents_path}")
+        doc_count = 0
+        with documents_path.open("w") as f:
+            for document in loader.load():
+                document_json = {
+                    "page_content": document.page_content,
+                    "metadata": document.metadata,
+                }
+                f.write(json.dumps(document_json) + "\n")
+                doc_count += 1
+        logging.info(f"Finished loading {doc_count} documents into {documents_path}")
+
+        metadata_path = docstore_dir / "metadata.json"
+        logging.info(f"Writing metadata to {metadata_path}")
+        with metadata_path.open("w") as f:
+            json.dump(loader.metadata, f)
+
+        logging.info(f"Successfully completed data loading for config: {config.name}")
+        return docstore_dir
+    except Exception as e:
+        logging.error(f"Failed loading data for config {config.name}: {e}", exc_info=True)
+        # Reraise the exception so the multiprocessing pool knows about the failure
+        raise
 
 
 def load(
@@ -878,12 +908,16 @@ def load(
         The latest version of the prepared dataset artifact in the format
         "{entity}/{project}/{result_artifact_name}:latest".
     """
+    logging.info(f"Starting Wandbot data ingestion for {entity}/{project}")
     run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
+    logging.info(f"Initialized Wandb run: {run.url}")
+
     artifact = wandb.Artifact(
         result_artifact_name,
         type="dataset",
         description="Raw documents for wandbot",
     )
+    logging.info(f"Created Wandb Artifact: {result_artifact_name}")
 
     configs = [
         DocodileEnglishStoreConfig(),
@@ -899,15 +933,46 @@ def load(
         WandbEduCodeStoreConfig(),
         FCReportsStoreConfig(),
     ]
+    config_names = [cfg.name for cfg in configs]
+    logging.info(f"Processing {len(configs)} data configurations: {config_names}")
 
-    pool = Pool(cpu_count() - 1)
+    num_processes = cpu_count() - 1
+    logging.info(f"Starting multiprocessing pool with {num_processes} processes.")
+    pool = Pool(num_processes)
+
     results = pool.imap_unordered(load_from_config, configs)
+    completed_count = 0
+    total_configs = len(configs)
 
     for docstore_path in results:
-        artifact.add_dir(
-            str(docstore_path),
-            name=docstore_path.name,
-        )
+        if docstore_path: # Check if the result is valid (not None due to an error)
+            logging.info(f"Adding directory {docstore_path} to artifact {result_artifact_name}")
+            artifact.add_dir(
+                str(docstore_path),
+                name=docstore_path.name,
+            )
+            completed_count += 1
+            logging.info(f"Progress: {completed_count}/{total_configs} configurations processed.")
+        else:
+            # Logging for errors is handled within load_from_config
+            pass
+
+
+    pool.close()
+    pool.join()
+    logging.info("Multiprocessing pool finished.")
+
+    if completed_count < total_configs:
+         logging.warning(f"Only {completed_count} out of {total_configs} configurations completed successfully.")
+    else:
+        logging.info(f"All {total_configs} configurations processed successfully.")
+
+
+    logging.info(f"Logging artifact {result_artifact_name} to Wandb.")
     run.log_artifact(artifact)
+    logging.info("Artifact logged successfully.")
     run.finish()
-    return f"{entity}/{project}/{result_artifact_name}:latest"
+    logging.info(f"Wandb run finished: {run.url}")
+    artifact_path = f"{entity}/{project}/{result_artifact_name}:latest"
+    logging.info(f"Data ingestion finished. Result artifact: {artifact_path}")
+    return artifact_path
