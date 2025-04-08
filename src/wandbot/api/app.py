@@ -146,7 +146,7 @@ async def initialize():
 
             # 3/3: Init Database
             try:
-                Base.metadata.create_all(bind=engine)
+                Base.metadata.create_all(bind=engine, checkfirst=True)
                 from wandbot.api.routers import database as database_router
 
                 logger.info("STARTUP: 3/3, 🦉 Starting Database initialization")
