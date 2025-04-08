@@ -49,9 +49,6 @@ async def initialize():
                 weave.init(
                     f"{app_config.wandb_entity}/{app_config.wandb_project}"
                 )
-                # Undo autopatch for langchain for now as its very verbose
-                from weave.integrations.langchain.langchain import langchain_patcher
-                langchain_patcher.undo_patch()
                 logger.info("STARTUP: 0/3, ✅ Weave initialized")
             except Exception as e:
                 logger.error(

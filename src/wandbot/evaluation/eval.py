@@ -162,6 +162,7 @@ class WandbotModel(weave.Model):
     language: str = "en"
     application: str = "api-eval"
     wandbot_url: str = "http://0.0.0.0:8000"
+    wandbot_config: dict = {}
 
     @weave.op
     async def predict(self, question: str) -> dict:
@@ -281,7 +282,9 @@ def main():
     # Initialize Wandbot Model
     wandbot = WandbotModel(language=config.lang, 
                            application=config.experiment_name, 
-                           wandbot_url=config.wandbot_url)
+                           wandbot_url=config.wandbot_url,
+                           wandbot_config=wandbot_info
+                           )
     
     # Initialize Correctness scorer
     correctness_scorer = WandbotCorrectnessScorer(config=config)

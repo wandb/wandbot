@@ -23,12 +23,16 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
+
 class IngestionConfig(BaseSettings):
     wandb_project: str = Field("wandbot-dev", env="WANDB_PROJECT")
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
     vectorstore_index_artifact_name: str = Field("chroma_index")
     vectorstore_index_artifact_type: str = Field("vectorstore")
-    cache_dir: pathlib.Path = Field(pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR")
+    cache_dir: pathlib.Path = Field(
+        pathlib.Path("data/cache/"), env="WANDBOT_CACHE_DIR"
+    )
+
 
 class DataSource(BaseSettings):
     cache_dir: pathlib.Path = Field("data/cache/raw_data")
@@ -56,9 +60,7 @@ class DataStoreConfig(BaseModel):
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
         sanitized_name = values.name.replace(" ", "_")
         values.docstore_dir = (
-            values.data_source.cache_dir
-            / sanitized_name
-            / values.docstore_dir
+            values.data_source.cache_dir / sanitized_name / values.docstore_dir
         )
         data_source = values.data_source
 
@@ -69,9 +71,7 @@ class DataStoreConfig(BaseModel):
             local_path_name = urlparse(data_source.repo_path).path.split("/")[-1]
             if not data_source.local_path:
                 data_source.local_path = (
-                    data_source.cache_dir
-                    / sanitized_name
-                    / local_path_name
+                    data_source.cache_dir / sanitized_name / local_path_name
                 )
             if data_source.is_git_repo:
                 if data_source.git_id_file is None:
@@ -79,16 +79,14 @@ class DataStoreConfig(BaseModel):
                         "The source data is a git repo but no git_id_file is set."
                         " Attempting to use the default ssh id file"
                     )
-                    data_source.git_id_file = (
-                        pathlib.Path.home() / ".ssh" / "id_rsa"
-                    )
+                    data_source.git_id_file = pathlib.Path.home() / ".ssh" / "id_rsa"
         values.data_source = data_source
 
         return values
 
 
 class DocodileEnglishStoreConfig(DataStoreConfig):
-    name: str = "English Documentation"
+    name: str = "english_documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/",
@@ -105,7 +103,7 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
 
 
 class DocodileJapaneseStoreConfig(DataStoreConfig):
-    name: str = "Japanese Documentation"
+    name: str = "japanese_documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/docs/",
@@ -120,7 +118,7 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
 
 
 class DocodileKoreanStoreConfig(DataStoreConfig):
-    name: str = "Korean Documentation"
+    name: str = "korean_documentation"
     source_type: str = "documentation"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/docs/",
@@ -134,36 +132,8 @@ class DocodileKoreanStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("wandb_documentation_ko")
 
 
-class ExampleCodeStoreConfig(DataStoreConfig):
-    name: str = "Examples code"
-    source_type: str = "code"
-    data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/examples/tree/master/",
-        repo_path="https://github.com/wandb/examples",
-        branch="master",
-        base_path="examples",
-        file_patterns=["*.py"],
-        is_git_repo=True,
-    )
-    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_code")
-
-
-class ExampleNotebookStoreConfig(DataStoreConfig):
-    name: str = "Examples Notebooks"
-    source_type: str = "notebook"
-    data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/examples/tree/master/",
-        repo_path="https://github.com/wandb/examples",
-        branch="master",
-        base_path="colabs",
-        file_patterns=["*.ipynb"],
-        is_git_repo=True,
-    )
-    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_colab")
-
-
 class SDKCodeStoreConfig(DataStoreConfig):
-    name: str = "Wandb SDK code"
+    name: str = "wandb_sdk_code"
     source_type: str = "code"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/wandb/tree/main/",
@@ -177,7 +147,7 @@ class SDKCodeStoreConfig(DataStoreConfig):
 
 
 class SDKTestsStoreConfig(DataStoreConfig):
-    name: str = "Wandb SDK tests"
+    name: str = "wandb_sdk_tests"
     source_type: str = "code"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/wandb/tree/main/",
@@ -190,8 +160,38 @@ class SDKTestsStoreConfig(DataStoreConfig):
     docstore_dir: pathlib.Path = pathlib.Path("wandb_sdk_tests")
 
 
+class WeaveDocStoreConfig(DataStoreConfig):
+    name: str = "weave_documentation"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave",
+        repo_path="https://github.com/wandb/weave",
+        branch="master",
+        base_path="docs",
+        file_patterns=["*.md", "*.mdx"],
+        is_git_repo=True,
+    )
+    language: str = "en"
+    docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
+
+
+class WeaveCookbookStoreConfig(DataStoreConfig):
+    name: str = "weave_cookbooks"
+    source_type: str = "code"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/weave",
+        repo_path="https://github.com/wandb/weave",
+        branch="master",
+        base_path="docs/notebooks",
+        file_patterns=["*.ipynb"],
+        is_git_repo=True,
+    )
+    language: str = "en"
+    docstore_dir: pathlib.Path = pathlib.Path("weave_cookbooks")
+
+
 class WeaveCodeStoreConfig(DataStoreConfig):
-    name: str = "Weave SDK code"
+    name: str = "weave_sdk_code"
     source_type: str = "code"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/tree/master/",
@@ -201,43 +201,67 @@ class WeaveCodeStoreConfig(DataStoreConfig):
         file_patterns=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
-    docstore_dir: pathlib.Path = pathlib.Path("weave_code_and_examples")
+    docstore_dir: pathlib.Path = pathlib.Path("weave_sdk_code")
 
 
-class WeaveDocStoreConfig(DataStoreConfig):
-    name: str = "Weave Documentation"
-    source_type: str = "documentation"
+class ExampleCodeStoreConfig(DataStoreConfig):
+    name: str = "examples_code"
+    source_type: str = "code"
     data_source: DataSource = DataSource(
-        remote_path="https://github.com/wandb/weave",
-        repo_path="https://github.com/wandb/weave",
+        remote_path="https://github.com/wandb/examples/tree/master/",
+        repo_path="https://github.com/wandb/examples",
         branch="master",
-        base_path="docs/docs",
-        file_patterns=[
-            "*.md",
-            "*.mdx"
-        ],
+        base_path="examples",
+        file_patterns=["*.py"],
         is_git_repo=True,
     )
-    language: str = "en"
-    docstore_dir: pathlib.Path = pathlib.Path("weave_documentation")
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_code")
+
+
+class ExampleNotebookStoreConfig(DataStoreConfig):
+    name: str = "examples_notebooks"
+    source_type: str = "code"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/examples/tree/master/",
+        repo_path="https://github.com/wandb/examples",
+        branch="master",
+        base_path="colabs",
+        file_patterns=["*.ipynb"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_examples_colab")
 
 
 class WandbEduCodeStoreConfig(DataStoreConfig):
-    name: str = "Wandb Edu code"
+    name: str = "wandb_edu_code"
     source_type: str = "code"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/edu/tree/main/",
         repo_path="https://github.com/wandb/edu",
         branch="main",
         base_path="",
-        file_patterns=["*.py", "*.ipynb", "*.md"],
+        file_patterns=["*.py", "*.ipynb"],
         is_git_repo=True,
     )
     docstore_dir: pathlib.Path = pathlib.Path("wandb_edu_code")
 
 
+class WandbEduDocStoreConfig(DataStoreConfig):
+    name: str = "wandb_edu_text"
+    source_type: str = "documentation"
+    data_source: DataSource = DataSource(
+        remote_path="https://github.com/wandb/edu/tree/main/",
+        repo_path="https://github.com/wandb/edu",
+        branch="main",
+        base_path="",
+        file_patterns=["*.md"],
+        is_git_repo=True,
+    )
+    docstore_dir: pathlib.Path = pathlib.Path("wandb_edu_text")
+
+
 class WeaveJsStoreConfig(DataStoreConfig):
-    name: str = "Weave JS code"
+    name: str = "weave_js_code"
     source_type: str = "code"
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/tree/master/",
@@ -251,7 +275,7 @@ class WeaveJsStoreConfig(DataStoreConfig):
 
 
 class FCReportsStoreConfig(DataStoreConfig):
-    name: str = "FC Reports"
+    name: str = "fc_reports"
     source_type: str = "report"
     data_source: DataSource = DataSource(
         remote_path="wandb-production",
@@ -266,9 +290,7 @@ class FCReportsStoreConfig(DataStoreConfig):
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
         sanitized_name = values.name.replace(" ", "_")
         values.docstore_dir = (
-            values.data_source.cache_dir
-            / sanitized_name
-            / values.docstore_dir
+            values.data_source.cache_dir / sanitized_name / values.docstore_dir
         )
         data_source = values.data_source
 

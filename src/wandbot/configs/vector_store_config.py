@@ -31,8 +31,8 @@ class VectorStoreConfig(BaseSettings):
     
     # Embeddings settings
     embeddings_provider:str = "openai"
-    embeddings_model_name: str = "text-embedding-3-large"
-    embeddings_dimensions: int = 3072  # needed when using OpenAI embeddings
+    embeddings_model_name: str = "text-embedding-3-small" #"text-embedding-3-large"
+    embeddings_dimensions: int = 512  # needed when using OpenAI embeddings
     
     # Embedding input types, e.g. "search_query" or "search_document"
     embeddings_query_input_type: str = "search_query"  # needed when using Cohere embeddings

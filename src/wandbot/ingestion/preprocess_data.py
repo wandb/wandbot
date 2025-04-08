@@ -179,6 +179,7 @@ def run_preprocessing_pipeline(
 
     lang_detect = FastTextLangDetect()
     result_artifact = wandb.Artifact(result_artifact_name, type="dataset")
+    all_source_metadata = {} # Initialize dictionary to store metadata for all sources
 
     # Find all unique parent directories containing documents.jsonl
     source_directories = set()
@@ -225,7 +226,7 @@ def run_preprocessing_pipeline(
         document_file = source_dir / "documents.jsonl"
         with document_file.open() as f:
             documents = [Document(**json.loads(line)) for line in f]
-        logger.info(f"Loaded {len(documents)} initial documents from source file: {document_file}")
+        logger.info(f"Loaded {len(documents)} initial file documents from source file: {document_file}")
         
         # 4. Transform documents
         # Replacing process_document_file call with direct transformation
@@ -266,14 +267,45 @@ def run_preprocessing_pipeline(
             json.dump(config, of)
 
         # Update and write metadata
+        keys_to_remove = [
+            "vectordb_index_artifact_url",
+            "vector_store_auth_token",
+            "embeddings_query_input_type",
+            "embeddings_document_input_type",
+        ]
+        for key in keys_to_remove:
+            metadata.pop(key, None) # Use pop with default None to avoid KeyError if key doesn't exist
+
         metadata["num_transformed_documents"] = len(transformed_documents)
         with output_metadata_path.open("w") as of:
             logger.info(f"Writing updated metadata to {output_metadata_path}")
             json.dump(metadata, of)
 
+        # Store this source's metadata
+        all_source_metadata[source_dir.name] = metadata
+
         # 6. Add processed directory to the result artifact
         result_artifact.add_dir(str(output_dir), name=source_dir.name)
 
-    run.log_artifact(result_artifact)
+    # Prepare description string now that all_source_metadata is populated
+    description_string = f"Preprocessed data artifact containing transformed text chunks for {len(all_source_metadata)} sources.\\n"
+    description_string += "Metadata per source:\\n"
+    description_string += json.dumps(all_source_metadata, indent=2) # Format as JSON for description
+
+    # Set metadata and description on the artifact object itself
+    result_artifact.metadata = all_source_metadata
+    result_artifact.description = description_string
+
+    # Define intended aliases (tags will be added *after* logging)
+    intended_aliases = [] # Default alias
+
+    # Log artifact - only pass artifact object and aliases
+    run.log_artifact(
+        result_artifact,
+        aliases=intended_aliases
+    )
+    logger.info(f"Artifact {result_artifact.name} logged with aliases: {intended_aliases}, now uploading...")
+
+
     run.finish()
     return f"{entity}/{project}/{result_artifact_name}:latest"

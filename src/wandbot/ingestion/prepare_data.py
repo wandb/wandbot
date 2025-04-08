@@ -114,9 +114,9 @@ class DataLoader(BaseLoader):
         )
         logger.info(f"Constructed search base path: {search_base.resolve()}")
          # Add detailed check before the main conditional
-        logger.info(f"Checking existence of search base: {search_base}")
-        logger.info(f"  os.path.exists: {os.path.exists(search_base)}")
-        logger.info(f"  os.path.isdir: {os.path.isdir(search_base)}")
+        logger.debug(f"Checking existence of search base: {search_base}")
+        logger.debug(f"  os.path.exists: {os.path.exists(search_base)}")
+        logger.debug(f"  os.path.isdir: {os.path.isdir(search_base)}")
         try:
             parent_dir_contents = os.listdir(self.config.data_source.local_path)
             logger.info(f"Contents of parent dir ({self.config.data_source.local_path}): {parent_dir_contents}")

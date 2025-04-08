@@ -158,17 +158,38 @@ def build_vector_store_artifact(
         # Create and log the result artifact
         logger.info(f"Creating result artifact: {final_artifact_name}")
         
+        # Serialize config once
+        serialized_config = config.model_dump(mode='json')
+
+        # Keys to remove from the serialized config in metadata
+        keys_to_remove = [
+            "vectordb_index_artifact_url", # Often derived or set elsewhere
+            "vector_store_auth_token",    # Sensitive
+            "embeddings_query_input_type", # Redundant if embeddings_document_input_type exists
+            # Keep embeddings_document_input_type as it's relevant context
+        ]
+        for key in keys_to_remove:
+            serialized_config.pop(key, None)
+
         artifact_metadata = {
-            "vector_store_config": config.model_dump(mode='json'), # Serialize config
+            "vector_store_config": serialized_config, # Use modified config
             "source_document_counts": source_doc_counts,
             "total_documents_processed": len(transformed_documents)
         }
         logger.info(f"Artifact metadata prepared: {json.dumps(artifact_metadata, indent=2)}")
 
+        # Prepare description
+        description_string = f"Chroma vector store artifact for {entity}/{project}.\\n"
+        description_string += f"Built from source artifact: {source_artifact_path}\\n"
+        description_string += f"Contains {len(transformed_documents)} embedded text chunks.\\n"
+        description_string += "\\nMetadata details:\\n"
+        description_string += json.dumps(artifact_metadata, indent=2)
+
         result_artifact = wandb.Artifact(
             name=final_artifact_name,
             type=ingestion_config.vectorstore_index_artifact_type,
-            metadata=artifact_metadata
+            metadata=artifact_metadata,
+            description=description_string # Add description here
         )
 
         logger.info(f"Adding vector store directory '{vectorstore_dir}' to artifact.")
@@ -176,12 +197,30 @@ def build_vector_store_artifact(
 
         logger.info("Logging result artifact to W&B...")
         aliases = [
-            "latest",
             f"embed-model-{config.embeddings_model_name}",
             f"embed-dim-{config.embeddings_dimensions}",
         ]
-        run.log_artifact(result_artifact, aliases=aliases)
-        logger.info("Result artifact logged successfully.")
+
+        run.log_artifact(result_artifact, aliases=aliases) # Metadata & description already set
+        logger.info(f"Artifact {result_artifact.name} logged with aliases: {aliases}, now uploading...")
+        result_artifact.wait() # Wait for the upload to complete
+        logger.info(f"Artifact {result_artifact.name} upload complete.")
+
+        # Now, fetch the logged artifact and add tags, with error handling
+        try:
+            api = wandb.Api()
+            # Use the artifact name and 'latest' alias to fetch the version just logged
+            logged_artifact_name = f"{entity}/{project}/{final_artifact_name}:latest"
+            logged_artifact = api.artifact(logged_artifact_name, type=ingestion_config.vectorstore_index_artifact_type)
+            # Combine existing tags with new aliases, ensuring uniqueness
+            existing_tags = set(logged_artifact.tags or [])
+            new_tags = set(aliases)
+            logged_artifact.tags = list(existing_tags.union(new_tags))
+            logged_artifact.save()
+            logger.info(f"Successfully added tags {list(new_tags)} to artifact {logged_artifact_name}")
+        except Exception as e:
+            # Log a warning instead of erroring out if tag addition fails
+            logger.warning(f"Failed to add tags {aliases} to artifact {final_artifact_name}: {e}", exc_info=False)
 
         final_artifact_path = f"{entity}/{project}/{final_artifact_name}:latest"
         logger.info(f"Vector store creation finished. Final artifact: {final_artifact_path}")

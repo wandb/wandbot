@@ -81,7 +81,7 @@ def main():
         logger.info("Skipping Vector Store Step")
 
     if "report" in run_config.steps:
-        logger.info("\n\n ------ Starting Report Step ------\n\n")
+        logger.info("\n\n ------ Starting Report Creation Step ------\n\n")
         if not raw_artifact_path:
             raw_artifact_path = (
                 f"{entity}/{project}/{run_config.raw_data_artifact_name}:latest"
