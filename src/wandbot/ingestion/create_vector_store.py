@@ -15,6 +15,8 @@ import json
 import pathlib
 from typing import List, Dict
 
+# from langchain_chroma import Chroma
+# from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
@@ -41,36 +43,36 @@ def _download_source_artifact(run: wandb.sdk.wandb_run.Run, source_artifact_path
     return pathlib.Path(artifact_dir)
 
 def _load_and_count_documents(artifact_dir: pathlib.Path) -> (List[Document], Dict[str, int]):
-    """Loads documents from jsonl files and counts them per source directory."""
+    """Loads documents (text chunks) from jsonl files and counts them per source directory."""
     document_files: List[pathlib.Path] = list(artifact_dir.rglob("documents.jsonl"))
-    logger.info(f"Found {len(document_files)} document file(s) in artifact.")
+    logger.info(f"Found {len(document_files)} preprocessed document file(s) in artifact.")
     source_doc_counts = {}
     transformed_documents = []
-    logger.info("Loading documents and counting per source...")
+    logger.info("Loading preprocessed documents (text chunks) and counting per source...")
     for document_file in document_files:
         source_name = document_file.parent.name
         count = 0
-        logger.debug(f"Loading documents from: {document_file}")
+        logger.debug(f"Loading text chunks from: {document_file}")
         with document_file.open() as f:
             for line in f:
                 transformed_documents.append(Document(**json.loads(line)))
                 count += 1
         source_doc_counts[source_name] = count
-        logger.debug(f"  Source '{source_name}' count: {count}")
-    logger.info(f"Loaded {len(transformed_documents)} total documents.")
-    logger.info(f"Source counts: {json.dumps(source_doc_counts, indent=2)}")
+        logger.debug(f"  Source '{source_name}' count (text chunks): {count}")
+    logger.info(f"Loaded {len(transformed_documents)} total text chunks.")
+    logger.info(f"Source counts (text chunks): {json.dumps(source_doc_counts, indent=2)}")
     return transformed_documents, source_doc_counts
 
 def _add_documents_to_vectorstore(client: ChromaVectorStore, documents: List[Document], batch_size: int):
-    """Adds documents to the vector store client in batches."""
-    logger.info(f"Adding {len(documents)} documents to Chroma in batches of {batch_size}...")
+    """Adds preprocessed documents (text chunks) to the vector store client in batches."""
+    logger.info(f"Adding {len(documents)} preprocessed documents (text chunks) to Chroma in batches of {batch_size}...")
     for batch_idx in trange(0, len(documents), batch_size):
         batch = documents[batch_idx : batch_idx + batch_size]
         logger.debug(
-            f"Adding batch {batch_idx // batch_size + 1} (size: {len(batch)}) to Chroma."
+            f"Adding batch {batch_idx // batch_size + 1} (size: {len(batch)} text chunks) to Chroma."
         )
         client.add_documents(batch)
-    logger.info("Finished adding documents to Chroma.")
+    logger.info("Finished adding text chunks to Chroma.")
 
 # --- Main Function ---
 
@@ -191,6 +193,7 @@ def build_vector_store_artifact(
             run.finish(exit_code=1)
         raise
     finally:
-        if run and run.state == "running":
+        # Ensure the run is finished cleanly
+        if run:
             run.finish()
             logger.info(f"Wandb run finished: {run.url}")

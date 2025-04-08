@@ -163,7 +163,7 @@ def process_document_file(
     return list(transformed_documents)
 
 
-def load(
+def run_preprocessing_pipeline(
     project: str,
     entity: str,
     source_artifact_path: str,
@@ -225,11 +225,14 @@ def load(
         document_file = source_dir / "documents.jsonl"
         with document_file.open() as f:
             documents = [Document(**json.loads(line)) for line in f]
+        logger.info(f"Loaded {len(documents)} initial documents from source file: {document_file}")
         
         # 4. Transform documents
         # Replacing process_document_file call with direct transformation
+        logger.info("Applying document transformers to generate text chunks...")
         transformed_documents = transformer.transform_documents(documents)
         transformed_documents = list(transformed_documents) # Ensure it's a list
+        logger.info(f"Generated {len(transformed_documents)} text chunks.")
 
         # 5. Prepare output paths and save results
         metadata_path = source_dir / "metadata.json"
@@ -254,6 +257,7 @@ def load(
 
         # Write transformed documents
         with transformed_file.open("w") as of:
+            logger.info(f"Writing {len(transformed_documents)} text chunks to {transformed_file}")
             for document in transformed_documents:
                 of.write(json.dumps(document.dict()) + "\n")
 
@@ -264,6 +268,7 @@ def load(
         # Update and write metadata
         metadata["num_transformed_documents"] = len(transformed_documents)
         with output_metadata_path.open("w") as of:
+            logger.info(f"Writing updated metadata to {output_metadata_path}")
             json.dump(metadata, of)
 
         # 6. Add processed directory to the result artifact

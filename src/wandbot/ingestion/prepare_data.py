@@ -20,7 +20,7 @@ import logging
 import os
 import pathlib
 from multiprocessing import Pool, cpu_count
-from typing import Any, Dict, Iterator, List
+from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import nbformat
@@ -46,7 +46,6 @@ from wandbot.configs.ingestion_config import (
     WandbEduCodeStoreConfig,
     WeaveCodeStoreConfig,
     WeaveDocStoreConfig,
-    DataSource,
 )
 from wandbot.ingestion.utils import (
     clean_contents,
@@ -55,6 +54,7 @@ from wandbot.ingestion.utils import (
 )
 from wandbot.schema.document import Document
 from wandbot.utils import get_logger
+import concurrent.futures
 
 logger = get_logger(__name__)
 logging.basicConfig(
@@ -113,6 +113,16 @@ class DataLoader(BaseLoader):
             / self.config.data_source.base_path
         )
         logger.info(f"Constructed search base path: {search_base.resolve()}")
+         # Add detailed check before the main conditional
+        logger.info(f"Checking existence of search base: {search_base}")
+        logger.info(f"  os.path.exists: {os.path.exists(search_base)}")
+        logger.info(f"  os.path.isdir: {os.path.isdir(search_base)}")
+        try:
+            parent_dir_contents = os.listdir(self.config.data_source.local_path)
+            logger.info(f"Contents of parent dir ({self.config.data_source.local_path}): {parent_dir_contents}")
+        except Exception as e_ls:
+            logger.error(f"Could not list contents of {self.config.data_source.local_path}: {e_ls}")
+
         if not search_base.is_dir():
             logger.warning(f"Search base directory does not exist or is not a directory: {search_base}")
             return []
@@ -120,7 +130,7 @@ class DataLoader(BaseLoader):
         for file_pattern in self.config.data_source.file_patterns:
             # Add logging for count per pattern
             found_files = list(search_base.rglob(file_pattern))
-            logger.info(f"Found {len(found_files)} files matching pattern '{file_pattern}' recursively in {search_base}")
+            logger.info(f"Found {len(found_files)} source files matching pattern '{file_pattern}' recursively in {search_base}")
             local_paths.extend(found_files)
         return local_paths
 
@@ -251,84 +261,115 @@ class DocodileDataLoader(DataLoader):
 
         return site_url
 
-    def lazy_load(
-        self,
-    ) -> Iterator[Document]:
-        """A lazy loader for Docodile documents.
-
-        This method implements the lazy loading behavior for Docodile documents.
-
-        Yields:
-            A Document object.
-        """
+    def lazy_load(self) -> Iterator[Document]:
+        """A lazy loader for Docodile documents, holding lock during load if git repo."""
         if self.config.data_source.is_git_repo:
+            local_repo_path = self.config.data_source.local_path
+            # lock_path = local_repo_path.parent / f"{local_repo_path.name}.lock" # Removed lock path
+            # logger.info(f"Acquiring lock for {local_repo_path} for full load process.") # Removed lock logging
+            # with filelock.FileLock(str(lock_path)): # Removed lock context
+            # logger.info(f"Lock acquired for {local_repo_path}. Fetching repo state.") # Removed lock logging
+            # Ensure correct branch state inside the lock
             self.metadata = fetch_git_repo(
                 self.config.data_source, self.config.data_source.git_id_file
             )
+            logger.info(f"Fetched repo state for {local_repo_path}")
 
-        local_paths = self._get_local_paths()
-        logger.info(
-            f"Found {len(local_paths)} potential document files for {self.config.name}"
-        )
-        document_files = {
-            local_path: self.generate_site_url(
-                self.config.data_source.local_path / self.config.data_source.base_path,
-                local_path,
+            # Find paths inside the (now unique) local repo path
+            local_paths = self._get_local_paths()
+            logger.info(
+                f"Found {len(local_paths)} potential source document files for {self.config.name}"
             )
-            for local_path in local_paths
-        }
-
-        for f_name in document_files:
-            logger.debug(f"Processing document file: {f_name}")
-            try:
-                # Load the document content first
-                document = TextLoader(str(f_name)).load()[0]
-                contents = document.page_content
-
-                # Clean contents (already made robust)
-                document.page_content = clean_contents(contents)
-
-                # Set basic metadata
-                document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
-                source_url = document_files[f_name]
-                document.metadata["source"] = source_url
-                document.metadata["language"] = self.config.language
-                document.metadata["source_type"] = self.config.source_type
-                logger.debug(f"Generated source URL: {source_url} for file: {f_name}")
-
-                # Attempt to extract description (handles frontmatter errors)
-                try:
-                    document.metadata["description"] = self.extract_description(f_name)
-                except Exception as e_desc:
-                    logger.warning(
-                        f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description."
+            document_files = {
+                local_path:
+                    self.generate_site_url(
+                        local_repo_path / self.config.data_source.base_path, # Use repo path
+                        local_path,
                     )
-                    document.metadata["description"] = ""
+                for local_path in local_paths
+            }
 
-                # Attempt to extract tags (handles frontmatter errors if underlying functions use it)
+            # Load files
+            for f_name in document_files:
+                logger.debug(f"Processing source file: {f_name}")
                 try:
-                    # Assuming extract_tags might rely on data derived from frontmatter indirectly
-                    # or could fail for other reasons. If it directly uses frontmatter, this is necessary.
-                    document.metadata["tags"] = self.extract_tags(source_url)
-                except Exception as e_tags:
+                    # Load the document content first
+                    document = TextLoader(str(f_name)).load()[0]
+                    contents = document.page_content
+                    document.page_content = clean_contents(contents)
+                    document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
+                    source_url = document_files[f_name]
+                    document.metadata["source"] = source_url
+                    document.metadata["language"] = self.config.language
+                    document.metadata["source_type"] = self.config.source_type
+                    logger.debug(f"Generated source URL: {source_url} for file: {f_name}")
+                    try:
+                        document.metadata["description"] = self.extract_description(f_name)
+                    except Exception as e_desc:
+                        logger.warning(
+                            f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description."
+                        )
+                        document.metadata["description"] = ""
+                    try:
+                        document.metadata["tags"] = self.extract_tags(source_url)
+                    except Exception as e_tags:
+                        logger.warning(
+                            f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
+                        )
+                        document.metadata["tags"] = ["Documentation"]
+                    yield document
+                except Exception as e_load:
                     logger.warning(
-                        f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
+                        f"Failed to load or perform basic processing for source documentation file {f_name} due to: {e_load}",
+                        exc_info=True,
                     )
-                    document.metadata["tags"] = [
-                        "Documentation"
-                    ]  # Or provide a suitable default
-
-                yield document
-
-            except Exception as e_load:
-                # Catch broader errors during file loading or initial processing
-                logger.warning(
-                    f"Failed to load or perform basic processing for documentation {f_name} due to: {e_load}",
-                    exc_info=True,
-                )
-        logger.info(
-            f"Processed {len(document_files)} document files for {self.config.name}"
-        )
+            # logger.info(f"Releasing lock for {local_repo_path} after processing {len(document_files)} files.") # Removed lock logging
+        else:
+            # Non-Git Repo: Original logic without lock
+            local_paths = self._get_local_paths()
+            logger.info(
+                f"Found {len(local_paths)} potential source document files for {self.config.name}"
+            )
+            document_files = {
+                local_path:
+                    self.generate_site_url(
+                        self.config.data_source.local_path / self.config.data_source.base_path,
+                        local_path,
+                    )
+                for local_path in local_paths
+            }
+            for f_name in document_files:
+                logger.debug(f"Processing source file: {f_name}")
+                try:
+                    document = TextLoader(str(f_name)).load()[0]
+                    contents = document.page_content
+                    document.page_content = clean_contents(contents)
+                    document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
+                    source_url = document_files[f_name]
+                    document.metadata["source"] = source_url
+                    document.metadata["language"] = self.config.language
+                    document.metadata["source_type"] = self.config.source_type
+                    logger.debug(f"Generated source URL: {source_url} for file: {f_name}")
+                    try:
+                        document.metadata["description"] = self.extract_description(f_name)
+                    except Exception as e_desc:
+                        logger.warning(
+                            f"Failed to extract description from {f_name} due to: {e_desc}. Setting empty description."
+                        )
+                        document.metadata["description"] = ""
+                    try:
+                        document.metadata["tags"] = self.extract_tags(source_url)
+                    except Exception as e_tags:
+                        logger.warning(
+                            f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
+                        )
+                        document.metadata["tags"] = ["Documentation"]
+                    yield document
+                except Exception as e_load:
+                    logger.warning(
+                        f"Failed to load or perform basic processing for source documentation file {f_name} due to: {e_load}",
+                        exc_info=True,
+                    )
 
 
 class WeaveDocsDataLoader(DocodileDataLoader):
@@ -351,88 +392,176 @@ class WeaveDocsDataLoader(DocodileDataLoader):
 
 class CodeDataLoader(DataLoader):
     def lazy_load(self) -> Iterator[Document]:
-        """A lazy loader for code documents.
-
-        This method implements the lazy loading behavior for code documents.
-
-        Yields:
-            A Document object.
-        """
+        """A lazy loader for code documents, holding lock during load if git repo."""
         if self.config.data_source.is_git_repo:
+            local_repo_path = self.config.data_source.local_path
+            # lock_path = local_repo_path.parent / f"{local_repo_path.name}.lock" # Removed lock path
+            # logger.info(f"Acquiring lock for {local_repo_path} for full load process.") # Removed lock logging
+            # with filelock.FileLock(str(lock_path)): # Removed lock context
+            # logger.info(f"Lock acquired for {local_repo_path}. Fetching repo state.") # Removed lock logging
+            # Ensure correct branch state inside the lock
             self.metadata = fetch_git_repo(
                 self.config.data_source, self.config.data_source.git_id_file
             )
+            logger.info(f"Fetched repo state for {local_repo_path}")
 
-        local_paths = self._get_local_paths()
+            # Find paths inside the (now unique) local repo path
+            local_paths = self._get_local_paths()
 
-        paths = list(local_paths)
-        local_paths = list(map(lambda x: str(x), paths))
-        local_path_parts = list(map(lambda x: x.parts, paths))
-        examples_idx = list(
-            map(
-                lambda x: x.index(self.config.data_source.local_path.stem),
-                local_path_parts,
-            )
-        )
-        remote_paths = list(
-            map(
-                lambda x: "/".join(x[1][x[0] + 1 :]),
-                zip(examples_idx, local_path_parts),
-            )
-        )
-        remote_paths = list(
-            map(
-                lambda x: f"{self.config.data_source.remote_path}{x}",
-                remote_paths,
-            )
-        )
-        document_files = dict(zip(local_paths, remote_paths))
-
-        for f_name in document_files:
+            paths = list(local_paths)
+            local_paths_str = list(map(lambda x: str(x), paths))
+            local_path_parts = list(map(lambda x: x.parts, paths))
             try:
-                if os.path.splitext(f_name)[-1] == ".ipynb":
-                    document = TextLoader(f_name).load()[0]
-                    contents = document.page_content
-                    notebook = nbformat.reads(contents, as_version=4)
-                    _, notebook = normalize(
-                        notebook, version=4, strip_invalid_metadata=True
-                    )  # Normalize the notebook
-                    md_exporter = MarkdownExporter(template="classic")
-                    (body, resources) = md_exporter.from_notebook_node(notebook)
-                    cleaned_body = clean_contents(body)
-                    document.page_content = cleaned_body
-                    document.metadata["source_type"] = (
-                        "notebook"
-                        if self.config.source_type == "code"
-                        else self.config.source_type
+                examples_idx = list(
+                    map(
+                        lambda x: x.index(self.config.data_source.local_path.stem),
+                        local_path_parts,
                     )
-                elif os.path.splitext(f_name)[-1] == ".md":
-                    document = TextLoader(f_name).load()[0]
-                    contents = document.page_content
-                    cleaned_body = clean_contents(contents)
-                    document.page_content = cleaned_body
-                    document.metadata["source_type"] = (
-                        "markdown"
-                        if self.config.source_type == "code"
-                        else self.config.source_type
+                )
+                remote_paths = list(
+                    map(
+                        lambda x: "/".join(x[1][x[0] + 1 :]),
+                        zip(examples_idx, local_path_parts),
                     )
-                else:
-                    document = TextLoader(f_name).load()[0]
-                    document.metadata["source_type"] = (
-                        "code"
-                        if self.config.source_type == "code"
-                        else self.config.source_type
-                    )
+                )
+            except ValueError as e:
+                logger.warning(f"Could not find local path stem in path parts for {self.config.name}: {e}. Using relative paths.")
+                # Fallback: Use path relative to the search base
+                search_base = self.config.data_source.local_path / self.config.data_source.base_path
+                remote_paths = [str(p.relative_to(search_base)) for p in paths]
 
-                document.metadata["file_type"] = os.path.splitext(
-                    document.metadata["source"]
-                )[-1]
-                document.metadata["source"] = document_files[
-                    document.metadata["source"]
-                ]
-                yield document
-            except Exception as e:
-                logger.warning(f"Failed to load code in {f_name} with error {e}")
+            remote_paths = list(
+                map(
+                    lambda x: f"{self.config.data_source.remote_path}{x}",
+                    remote_paths,
+                )
+            )
+            document_files = dict(zip(local_paths_str, remote_paths))
+
+            # Load files
+            for f_name in document_files:
+                try:
+                    doc_metadata_source = f_name # Keep original local path for loading
+                    doc_source_url = document_files[f_name] # Use calculated remote path
+
+                    if os.path.splitext(f_name)[-1] == ".ipynb":
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        contents = document.page_content
+                        notebook = nbformat.reads(contents, as_version=4)
+                        _, notebook = normalize(
+                            notebook, version=4, strip_invalid_metadata=True
+                        )
+                        md_exporter = MarkdownExporter(template="classic")
+                        (body, resources) = md_exporter.from_notebook_node(notebook)
+                        cleaned_body = clean_contents(body)
+                        document.page_content = cleaned_body
+                        document.metadata["source_type"] = (
+                            "notebook"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+                    elif os.path.splitext(f_name)[-1] == ".md":
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        contents = document.page_content
+                        cleaned_body = clean_contents(contents)
+                        document.page_content = cleaned_body
+                        document.metadata["source_type"] = (
+                            "markdown"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+                    else:
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        document.metadata["source_type"] = (
+                            "code"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+
+                    document.metadata["file_type"] = os.path.splitext(f_name)[-1]
+                    document.metadata["source"] = doc_source_url # Set the correct remote source URL
+                    yield document
+                except Exception as e:
+                    logger.warning(f"Failed to load code in {f_name} with error {e}")
+            # logger.info(f"Releasing lock for {local_repo_path} after processing {len(document_files)} files.") # Removed lock logging
+        else:
+            # Non-Git Repo: Original logic without lock
+            local_paths = self._get_local_paths()
+            paths = list(local_paths)
+            # ... (rest of original non-git path processing and loading) ...
+            # ... (ensure this part matches the structure inside the lock) ...
+            local_paths_str = list(map(lambda x: str(x), paths))
+            local_path_parts = list(map(lambda x: x.parts, paths))
+            try:
+                examples_idx = list(
+                    map(
+                        lambda x: x.index(self.config.data_source.local_path.stem),
+                        local_path_parts,
+                    )
+                )
+                remote_paths = list(
+                    map(
+                        lambda x: "/".join(x[1][x[0] + 1 :]),
+                        zip(examples_idx, local_path_parts),
+                    )
+                )
+            except ValueError as e:
+                logger.warning(f"Could not find local path stem in path parts for {self.config.name}: {e}. Using relative paths.")
+                search_base = self.config.data_source.local_path / self.config.data_source.base_path
+                remote_paths = [str(p.relative_to(search_base)) for p in paths]
+
+            remote_paths = list(
+                map(
+                    lambda x: f"{self.config.data_source.remote_path}{x}",
+                    remote_paths,
+                )
+            )
+            document_files = dict(zip(local_paths_str, remote_paths))
+            for f_name in document_files:
+                try:
+                    doc_metadata_source = f_name
+                    doc_source_url = document_files[f_name]
+                    if os.path.splitext(f_name)[-1] == ".ipynb":
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        contents = document.page_content
+                        # ... (rest of ipynb processing) ...
+                        notebook = nbformat.reads(contents, as_version=4)
+                        _, notebook = normalize(
+                            notebook, version=4, strip_invalid_metadata=True
+                        )
+                        md_exporter = MarkdownExporter(template="classic")
+                        (body, resources) = md_exporter.from_notebook_node(notebook)
+                        cleaned_body = clean_contents(body)
+                        document.page_content = cleaned_body
+                        document.metadata["source_type"] = (
+                            "notebook"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+                    elif os.path.splitext(f_name)[-1] == ".md":
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        contents = document.page_content
+                        # ... (rest of md processing) ...
+                        cleaned_body = clean_contents(contents)
+                        document.page_content = cleaned_body
+                        document.metadata["source_type"] = (
+                            "markdown"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+                    else:
+                        document = TextLoader(doc_metadata_source).load()[0]
+                        document.metadata["source_type"] = (
+                            "code"
+                            if self.config.source_type == "code"
+                            else self.config.source_type
+                        )
+
+                    document.metadata["file_type"] = os.path.splitext(f_name)[-1]
+                    document.metadata["source"] = doc_source_url # Set the correct remote source URL
+                    yield document
+                except Exception as e:
+                    logger.warning(f"Failed to load code in {f_name} with error {e}")
 
 
 class FCReportsDataLoader(DataLoader):
@@ -886,7 +1015,7 @@ def get_loader_from_config(config: DataStoreConfig) -> DataLoader:
     if source_type == "documentation":
         if "weave" in config.name.lower():
             source_type = "weave_documentation"
-            logging.info("Identified Weave documentation loader.")
+            logging.info("Identified weave documentation loader.")
         else:
             source_type = "wandb_documentation"
             logging.info("Identified W&B documentation loader.")
@@ -926,7 +1055,7 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
                 }
                 f.write(json.dumps(document_json) + "\n")
                 doc_count += 1
-        logging.info(f"Finished loading {doc_count} documents into {documents_path}")
+        logging.info(f"Finished saving {doc_count} processed source files to {documents_path}")
 
         metadata_path = docstore_dir / "metadata.json"
         logging.info(f"Writing metadata to {metadata_path}")
@@ -944,37 +1073,11 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
         raise
 
 
-def load(
-    project: str | None = ingestion_config.wandb_project,
-    entity: str | None = ingestion_config.wandb_entity,
-    result_artifact_name: str = "raw_data",
-) -> str:
-    """Loads and prepares data for the Wandbot ingestion system.
+# --- Refactored Helper Functions --- 
 
-    This function orchestrates the data loading process for various data sources
-    defined in the configuration. It initializes a Weights & Biases run,
-    loads data using the appropriate data loaders, saves the loaded documents
-    to JSONL files, and logs the resulting data as a W&B artifact.
-
-    Args:
-        project: The Weights & Biases project name.
-        entity: The Weights & Biases entity (user or team) name.
-        result_artifact_name: The name for the resulting W&B artifact.
-
-    Returns:
-        The path to the logged artifact.
-    """
-    logging.info(f"Starting Wandbot data ingestion for {entity}/{project}")
-    run = wandb.init(project=project, entity=entity, job_type="prepare_dataset")
-    logging.info(f"Initialized Wandb run: {run.url}")
-
-    # Generate a timestamp string for this run
-    timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    timestamped_cache_root = ingestion_config.cache_dir / timestamp_str
-    logging.info(f"Using timestamped cache root: {timestamped_cache_root}")
-
-    # Define all configurations
-    all_configs: List[DataStoreConfig] = [
+def get_all_data_store_configs() -> List[DataStoreConfig]:
+    """Returns a list of all available DataStoreConfig instances."""
+    return [
         DocodileEnglishStoreConfig(),
         DocodileJapaneseStoreConfig(),
         DocodileKoreanStoreConfig(),
@@ -988,73 +1091,112 @@ def load(
         FCReportsStoreConfig(),
     ]
 
-    # Filter for the specific config we want to debug
-    # configs_to_process = [
-    #     config
-    #     for config in all_configs
-    #     if isinstance(config, DocodileEnglishStoreConfig)
-    # ]
-    configs_to_process = all_configs
+def filter_configs(
+    all_configs: List[DataStoreConfig],
+    include_sources: Optional[List[str]],
+    exclude_sources: Optional[List[str]],
+) -> List[DataStoreConfig]:
+    """Filters configurations based on include/exclude lists."""
+    configs_to_process = list(all_configs) # Start with a copy
+    if include_sources:
+        configs_to_process = [
+            cfg for cfg in configs_to_process if cfg.name in include_sources
+        ]
+        logger.info(f"Including only specified sources: {include_sources}")
+    if exclude_sources:
+        original_count = len(configs_to_process)
+        configs_to_process = [
+            cfg for cfg in configs_to_process if cfg.name not in exclude_sources
+        ]
+        logger.info(f"Excluding specified sources: {exclude_sources}")
+        logger.info(f"Filtered from {original_count} to {len(configs_to_process)} sources.")
+    return configs_to_process
 
-    # Update docstore_dir for each config to include the timestamp directory
-    for config in configs_to_process:
+def update_config_paths(
+    configs: List[DataStoreConfig], timestamped_cache_root: pathlib.Path
+) -> List[DataStoreConfig]:
+    """Updates the docstore_dir for each config based on the timestamped root."""
+    updated_configs = []
+    for config in configs:
+        # Assuming the base dir for raw data is the parent of the config's cache_dir
+        # This logic might need adjustment if cache_dir structure changes
+        try:
+            raw_data_base_dir_name = config.data_source.cache_dir.parent.name
+        except AttributeError:
+            # Fallback if cache_dir doesn't have a parent (e.g., it's the root)
+            # Or handle based on expected structure
+            logger.warning(f"Could not determine raw data base dir name from {config.data_source.cache_dir}. Using default 'raw_data'.")
+            raw_data_base_dir_name = "raw_data"
+        
         original_docstore_name = config.docstore_dir.name
-        # Get the default 'raw_data' dir name from the DataSource definition
-        raw_data_dir_name = DataSource().cache_dir.name
         config.docstore_dir = (
-            timestamped_cache_root / raw_data_dir_name / original_docstore_name
+            timestamped_cache_root / raw_data_base_dir_name / original_docstore_name
         )
-        logging.debug(
+        logger.debug(
             f"Updated docstore_dir for {config.name} to {config.docstore_dir}"
         )
+        updated_configs.append(config)
+    return updated_configs
 
-    # Use multiprocessing to load data in parallel
-    num_processes = max(1, cpu_count() // 2)
-    pool = Pool(num_processes)
+def run_load_tasks_parallel(configs: List[DataStoreConfig]) -> List[Optional[pathlib.Path]]:
+    """Runs load_from_config for each config in parallel using ProcessPoolExecutor."""
+    results = []
+    tasks = [(load_from_config, (config,)) for config in configs]
+    
+    num_processes = max(8, cpu_count() - 1)
+    logger.info(f"Starting data loading tasks for {len(configs)} sources with up to {num_processes} parallel processes.")
 
-    results = pool.map(load_from_config, configs_to_process)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_processes) as executor:
+        futures = [executor.submit(func, *args) for func, args in tasks]
+        logger.info(f"Submitted {len(futures)} tasks to the executor. Waiting for completion...")
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                # Log errors from the futures themselves
+                logger.error(f"A task failed with exception: {e}", exc_info=True)
+                # Append None to indicate a task failure
+                results.append(None)
+    
+    logger.info("All load tasks completed.")
+    return results
 
-    pool.close()
-    pool.join()
-
+def log_results_to_artifact(
+    run: wandb.sdk.wandb_run.Run,
+    artifact_name: str,
+    successful_docstore_paths: List[pathlib.Path],
+    total_configs_processed: int
+) -> str:
+    """Creates, populates, and logs a W&B artifact with the results."""
     artifact = wandb.Artifact(
-        result_artifact_name,
+        artifact_name,
         type="dataset",
-        description="Raw documents for wandbot",
+        description="Raw documents for wandbot, potentially filtered.",
     )
-    logging.info(f"Created Wandb Artifact: {result_artifact_name}")
+    logging.info(f"Created Wandb Artifact: {artifact_name}")
 
     completed_count = 0
-    total_configs = len(configs_to_process)
     added_to_artifact = []
 
-    for docstore_path in results:
+    for docstore_path in successful_docstore_paths:
         try:
-            # The docstore_path is already in the correct timestamped location.
-            # No need to rename locally.
-            # We need the original config name for the artifact structure.
-            # Assuming the structure is timestamped_cache_root / 'raw_data' / config_name
-            artifact_entry_name = docstore_path.name  # e.g., English_Documentation
-            artifact_base_dir = docstore_path.parent.name  # e.g., raw_data
+            artifact_entry_name = docstore_path.name
+            # Use the parent directory name (e.g., raw_data) as the base in the artifact
+            artifact_base_dir = docstore_path.parent.name 
             artifact_full_name = f"{artifact_base_dir}/{artifact_entry_name}"
 
-            # The path already includes the timestamp. Rename for artifact clarity (remove run_id if needed).
-            # Keep the original logic for adding to artifact for now.
-            # unique_local_path = docstore_path.parent / f"{docstore_path.name}_{run.id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}"
-            # logging.info(f"Renaming local cache {docstore_path} to {unique_local_path}")
-            # docstore_path.rename(unique_local_path)
-
             logging.info(
-                f"Adding directory {docstore_path} to artifact {result_artifact_name} as {artifact_full_name}"
+                f"Adding directory {docstore_path} to artifact {artifact_name} as {artifact_full_name}"
             )
             artifact.add_dir(
-                str(docstore_path),  # Use the final timestamped path
-                name=artifact_full_name,  # Use structure like 'raw_data/English_Documentation'
+                str(docstore_path),
+                name=artifact_full_name,
             )
             added_to_artifact.append(artifact_full_name)
             completed_count += 1
             logging.info(
-                f"Progress: {completed_count}/{total_configs} configurations processed and added."
+                f"Progress: {completed_count}/{len(successful_docstore_paths)} successful configurations added."
             )
         except Exception as e:
             logging.error(
@@ -1064,20 +1206,101 @@ def load(
 
     logging.info(f"Successfully added directories to artifact: {added_to_artifact}")
 
-    if completed_count < total_configs:
+    # Adjust logging based on total submitted vs successful results
+    num_failed_tasks = total_configs_processed - len(successful_docstore_paths)
+
+    if completed_count < len(successful_docstore_paths):
         logging.warning(
-            f"Only {completed_count} out of {total_configs} configurations completed successfully and added to artifact."
+            f"Only {completed_count} out of {len(successful_docstore_paths)} successfully processed configurations were added to the artifact."
+            f" ({num_failed_tasks} tasks failed during execution)."
+        )
+    elif num_failed_tasks > 0:
+        logging.warning(
+            f"{num_failed_tasks} tasks failed during processing. Successfully processed and added {completed_count} configurations to artifact."
         )
     else:
         logging.info(
-            f"All {total_configs} configurations processed successfully and added to artifact."
+            f"All {total_configs_processed} configurations processed successfully and added to artifact."
         )
 
-    logging.info(f"Logging artifact {result_artifact_name} to Wandb.")
+    logging.info(f"Logging artifact {artifact_name} to Wandb.")
     run.log_artifact(artifact)
     logging.info("Artifact logged successfully.")
-    run.finish()
-    logging.info(f"Wandb run finished: {run.url}")
-    artifact_path = f"{entity}/{project}/{result_artifact_name}:latest"
-    logging.info(f"Data ingestion finished. Result artifact: {artifact_path}")
+    artifact_path = f"{run.entity}/{run.project}/{artifact_name}:latest"
     return artifact_path
+
+# --- End Refactored Helper Functions ---
+
+def run_prepare_data_pipeline(project: str, entity: str, result_artifact_name: str,
+         include_sources: Optional[List[str]] = None,
+         exclude_sources: Optional[List[str]] = None) -> str:
+    """Loads and prepares data, running all configurations in parallel.
+
+    Args:
+        project: The W&B project name.
+        entity: The W&B entity name.
+        result_artifact_name: The name for the resulting raw data artifact.
+        include_sources: Optional list of source names to specifically include.
+        exclude_sources: Optional list of source names to specifically exclude.
+
+    Returns:
+        The path string of the logged W&B artifact.
+    """
+    run = wandb.init(project=project, entity=entity, job_type="data_ingestion")
+    if run is None:
+        raise Exception("Failed to initialize wandb run.")
+    logging.info(f"Wandb run initialized: {run.url}")
+
+    try:
+        # 1. Get all available configurations
+        all_configs = get_all_data_store_configs()
+
+        # 2. Filter configurations based on CLI args
+        configs_to_process = filter_configs(all_configs, include_sources, exclude_sources)
+
+        if not configs_to_process:
+            logger.warning("No configurations left to process after filtering. Exiting.")
+            return f"{entity}/{project}/{result_artifact_name}:latest" # Return placeholder
+
+        # 3. Set up timestamped paths for this run
+        run_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Use the base cache dir from the global config
+        timestamped_cache_root = ingestion_config.cache_dir / run_timestamp
+        timestamped_cache_root.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Created timestamped cache directory: {timestamped_cache_root}")
+
+        # 4. Update paths within the configs
+        configs_with_updated_paths = update_config_paths(configs_to_process, timestamped_cache_root)
+        
+        # 5. Run the loading tasks in parallel
+        results = run_load_tasks_parallel(configs_with_updated_paths)
+
+        # 6. Filter out failed tasks (represented by None)
+        successful_results = [res for res in results if res is not None]
+
+        # 7. Log results to artifact
+        if successful_results:
+            artifact_path = log_results_to_artifact(
+                run=run,
+                artifact_name=result_artifact_name,
+                successful_docstore_paths=successful_results,
+                total_configs_processed=len(configs_to_process)
+            )
+            logging.info(f"Data ingestion finished. Result artifact: {artifact_path}")
+        else:
+            logger.warning("No tasks completed successfully. No artifact will be logged.")
+            artifact_path = f"{entity}/{project}/{result_artifact_name}:failed"
+
+        return artifact_path
+
+    except Exception as e:
+        logger.error(f"Ingestion pipeline failed with error: {e}", exc_info=True)
+        # Ensure run is finished even on failure
+        if run:
+            run.finish(exit_code=1)
+        raise # Re-raise the exception after finishing the run
+    finally:
+        # Ensure the run is finished cleanly if no exception occurred or after handling
+        if run:
+            run.finish()
+            logging.info(f"Wandb run finished: {run.url}")

@@ -23,14 +23,6 @@ from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
-# Define shared local paths for git repos relative to the cache_dir
-SHARED_CACHE_DIR = pathlib.Path("data/cache/raw_data")
-DOCS_LOCAL_PATH = SHARED_CACHE_DIR / "docs"
-EXAMPLES_LOCAL_PATH = SHARED_CACHE_DIR / "examples"
-WANDB_SDK_LOCAL_PATH = SHARED_CACHE_DIR / "wandb"
-WEAVE_LOCAL_PATH = SHARED_CACHE_DIR / "weave"
-EDU_LOCAL_PATH = SHARED_CACHE_DIR / "edu"
-
 class IngestionConfig(BaseSettings):
     wandb_project: str = Field("wandbot-dev", env="WANDB_PROJECT")
     wandb_entity: str = Field("wandbot", env="WANDB_ENTITY")
@@ -58,6 +50,7 @@ class DataStoreConfig(BaseModel):
     docstore_dir: pathlib.Path = pathlib.Path("docstore")
     chunk_size: int = 512
     chunk_multiplier: int = 2
+    language: Optional[str] = None
 
     @model_validator(mode="after")
     def _set_cache_paths(cls, values: "DataStoreConfig") -> "DataStoreConfig":
@@ -73,12 +66,12 @@ class DataStoreConfig(BaseModel):
             data_source.is_git_repo = (
                 urlparse(data_source.repo_path).netloc == "github.com"
             )
-            local_path = urlparse(data_source.repo_path).path.split("/")[-1]
+            local_path_name = urlparse(data_source.repo_path).path.split("/")[-1]
             if not data_source.local_path:
                 data_source.local_path = (
                     data_source.cache_dir
                     / sanitized_name
-                    / local_path
+                    / local_path_name
                 )
             if data_source.is_git_repo:
                 if data_source.git_id_file is None:
@@ -100,7 +93,6 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://docs.wandb.ai/",
         repo_path="https://github.com/wandb/docs",
-        local_path=DOCS_LOCAL_PATH,
         branch="main",
         base_path="content",
         file_patterns=["*.md", "*.mdx"],
@@ -118,7 +110,6 @@ class DocodileJapaneseStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/docs/",
         repo_path="https://github.com/wandb/docs/",
-        local_path=DOCS_LOCAL_PATH,
         base_path="docs",
         file_patterns=["*.md", "*.mdx"],
         is_git_repo=True,
@@ -134,7 +125,6 @@ class DocodileKoreanStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/docs/",
         repo_path="https://github.com/wandb/docs/",
-        local_path=DOCS_LOCAL_PATH,
         base_path="docs",
         file_patterns=["*.md"],
         is_git_repo=True,
@@ -150,7 +140,6 @@ class ExampleCodeStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/examples/tree/master/",
         repo_path="https://github.com/wandb/examples",
-        local_path=EXAMPLES_LOCAL_PATH,
         branch="master",
         base_path="examples",
         file_patterns=["*.py"],
@@ -165,7 +154,6 @@ class ExampleNotebookStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/examples/tree/master/",
         repo_path="https://github.com/wandb/examples",
-        local_path=EXAMPLES_LOCAL_PATH,
         branch="master",
         base_path="colabs",
         file_patterns=["*.ipynb"],
@@ -180,7 +168,6 @@ class SDKCodeStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/wandb/tree/main/",
         repo_path="https://github.com/wandb/wandb",
-        local_path=WANDB_SDK_LOCAL_PATH,
         branch="main",
         base_path="wandb",
         file_patterns=["*.py"],
@@ -195,7 +182,6 @@ class SDKTestsStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/wandb/tree/main/",
         repo_path="https://github.com/wandb/wandb",
-        local_path=WANDB_SDK_LOCAL_PATH,
         branch="main",
         base_path="tests",
         file_patterns=["*.py"],
@@ -210,8 +196,7 @@ class WeaveCodeStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/tree/master/",
         repo_path="https://github.com/wandb/weave",
-        branch="main",
-        local_path=WEAVE_LOCAL_PATH,
+        branch="master",
         base_path="weave",
         file_patterns=["*.py", "*.ipynb"],
         is_git_repo=True,
@@ -225,8 +210,7 @@ class WeaveDocStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave",
         repo_path="https://github.com/wandb/weave",
-        local_path=WEAVE_LOCAL_PATH,
-        branch="main",
+        branch="master",
         base_path="docs/docs",
         file_patterns=[
             "*.md",
@@ -245,7 +229,6 @@ class WandbEduCodeStoreConfig(DataStoreConfig):
         remote_path="https://github.com/wandb/edu/tree/main/",
         repo_path="https://github.com/wandb/edu",
         branch="main",
-        local_path=EDU_LOCAL_PATH,
         base_path="",
         file_patterns=["*.py", "*.ipynb", "*.md"],
         is_git_repo=True,
@@ -259,7 +242,6 @@ class WeaveJsStoreConfig(DataStoreConfig):
     data_source: DataSource = DataSource(
         remote_path="https://github.com/wandb/weave/tree/master/",
         repo_path="https://github.com/wandb/weave",
-        local_path=WEAVE_LOCAL_PATH,
         branch="master",
         base_path="weave-js",
         file_patterns=["*.js", "*.ts"],

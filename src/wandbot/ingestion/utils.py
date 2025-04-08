@@ -34,7 +34,6 @@ import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
-import filelock
 
 import frontmatter
 import giturlparse
@@ -113,7 +112,6 @@ def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
             commit_author=str(head_commit.author),
             commit_time=head_commit.committed_datetime.strftime("%Y-%m-%d %H:%M:%S"),
             commit_hash=head_commit.hexsha,
-            commit_stats=head_commit.stats.total,
         )
     except Exception as e:
         logger.error(f"Failed to fetch metadata from repo at {repo.working_dir}: {e}")
@@ -123,17 +121,14 @@ def fetch_repo_metadata(repo: "Repo") -> Dict[str, str]:
             "commit_author": "N/A",
             "commit_time": "N/A",
             "commit_hash": "N/A",
-            "commit_stats": {},
         }
 
 
 def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
-    """Fetch the git repository, optimizing for single clone per repo URL.
+    """Fetch the git repository using direct subprocess calls for clone and LFS.
 
-    Clones the repository if it doesn't exist locally, otherwise fetches updates
-    and checks out the specified branch. Assumes configurations for the same
-    repo_path use the same local_path.
-    Uses file locking to prevent race conditions during concurrent access.
+    Clones the repository fully for the specified branch after ensuring
+    any existing local directory is removed. Includes Git LFS pull steps.
 
     Args:
         paths: The DataSource configuration containing repo_path, local_path, branch, etc.
@@ -148,154 +143,112 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
 
     local_repo_path = paths.local_path
     repo_url = paths.repo_path
-    # Use 'main' as default if branch is not specified or None
     branch = paths.branch if paths.branch else "main"
 
-    # Define a lock file path based on the local repo path
-    lock_path = local_repo_path.parent / f"{local_repo_path.name}.lock"
-
-    # Ensure the parent directory for the clone exists
-    local_repo_path.parent.mkdir(parents=True, exist_ok=True)
-
-    repo = None
     repo_metadata = {}
 
     try:
-        # Acquire lock for this specific repository path
-        with filelock.FileLock(str(lock_path)):
-            logger.info(f"Acquired lock for {local_repo_path}")
+        # Ensure the parent directory exists
+        local_repo_path.parent.mkdir(parents=True, exist_ok=True)
 
-            if local_repo_path.is_dir():
-                try:
-                    repo = Repo(local_repo_path)
-                    logger.info(
-                        f"Repo {local_repo_path} already exists. Fetching updates for {repo_url}"
-                    )
-                    with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
-                        origin = repo.remotes.origin
-                        # Check and configure fetch refspec if missing
-                        if not origin.config_reader.has_option('fetch'):
-                            logger.warning(f"Missing fetch refspec for remote 'origin' in {local_repo_path}. Configuring default.")
-                            with origin.config_writer as writer:
-                                writer.set("fetch", "+refs/heads/*:refs/remotes/origin/*")
-
-                        # Fetch all remote branches refs without checking out/merging
-                        logger.info(f"Fetching updates for {local_repo_path}...")
-                        origin.fetch(prune=True)
-                        logger.info(f"Fetch complete for {local_repo_path}.")
-
-                except InvalidGitRepositoryError:
-                    logger.warning(
-                        f"Folder {local_repo_path} exists but is not a valid git repo. Removing it."
-                    )
-                    try:
-                        shutil.rmtree(local_repo_path)
-                    except OSError as e:
-                        logger.error(f"Failed to remove existing directory {local_repo_path}: {e}")
-                        raise
-                    repo = None # Set repo to None to trigger clone below
-
-            # If repo is still None (either didn't exist or was invalid), clone it
-            if repo is None:
-                logger.info(f"Cloning {repo_url} (branch: {branch}) into {local_repo_path}...")
-                # Initial clone - try cloning the specific branch directly first for efficiency
-                try:
-                     repo = Repo.clone_from(
-                         url=repo_url,
-                         to_path=local_repo_path,
-                         env=git_ssh_command_env,
-                         branch=branch,
-                         # depth=1 # Optional: Uncomment for shallow clone if full history isn't needed
-                     )
-                     logger.info(f"Successfully cloned branch '{branch}' of {repo_url}")
-                     # If clone is successful with the specific branch, we might not need subsequent checkout/pull
-                     # unless we want to ensure it's absolutely the latest.
-                     # For simplicity and consistency, we'll proceed to checkout/pull anyway.
-                except GitCommandError as e:
-                    # If cloning a specific branch fails (e.g., during first setup or transient error)
-                    # Fallback: Clone default branch first, then checkout desired branch
-                    logger.warning(f"Failed to clone branch '{branch}' directly for {repo_url}. "
-                                   f"Cloning default branch and then checking out '{branch}'. Error: {e}")
-                    # Check if clone dir exists from failed attempt and remove if necessary
-                    if local_repo_path.exists():
-                        logger.warning(f"Removing potentially incomplete directory {local_repo_path} before retrying.")
-                        shutil.rmtree(local_repo_path)
-
-                    repo = Repo.clone_from(
-                        url=repo_url,
-                        to_path=local_repo_path,
-                        env=git_ssh_command_env,
-                        # Don't specify branch here, clones default (usually 'main' or 'master')
-                        # depth=1 # Optional: Uncomment for shallow clone
-                    )
-                    logger.info(f"Successfully cloned default branch of {repo_url}. Will checkout '{branch}' next.")
-                    # We'll definitely need to checkout the desired branch in the next step
-
-            # --- Moved Checkout and Pull Logic Here ---
-            # Ensure repo object is valid before proceeding
-            if repo is None:
-                 raise Exception(f"Git repo object is unexpectedly None for {local_repo_path} after clone/fetch attempts.")
-
-            # Now checkout and pull the desired branch (applies after clone or fetch)
-            with repo.git.custom_environment(GIT_SSH_COMMAND=git_command):
-                active_branch_name = repo.active_branch.name
-                logger.info(f"Current active branch in {local_repo_path}: {active_branch_name}")
-                
-                # Only checkout if the active branch is different from the target branch
-                if active_branch_name != branch:
-                    logger.info(f"Checking out target branch: {branch} in {local_repo_path}")
-                    try:
-                        # Add detail on checkout command
-                        checkout_output = repo.git.checkout(branch)
-                        logger.info(f"Successfully checked out branch: {branch}. Output: {checkout_output}")
-                    except GitCommandError as e:
-                        # Try fetching again and then checkout, branch might be new
-                        logger.warning(f"Initial checkout of branch '{branch}' failed: {e}. Fetching again and retrying checkout.")
-                        try:
-                            fetch_again_output = repo.remotes.origin.fetch()
-                            logger.info(f"Second fetch output: {fetch_again_output}")
-                            checkout_retry_output = repo.git.checkout(branch)
-                            logger.info(f"Successfully checked out branch: {branch} after second attempt. Output: {checkout_retry_output}")
-                        except GitCommandError as e_retry:
-                            logger.error(f"Failed to checkout branch '{branch}' even after fetching again in {local_repo_path}: {e_retry}. "
-                                         f"Proceeding with current branch '{repo.active_branch.name}'.")
-                            # Update branch variable to reflect reality if checkout failed definitively
-                            branch = repo.active_branch.name 
-                else:
-                    logger.info(f"Repo {local_repo_path} already on target branch {branch}. Skipping checkout.")
-
-                # Pull the latest changes for the target branch (now the active branch)
-                # Use the potentially updated 'branch' variable in case checkout failed and we reverted
-                current_branch_to_pull = repo.active_branch.name
-                logger.info(f"Pulling latest changes for branch: {current_branch_to_pull} in {local_repo_path}")
-                try:
-                    # Add detail on pull command
-                    pull_output = repo.remotes.origin.pull(current_branch_to_pull)
-                    logger.info(f"Successfully pulled changes for branch: {current_branch_to_pull}. Output: {pull_output}")
-                except GitCommandError as e:
-                        logger.error(f"Failed to pull changes for branch '{current_branch_to_pull}' in {local_repo_path}: {e}")
-                        # Proceed with current state, metadata will reflect this
-
-            # Fetch metadata *inside* the lock
-            repo_metadata = fetch_repo_metadata(repo)
-            # Log directory contents before releasing lock
+        # --- Delete existing directory ---
+        if local_repo_path.exists():
+            logger.warning(f"Removing existing directory {local_repo_path} to perform a fresh clone.")
             try:
-                dir_contents = os.listdir(local_repo_path)
-                logger.info(f"Contents of {local_repo_path} before releasing lock: {dir_contents}")
-            except Exception as e_ls:
-                logger.error(f"Failed to list directory contents for {local_repo_path}: {e_ls}")
-            logger.info(f"Releasing lock for {local_repo_path}")
+                shutil.rmtree(local_repo_path)
+            except OSError as e:
+                logger.error(f"Failed to remove existing directory {local_repo_path}: {e}")
+                raise
 
-    except FileNotFoundError as e:
+        # --- Use subprocess for git clone ---
+        logger.info(f"Performing fresh clone of {repo_url} (branch: {branch}) into {local_repo_path} using subprocess...")
+        clone_cmd = [
+            'git', 'clone', '--branch', branch,
+            '--depth=1',
+            '--', repo_url, str(local_repo_path)
+        ]
+        logger.info(f"Running clone command: {' '.join(clone_cmd)}")
+        result = subprocess.run(clone_cmd, env=git_ssh_command_env, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            logger.error(f"Subprocess git clone failed. Return code: {result.returncode}")
+            logger.error(f"Clone stdout: {result.stdout}")
+            logger.error(f"Clone stderr: {result.stderr}")
+            raise GitCommandError(clone_cmd, result.returncode, result.stderr)
+        logger.info(f"Successfully cloned branch '{branch}' of {repo_url} via subprocess.")
+        logger.debug(f"Clone stdout: {result.stdout}")
+        logger.debug(f"Clone stderr: {result.stderr}")
+
+        # --- Use subprocess for Git LFS pull steps ---
+        logger.info(f"Attempting Git LFS pull for {local_repo_path} using subprocess")
+        try:
+            # Need commit hash for fetch - use GitPython just for this temporarily, or parse from clone output if possible.
+            # For now, let's try fetching all LFS objects for the branch tip.
+            # repo = Repo(local_repo_path) # Re-initialize Repo object to get commit hash
+            # commit_hash = repo.head.commit.hexsha
+
+            # Fetch all LFS objects for the current checkout
+            lfs_fetch_cmd = ['git', 'lfs', 'fetch']
+            logger.info(f"Running LFS fetch command: {' '.join(lfs_fetch_cmd)}")
+            result_fetch = subprocess.run(lfs_fetch_cmd, cwd=local_repo_path, env=git_ssh_command_env, capture_output=True, text=True, check=False)
+            if result_fetch.returncode != 0:
+                logger.warning(f"Subprocess git lfs fetch failed. Return code: {result_fetch.returncode}. Stderr: {result_fetch.stderr}. This might be ok.")
+            else:
+                 logger.info(f"LFS fetch stdout: {result_fetch.stdout}")
+                 logger.debug(f"LFS fetch stderr: {result_fetch.stderr}")
+
+            # Checkout LFS files (replace pointers)
+            lfs_checkout_cmd = ['git', 'lfs', 'checkout']
+            logger.info(f"Running LFS checkout command: {' '.join(lfs_checkout_cmd)}")
+            result_checkout = subprocess.run(lfs_checkout_cmd, cwd=local_repo_path, env=git_ssh_command_env, capture_output=True, text=True, check=False)
+            if result_checkout.returncode != 0:
+                 logger.warning(f"Subprocess git lfs checkout failed. Return code: {result_checkout.returncode}. Stderr: {result_checkout.stderr}. This might be ok.")
+            else:
+                 logger.info(f"LFS checkout stdout: {result_checkout.stdout}")
+                 logger.debug(f"LFS checkout stderr: {result_checkout.stderr}")
+
+            logger.info(f"Git LFS pull commands executed via subprocess for {local_repo_path}")
+
+        except Exception as e_lfs_sub:
+            logger.warning(f"An unexpected error occurred during subprocess Git LFS operations: {e_lfs_sub}")
+        # --- End Git LFS pull steps ---
+
+        # --- Add Debugging: List directory contents ---
+        try:
+            logger.debug(f"DEBUG: Listing contents of cloned repo at {local_repo_path} (after subprocess clone/LFS):")
+            for root, dirs, files in os.walk(local_repo_path):
+                if '.git' in dirs:
+                    dirs.remove('.git')
+                relative_root = os.path.relpath(root, local_repo_path)
+                if relative_root == '.':
+                    relative_root = ''
+                for name in files:
+                    logger.debug(f"  Listing files: {os.path.join(relative_root, name)}")
+                for name in dirs:
+                    logger.debug(f"  Lising dirs:  {os.path.join(relative_root, name)}/")
+        except Exception as e_walk:
+            logger.error(f"DEBUG: Failed to list directory contents for {local_repo_path}: {e_walk}")
+        # --- End Debugging ---
+
+        # Fetch metadata - Use GitPython Repo object initialized after successful subprocess clone
+        try:
+            repo = Repo(local_repo_path) # Initialize repo object *after* successful clone
+            repo_metadata = fetch_repo_metadata(repo)
+        except InvalidGitRepositoryError:
+             logger.error(f"Path {local_repo_path} is not a valid Git repository after subprocess clone.")
+             repo_metadata = {"error": "Invalid git repo after subprocess clone"}
+        except Exception as e_meta:
+            logger.error(f"Failed to get metadata after subprocess clone: {e_meta}")
+            repo_metadata = {"error": "Metadata fetch failed after subprocess clone"}
+
+    except FileNotFoundError as e: # Outer except for SSH key
         logger.error(f"SSH Key file error: {e}")
         raise # Reraise critical error
-    except filelock.Timeout:
-        logger.error(f"Could not acquire lock for {local_repo_path} within timeout period.")
-        # Return empty metadata or raise an error, depending on desired behavior
-        raise TimeoutError(f"Failed to acquire lock for git repo: {local_repo_path}")
-    except Exception as e:
+    except GitCommandError as e: # Outer except for clone failure
+         logger.error(f"Git clone command failed: {e}")
+         raise
+    except Exception as e: # Outer except for other errors
         logger.error(f"An unexpected error occurred during git operations for {repo_url} at {local_repo_path}: {e}")
-        raise # Reraise unexpected errors
+        raise
 
     return repo_metadata
 

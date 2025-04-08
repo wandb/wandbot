@@ -89,19 +89,24 @@ class ChromaVectorStore:
             raise ValueError(f"Invalid vector_store_mode: {self.vector_store_config.vector_store_mode}")
             
         logger.info(f"Initializing Chroma collection: {self.vector_store_config.vectordb_collection_name}")
+        # Prepare metadata to be passed during creation/retrieval
+        collection_metadata = {self.vector_store_config.distance_key: self.vector_store_config.distance}
+        logger.info(f"Setting collection metadata on creation: {collection_metadata}")
+        
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,
+            metadata=collection_metadata  # Pass metadata here
         )
-        if self.collection.metadata is None or self.vector_store_config.distance_key not in self.collection.metadata:
-             logger.warning(f"Collection metadata might be missing distance key '{self.vector_store_config.distance_key}'. Attempting to modify.")
-             try:
-                 current_meta = self.collection.metadata or {}
-                 current_meta[self.vector_store_config.distance_key] = self.vector_store_config.distance
-                 self.collection.modify(metadata=current_meta)
-                 logger.info(f"Successfully set collection metadata: {self.collection.metadata}")
-             except Exception as e:
-                 logger.error(f"Failed to set collection metadata: {e}. Relevance scoring might be incorrect.")
+        
+        # Verify metadata after creation/retrieval (optional logging)
+        retrieved_metadata = self.collection.metadata or {}
+        if self.vector_store_config.distance_key not in retrieved_metadata or \
+           retrieved_metadata.get(self.vector_store_config.distance_key) != self.vector_store_config.distance:
+             logger.warning(f"Retrieved collection metadata {retrieved_metadata} does not match expected {collection_metadata}. "
+                            f"This might happen if the collection existed with different settings. Relevance scoring might be affected.")
+        else:
+            logger.info(f"Successfully confirmed collection metadata: {retrieved_metadata}")
     
     @weave.op
     def query(self, 
