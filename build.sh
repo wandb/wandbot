@@ -21,13 +21,20 @@ done
 
 # Create virtualenv & set up
 rm -rf .venv
+
 python3.12 -m venv wandbot_venv --clear
-export VIRTUAL_ENV=wandbot_venv
-export PATH="$VIRTUAL_ENV/bin:$PATH"
-export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
+source wandbot_venv/bin/activate
+
+# export VIRTUAL_ENV=wandbot_venv
+# export PATH="$VIRTUAL_ENV/bin:$PATH"
+# export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
+# Only set a narrow python path, excludes numpy 1.24
+export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/wandbot_venv/lib/python3.12/site-packages
 
 # Use uv for faster installs
 pip install --no-user pip uv --upgrade
+
+uv pip install "numpy>=2.2.0" --force-reinstall
 
 # Clear any existing installations that might conflict
 rm -rf $VIRTUAL_ENV/lib/python*/site-packages/typing_extensions*
