@@ -2,12 +2,12 @@ echo "Running build.sh"
 set -x  # Enable command echo
 set -e  # Exit on error
 
-# Debug disk usage
-du -sh .
-top_usage=$(du -ah . | sort -rh | head -n 20)
-current_dir_usage=$(du -sm . | awk '{print $1}')
-echo -e "Current directory usage: ${current_dir_usage}M"
-echo -e "Top files/dirs usage: ${top_usage}\n"
+# # Debug disk usage
+# du -sh .
+# top_usage=$(du -ah . | sort -rh | head -n 20)
+# current_dir_usage=$(du -sm . | awk '{print $1}')
+# echo -e "Current directory usage: ${current_dir_usage}M"
+# echo -e "Top files/dirs usage: ${top_usage}\n"
 
 # Find libstdc++ to use 
 for dir in /nix/store/*-gcc-*/lib64 /nix/store/*-stdenv-*/lib /nix/store/*-libstdc++*/lib; do
