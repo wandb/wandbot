@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
+
 
 class Document(BaseModel):
     """Class for storing a piece of text and associated metadata."""

@@ -45,20 +45,20 @@ Typical usage example:
     print(f"Answer: {response.answer}")
     print(f"Time taken: {response.time_taken}")
 """
+import sys
+import traceback
 from typing import List
 
 import weave
-from wandbot.configs.chat_config import ChatConfig
-from wandbot.configs.vector_store_config import VectorStoreConfig
+
 from wandbot.chat.rag import RAGPipeline, RAGPipelineOutput
 from wandbot.chat.schemas import ChatRequest, ChatResponse
+from wandbot.chat.utils import translate_en_to_ja, translate_ja_to_en
+from wandbot.configs.chat_config import ChatConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.database.schemas import QuestionAnswer
 from wandbot.retriever import VectorStore
-from wandbot.utils import Timer, get_logger, run_sync
-from wandbot.chat.utils import translate_ja_to_en, translate_en_to_ja
-from wandbot.utils import ErrorInfo, get_error_file_path
-import traceback
-import sys
+from wandbot.utils import ErrorInfo, Timer, get_error_file_path, get_logger, run_sync
 
 logger = get_logger(__name__)
 

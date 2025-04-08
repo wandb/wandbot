@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)

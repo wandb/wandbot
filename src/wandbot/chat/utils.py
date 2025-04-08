@@ -1,5 +1,5 @@
-from openai import OpenAI
 import weave
+from openai import OpenAI
 
 EN_TO_JA_SYSTEM_PROMPT =  "You are a professional translator. \n\n\
 Translate the user's text into Japanese according to the specified rules. \n\

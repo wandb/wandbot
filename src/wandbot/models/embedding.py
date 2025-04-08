@@ -1,16 +1,17 @@
-import os
 import asyncio
-import weave
-from typing import List, Union, Tuple, Dict, Any
-from tenacity import retry, stop_after_attempt, wait_exponential
 import base64
-import numpy as np
-import traceback
+import os
 import sys
+import traceback
+from typing import Any, Dict, List, Tuple, Union
+
+import numpy as np
+import weave
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from wandbot.configs.vector_store_config import VectorStoreConfig
-from wandbot.utils import get_logger, ErrorInfo, get_error_file_path
 from wandbot.schema.api_status import APIStatus
+from wandbot.utils import ErrorInfo, get_error_file_path, get_logger
 
 logger = get_logger(__name__)
 vector_store_config = VectorStoreConfig()

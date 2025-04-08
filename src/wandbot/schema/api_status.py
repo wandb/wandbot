@@ -1,7 +1,9 @@
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 from wandbot.utils import ErrorInfo
+
 
 class APIStatus(BaseModel):
     """Track status of external API calls."""

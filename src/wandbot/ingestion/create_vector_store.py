@@ -13,20 +13,20 @@ Typical usage example:
 
 import json
 import pathlib
-from typing import List, Dict
+from typing import Dict, List
 
 # from langchain_chroma import Chroma
 # from langchain_openai import OpenAIEmbeddings
 from tqdm import trange
 
 import wandb
-from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.configs.chat_config import ChatConfig
-from wandbot.models.embedding import EmbeddingModel
-from wandbot.utils import get_logger
-from wandbot.schema.document import Document
-from wandbot.retriever.chroma import ChromaVectorStore
 from wandbot.configs.ingestion_config import IngestionConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
+from wandbot.retriever.chroma import ChromaVectorStore
+from wandbot.schema.document import Document
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 

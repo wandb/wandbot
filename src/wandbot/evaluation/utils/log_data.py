@@ -2,11 +2,11 @@ import os
 
 os.environ["WANDB_ENTITY"] = "wandbot"
 
-import wandb
-import weave
 import pandas as pd
+import weave
 from weave import Dataset
 
+import wandb
 from wandbot.evaluation.eval_config import EvalConfig
 
 config = EvalConfig()

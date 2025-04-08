@@ -14,8 +14,8 @@ from wandbot.ingestion.preprocessors.markdown import (
     CustomMarkdownTextSplitter,
     create_id_from_document,
 )
-from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 from wandbot.schema.document import Document
+from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 
 
 def extract_docstrings(node: Node, node_type: str, language: Any):

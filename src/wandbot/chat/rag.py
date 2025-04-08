@@ -1,16 +1,15 @@
 import datetime
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 
 import weave
 from pydantic import BaseModel
 
-from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.configs.chat_config import ChatConfig
+from wandbot.rag.query_handler import QueryEnhancer
 from wandbot.rag.response_synthesis import ResponseSynthesizer
 from wandbot.rag.retrieval import FusionRetrievalEngine
 from wandbot.retriever import VectorStore
-from wandbot.utils import Timer, get_logger, run_sync
-from wandbot.utils import ErrorInfo
+from wandbot.utils import ErrorInfo, Timer, get_logger, run_sync
 
 logger = get_logger(__name__)
 chat_config = ChatConfig()

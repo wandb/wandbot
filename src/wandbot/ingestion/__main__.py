@@ -1,9 +1,9 @@
 from wandbot.configs.ingestion_config import IngestionConfig
-from wandbot.ingestion.run_ingestion_config import IngestionRunConfig, get_run_config
+from wandbot.ingestion.create_vector_store import build_vector_store_artifact
 from wandbot.ingestion.prepare_data import run_prepare_data_pipeline
 from wandbot.ingestion.preprocess_data import run_preprocessing_pipeline
-from wandbot.ingestion.create_vector_store import build_vector_store_artifact
 from wandbot.ingestion.report import create_ingestion_report
+from wandbot.ingestion.run_ingestion_config import IngestionRunConfig, get_run_config
 from wandbot.utils import get_logger
 
 ingestion_config = IngestionConfig()

@@ -14,6 +14,7 @@ Typical usage example:
     load(project="my_project", entity="my_entity", result_artifact_name="raw_dataset")
 """
 
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -44,8 +45,11 @@ from wandbot.configs.ingestion_config import (
     SDKCodeStoreConfig,
     SDKTestsStoreConfig,
     WandbEduCodeStoreConfig,
+    WandbEduDocStoreConfig,
     WeaveCodeStoreConfig,
+    WeaveCookbookStoreConfig,
     WeaveDocStoreConfig,
+    WeaveJsStoreConfig,
 )
 from wandbot.ingestion.utils import (
     clean_contents,
@@ -54,7 +58,6 @@ from wandbot.ingestion.utils import (
 )
 from wandbot.schema.document import Document
 from wandbot.utils import get_logger
-import concurrent.futures
 
 logger = get_logger(__name__)
 logging.basicConfig(
@@ -1061,7 +1064,7 @@ def load_from_config(config: DataStoreConfig, debug: bool = False) -> pathlib.Pa
         logging.info(f"Finished saving {doc_count} processed source files to {documents_path}")
 
         metadata_path = docstore_dir / "metadata.json"
-        logging.info(f"Writing metadata to {metadata_path}")
+        logging.debug(f"Writing metadata to {metadata_path}")
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
         loader.metadata["num_documents"] = doc_count # Ensure metadata reflects actual count
         with metadata_path.open("w") as f:
@@ -1087,11 +1090,14 @@ def get_all_data_store_configs() -> List[DataStoreConfig]:
         DocodileKoreanStoreConfig(),
         WeaveDocStoreConfig(),
         WeaveCodeStoreConfig(),
+        WeaveCookbookStoreConfig(),
+        WeaveJsStoreConfig(),
         SDKCodeStoreConfig(),
         SDKTestsStoreConfig(),
         ExampleCodeStoreConfig(),
         ExampleNotebookStoreConfig(),
         WandbEduCodeStoreConfig(),
+        WandbEduDocStoreConfig(),
         FCReportsStoreConfig(),
     ]
 

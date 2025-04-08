@@ -1,8 +1,9 @@
-import weave
 import json
-import requests
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import requests
+import weave
 from tqdm import tqdm
 
 dataset_ref = weave.ref(

@@ -1,20 +1,19 @@
 import asyncio
 import os
-import traceback
 import sys
+import traceback
+from pathlib import Path
 from typing import Any, Dict, List
 
-import weave
-
 import requests
+import weave
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
 
-from wandbot.utils import get_logger, ErrorInfo, get_error_file_path
-from wandbot.schema.document import Document
 from wandbot.schema.api_status import APIStatus
+from wandbot.schema.document import Document
+from wandbot.utils import ErrorInfo, get_error_file_path, get_logger
 
 logger = get_logger(__name__)
 

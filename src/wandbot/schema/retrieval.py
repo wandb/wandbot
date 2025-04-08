@@ -1,8 +1,10 @@
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from wandbot.schema.document import Document
 from wandbot.utils import ErrorInfo
+
 
 class APIStatus(BaseModel):
     """Track status of external API calls during retrieval."""

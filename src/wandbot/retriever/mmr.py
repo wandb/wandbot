@@ -1,9 +1,12 @@
-from typing import List, Any
+from typing import Any, List
+
 import numpy as np
 import weave
 
 from wandbot.retriever.utils import cosine_similarity
 from wandbot.schema.document import Document
+
+
 @weave.op
 def maximal_marginal_relevance(
     query_embedding: np.ndarray,

@@ -1,19 +1,20 @@
-import os
-import json
-import httpx
-import weave
 import asyncio
-import re
+import json
 import logging
-import requests
-from weave import Evaluation
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, after_log
+import os
+import re
 from pathlib import Path
-from dotenv import load_dotenv
 
+import httpx
+import requests
+import weave
+from dotenv import load_dotenv
+from tenacity import after_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from weave import Evaluation
+
+from wandbot.evaluation.eval_config import EvalConfig, get_eval_config
+from wandbot.evaluation.eval_metrics.correctness import CorrectnessEvaluationResult, WandBotCorrectnessEvaluator
 from wandbot.utils import get_logger
-from wandbot.evaluation.eval_metrics.correctness import WandBotCorrectnessEvaluator, CorrectnessEvaluationResult
-from wandbot.evaluation.eval_config import get_eval_config, EvalConfig
 
 # Load environment variables from .env in project root
 ENV_PATH = Path(__file__).parent.parent.parent.parent / '.env'

@@ -26,12 +26,12 @@ Typical usage example:
     cell_info = concatenate_cells(cell, include_outputs, max_output_length, traceback)
 """
 
+import os
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
-import os
-import shutil
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -40,10 +40,10 @@ import giturlparse
 import markdown
 import markdownify
 from bs4 import BeautifulSoup, Comment
-from git import Repo, InvalidGitRepositoryError, GitCommandError
+from git import GitCommandError, InvalidGitRepositoryError, Repo
 
-from wandbot.utils import get_logger
 from wandbot.configs.ingestion_config import DataSource
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -198,7 +198,7 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
 
             # Checkout LFS files (replace pointers)
             lfs_checkout_cmd = ['git', 'lfs', 'checkout']
-            logger.info(f"Running LFS checkout command: {' '.join(lfs_checkout_cmd)}")
+            logger.debug(f"Running LFS checkout command: {' '.join(lfs_checkout_cmd)}")
             result_checkout = subprocess.run(lfs_checkout_cmd, cwd=local_repo_path, env=git_ssh_command_env, capture_output=True, text=True, check=False)
             if result_checkout.returncode != 0:
                  logger.warning(f"Subprocess git lfs checkout failed. Return code: {result_checkout.returncode}. Stderr: {result_checkout.stderr}. This might be ok.")
@@ -206,7 +206,7 @@ def fetch_git_repo(paths: DataSource, id_file: Path) -> Dict[str, str]:
                  logger.info(f"LFS checkout stdout: {result_checkout.stdout}")
                  logger.debug(f"LFS checkout stderr: {result_checkout.stderr}")
 
-            logger.info(f"Git LFS pull commands executed via subprocess for {local_repo_path}")
+            logger.debug(f"Git LFS pull commands executed via subprocess for {local_repo_path}")
 
         except Exception as e_lfs_sub:
             logger.warning(f"An unexpected error occurred during subprocess Git LFS operations: {e_lfs_sub}")

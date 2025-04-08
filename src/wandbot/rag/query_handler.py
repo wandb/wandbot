@@ -6,20 +6,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import regex as re
 import weave
 from pydantic import BaseModel, Field
-from tenacity import (
-    retry,
-    stop_after_attempt, 
-    wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
-    after_log
-)
+from tenacity import after_log, before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from wandbot.configs.chat_config import ChatConfig
-from wandbot.utils import get_logger
 from wandbot.models.llm import LLMModel
 from wandbot.schema.api_status import APIStatus
-
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 retry_chat_config = ChatConfig()

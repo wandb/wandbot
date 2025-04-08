@@ -1,6 +1,9 @@
 from dataclasses import dataclass
-import simple_parsing as sp
 from typing import Literal
+
+import simple_parsing as sp
+
+
 @dataclass
 class EvalConfig:
     # language for eval dataset to use (en or ja)

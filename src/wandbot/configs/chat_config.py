@@ -12,8 +12,10 @@ Typical usage example:
   print(config.chat_model_name)
 """
 
-from pydantic_settings import BaseSettings
 from typing import Literal
+
+from pydantic_settings import BaseSettings
+
 
 class ChatConfig(BaseSettings):    
     # Retrieval settings

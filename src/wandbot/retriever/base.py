@@ -1,14 +1,16 @@
-from typing import List, Dict
 import asyncio
+from typing import Dict, List
+
 import weave
+
+import wandb
+from wandbot.configs.chat_config import ChatConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
 from wandbot.retriever.chroma import ChromaVectorStore
 from wandbot.schema.document import Document
-import wandb
-
-from wandbot.models.embedding import EmbeddingModel
-from wandbot.configs.vector_store_config import VectorStoreConfig
-from wandbot.configs.chat_config import ChatConfig
 from wandbot.utils import get_logger
+
 logger = get_logger(__name__)
 
 class VectorStore:

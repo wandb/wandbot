@@ -1,7 +1,9 @@
 # src/wandbot/ingestion/config.py
 from dataclasses import dataclass, field
-import simple_parsing as sp
 from typing import List, Literal
+
+import simple_parsing as sp
+
 
 @dataclass
 class IngestionRunConfig:

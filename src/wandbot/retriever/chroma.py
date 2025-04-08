@@ -6,20 +6,20 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
 """
+import uuid
+from typing import Any, Callable, Dict, List, Optional
+
+import chromadb
+import numpy as np
+import weave
+from chromadb.config import Settings
+
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.configs.vector_store_config import VectorStoreConfig
 from wandbot.models.embedding import EmbeddingModel
-import weave
-from typing import Any, Callable, Dict, List, Optional
-import numpy as np
-import uuid
-
-import chromadb
-from chromadb.config import Settings
-
-from wandbot.utils import get_logger
-from wandbot.schema.document import Document
 from wandbot.retriever.mmr import max_marginal_relevance_search_by_vector
+from wandbot.schema.document import Document
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 

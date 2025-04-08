@@ -29,25 +29,24 @@ import logging
 import os
 import pathlib
 import re
+import shutil
 import sqlite3
 import string
-from typing import Any, Coroutine, List, Tuple, Dict, Optional
-import shutil
-from pathlib import Path
 import subprocess
+from pathlib import Path
+from typing import Any, Coroutine, Dict, List, Optional, Tuple
 
 import fasttext
 import nest_asyncio
 import tiktoken
-from wandbot.schema.document import Document
-from pydantic import Field, BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from rich.logging import RichHandler
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.theme import Theme
 
 import wandb
+from wandbot.schema.document import Document
 
 
 def get_logger(name: str) -> logging.Logger:

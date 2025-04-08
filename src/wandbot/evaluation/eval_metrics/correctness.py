@@ -1,9 +1,10 @@
-from typing import Any, Optional, List
-import regex as re
-from pydantic import BaseModel, Field
-import weave
+from typing import Any, List, Optional
 
-from wandbot.models.llm import LLMModel, LLMError
+import regex as re
+import weave
+from pydantic import BaseModel, Field
+
+from wandbot.models.llm import LLMError, LLMModel
 
 SYSTEM_TEMPLATE = """You are a Weight & Biases support expert tasked with evaluating the correctness of answers to questions asked by users to a technical support chatbot.
 

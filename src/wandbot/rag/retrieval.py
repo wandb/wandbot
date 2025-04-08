@@ -1,23 +1,23 @@
 import asyncio
-import os
 import logging
-from typing import Any, Dict, List
-from copy import deepcopy
-import traceback
+import os
 import sys
+import traceback
+from copy import deepcopy
+from typing import Any, Dict, List
 
-from wandbot.schema.document import Document
-from wandbot.schema.retrieval import RetrievalResult
-from wandbot.schema.api_status import APIStatus
-from wandbot.configs.chat_config import ChatConfig
 import cohere
 import weave
+from tenacity import after_log, retry, stop_after_attempt, wait_exponential
 from weave.trace.autopatch import autopatch
-from wandbot.utils import run_sync, get_error_file_path, ErrorInfo
-from tenacity import retry, stop_after_attempt, wait_exponential, after_log
 
+from wandbot.configs.chat_config import ChatConfig
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import _async_run_web_search
+from wandbot.schema.api_status import APIStatus
+from wandbot.schema.document import Document
+from wandbot.schema.retrieval import RetrievalResult
+from wandbot.utils import ErrorInfo, get_error_file_path, run_sync
 
 logger = logging.getLogger(__name__)
 retry_chat_config = ChatConfig()

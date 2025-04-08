@@ -1,13 +1,14 @@
-from typing import Any, Dict, List, Tuple
 import logging
+from typing import Any, Dict, List, Tuple
 
 import weave
-from wandbot.rag.utils import combine_documents, create_query_str
-from wandbot.schema.retrieval import RetrievalResult
-from wandbot.models.llm import LLMModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential, before_sleep_log, after_log
-from wandbot.schema.api_status import APIStatus
+from tenacity import after_log, before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from wandbot.configs.chat_config import ChatConfig
+from wandbot.models.llm import LLMModel
+from wandbot.rag.utils import combine_documents, create_query_str
+from wandbot.schema.api_status import APIStatus
+from wandbot.schema.retrieval import RetrievalResult
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)

@@ -1,10 +1,10 @@
 from typing import Callable, List, Union
-import numpy as np
 
+import numpy as np
 import weave
 
-from wandbot.utils import get_logger
 from wandbot.schema.document import Document
+from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -98,7 +98,7 @@ def _filter_similar_embeddings(
             # Default to dropping the second document of any highly similar pair
             included_idxs.remove(second_idx)
     
-    return list(sorted(included_idxs))
+    return sorted(included_idxs)
 
 
 # class EmbeddingsRedundantFilter(BaseDocumentTransformer, BaseModel):
