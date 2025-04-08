@@ -81,6 +81,7 @@ def build_vector_store_artifact(
     entity: str,
     source_artifact_path: str,
     result_artifact_name: str = None, # Allow overriding default name
+    debug: bool = False, # Add debug flag
 ) -> str:
     """Builds and logs the vector store artifact.
 
@@ -92,6 +93,7 @@ def build_vector_store_artifact(
         entity: The name of the entity.
         source_artifact_path: The path to the source artifact (preprocessed data).
         result_artifact_name: Optional name for the resulting vector store artifact.
+        debug: If True, indicates a debug run.
 
     Returns:
         The name of the resulting artifact.
@@ -181,8 +183,10 @@ def build_vector_store_artifact(
         # Prepare description
         description_string = f"Chroma vector store artifact for {entity}/{project}.\\n"
         description_string += f"Built from source artifact: {source_artifact_path}\\n"
-        description_string += f"Contains {len(transformed_documents)} embedded text chunks.\\n"
-        description_string += "\\nMetadata details:\\n"
+        description_string += f"Contains {len(transformed_documents)} embedded text chunks."
+        if debug:
+            description_string += " (DEBUG MODE: Data potentially limited)"
+        description_string += "\\n\\nMetadata details:\\n"
         description_string += json.dumps(artifact_metadata, indent=2)
 
         result_artifact = wandb.Artifact(
@@ -197,9 +201,11 @@ def build_vector_store_artifact(
 
         logger.info("Logging result artifact to W&B...")
         aliases = [
-            f"embed-model-{config.embeddings_model_name}",
-            f"embed-dim-{config.embeddings_dimensions}",
+            f"embed-model_{config.embeddings_model_name}",
+            f"embed-dim_{config.embeddings_dimensions}",
         ]
+        if debug:
+            aliases.append("debug") # Add a debug alias
 
         run.log_artifact(result_artifact, aliases=aliases) # Metadata & description already set
         logger.info(f"Artifact {result_artifact.name} logged with aliases: {aliases}, now uploading...")
@@ -212,9 +218,11 @@ def build_vector_store_artifact(
             # Use the artifact name and 'latest' alias to fetch the version just logged
             logged_artifact_name = f"{entity}/{project}/{final_artifact_name}:latest"
             logged_artifact = api.artifact(logged_artifact_name, type=ingestion_config.vectorstore_index_artifact_type)
-            # Combine existing tags with new aliases, ensuring uniqueness
+
+            # Add tags (aliases + potentially 'debug') to the logged artifact
+            # Ensure uniqueness
             existing_tags = set(logged_artifact.tags or [])
-            new_tags = set(aliases)
+            new_tags = set(aliases) # Aliases already include 'debug' if needed
             logged_artifact.tags = list(existing_tags.union(new_tags))
             logged_artifact.save()
             logger.info(f"Successfully added tags {list(new_tags)} to artifact {logged_artifact_name}")

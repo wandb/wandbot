@@ -89,6 +89,7 @@ def create_ingestion_report(
     entity: str,
     raw_artifact: str,
     vectorstore_artifact: str,
+    debug: bool = False,
 ) -> None:
     """Creates a data ingestion report.
 
@@ -97,13 +98,23 @@ def create_ingestion_report(
         entity: The name of the entity.
         raw_artifact: The raw artifact to include in the report.
         vectorstore_artifact: The vectorstore artifact to include in the report.
+        debug: If True, indicates the report is for a debug run.
     """
+    report_title = f"Wandbot Data Ingestion Report: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    report_description = (
+        f"This report contains details of the data ingestion process "
+        f"for the Wandbot run on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    if debug:
+        report_title += " (DEBUG RUN)"
+        report_description += " (DEBUG MODE: Data limited to first source and first 3 documents)."
+
     report = wr.Report(
         project=project,
         entity=entity,
-        title=f"Wandbot Data Ingestion Report: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        description=f"This report contains details of the data ingestion process "
-        f"for the Wandbot run on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        title=report_title,
+        description=report_description,
     )
 
     if wandb.run is None:

@@ -20,6 +20,8 @@ class IngestionRunConfig:
     """Override the default preprocessed data artifact name."""
     vectorstore_artifact_name: str = "chroma_index"
     """Override the default vector store artifact name."""
+    debug: bool = False
+    """Run in debug mode: process only the first source and first 3 documents, append _debug to artifact names."""
 
 def get_run_config() -> IngestionRunConfig:
     """Parses command line arguments for ingestion run configuration."""

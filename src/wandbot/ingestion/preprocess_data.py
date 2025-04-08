@@ -168,6 +168,7 @@ def run_preprocessing_pipeline(
     entity: str,
     source_artifact_path: str,
     result_artifact_name: str = "transformed_data",
+    debug: bool = False,
 ) -> str:
     run: wandb.wandb_sdk.wandb_run.Run = wandb.init(
         project=project, entity=entity, job_type="preprocess_data"
@@ -225,8 +226,13 @@ def run_preprocessing_pipeline(
         # 3. Load documents for this source
         document_file = source_dir / "documents.jsonl"
         with document_file.open() as f:
-            documents = [Document(**json.loads(line)) for line in f]
-        logger.info(f"Loaded {len(documents)} initial file documents from source file: {document_file}")
+            documents = []
+            for i, line in enumerate(f):
+                if debug and i >= 3:
+                    logger.warning(f"DEBUG MODE: Reading only first 3 documents from {document_file}")
+                    break
+                documents.append(Document(**json.loads(line)))
+        logger.info(f"Loaded {len(documents)} initial file documents from source file: {document_file}{' (DEBUG MODE limit applied)' if debug else ''}")
         
         # 4. Transform documents
         # Replacing process_document_file call with direct transformation
@@ -288,8 +294,10 @@ def run_preprocessing_pipeline(
         result_artifact.add_dir(str(output_dir), name=source_dir.name)
 
     # Prepare description string now that all_source_metadata is populated
-    description_string = f"Preprocessed data artifact containing transformed text chunks for {len(all_source_metadata)} sources.\\n"
-    description_string += "Metadata per source:\\n"
+    description_string = f"Preprocessed data artifact containing transformed text chunks for {len(all_source_metadata)} sources."
+    if debug:
+        description_string += " (DEBUG MODE: Processed only first source and first 3 documents)."
+    description_string += "\nMetadata per source:\n"
     description_string += json.dumps(all_source_metadata, indent=2) # Format as JSON for description
 
     # Set metadata and description on the artifact object itself

@@ -1031,8 +1031,8 @@ def get_loader_from_config(config: DataStoreConfig) -> DataLoader:
         raise ValueError(f"No loader found for source type {source_type}")
 
 
-def load_from_config(config: DataStoreConfig) -> pathlib.Path:
-    logging.info(f"Starting data loading for config: {config.name}")
+def load_from_config(config: DataStoreConfig, debug: bool = False) -> pathlib.Path:
+    logging.info(f"Starting data loading for config: {config.name}{' (DEBUG MODE: first 3 docs)' if debug else ''}")
     try:
         loader = get_loader_from_config(config)
         docstore_dir = loader.config.docstore_dir
@@ -1048,7 +1048,10 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
         logging.info(f"Starting document loading into {documents_path}")
         doc_count = 0
         with documents_path.open("w") as f:
-            for document in loader.load():
+            for i, document in enumerate(loader.load()):
+                if debug and i >= 3:
+                    logging.warning(f"DEBUG MODE: Stopping document loading for {config.name} after 3 documents.")
+                    break
                 document_json = {
                     "page_content": document.page_content,
                     "metadata": document.metadata,
@@ -1060,6 +1063,7 @@ def load_from_config(config: DataStoreConfig) -> pathlib.Path:
         metadata_path = docstore_dir / "metadata.json"
         logging.info(f"Writing metadata to {metadata_path}")
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        loader.metadata["num_documents"] = doc_count # Ensure metadata reflects actual count
         with metadata_path.open("w") as f:
             json.dump(loader.metadata, f)
 
@@ -1095,9 +1099,22 @@ def filter_configs(
     all_configs: List[DataStoreConfig],
     include_sources: Optional[List[str]],
     exclude_sources: Optional[List[str]],
+    debug: bool = False
 ) -> List[DataStoreConfig]:
-    """Filters configurations based on include/exclude lists."""
+    """Filters configurations based on include/exclude lists and debug flag."""
     configs_to_process = list(all_configs) # Start with a copy
+
+    # Apply debug filter first if active
+    if debug:
+        if configs_to_process:
+            first_config = configs_to_process[0]
+            logger.warning(f"DEBUG MODE: Only processing the first source: {first_config.name}")
+            configs_to_process = [first_config]
+        else:
+            logger.warning("DEBUG MODE: No configurations available to process.")
+            return [] # Return empty list if no configs to begin with
+
+    # Then apply include/exclude filters
     if include_sources:
         configs_to_process = [
             cfg for cfg in configs_to_process if cfg.name in include_sources
@@ -1138,10 +1155,11 @@ def update_config_paths(
         updated_configs.append(config)
     return updated_configs
 
-def run_load_tasks_parallel(configs: List[DataStoreConfig]) -> List[Optional[pathlib.Path]]:
+def run_load_tasks_parallel(configs: List[DataStoreConfig], debug: bool = False) -> List[Optional[pathlib.Path]]:
     """Runs load_from_config for each config in parallel using ProcessPoolExecutor."""
     results = []
-    tasks = [(load_from_config, (config,)) for config in configs]
+    # Pass debug flag to load_from_config
+    tasks = [(load_from_config, (config, debug)) for config in configs]
     
     num_processes = max(8, cpu_count() - 1)
     logger.info(f"Starting data loading tasks for {len(configs)} sources with up to {num_processes} parallel processes.")
@@ -1233,7 +1251,8 @@ def log_results_to_artifact(
 
 def run_prepare_data_pipeline(project: str, entity: str, result_artifact_name: str,
          include_sources: Optional[List[str]] = None,
-         exclude_sources: Optional[List[str]] = None) -> str:
+         exclude_sources: Optional[List[str]] = None,
+         debug: bool = False) -> str:
     """Loads and prepares data, running all configurations in parallel.
 
     Args:
@@ -1242,6 +1261,7 @@ def run_prepare_data_pipeline(project: str, entity: str, result_artifact_name: s
         result_artifact_name: The name for the resulting raw data artifact.
         include_sources: Optional list of source names to specifically include.
         exclude_sources: Optional list of source names to specifically exclude.
+        debug: If True, runs in debug mode (first source, first 3 docs).
 
     Returns:
         The path string of the logged W&B artifact.
@@ -1256,7 +1276,7 @@ def run_prepare_data_pipeline(project: str, entity: str, result_artifact_name: s
         all_configs = get_all_data_store_configs()
 
         # 2. Filter configurations based on CLI args
-        configs_to_process = filter_configs(all_configs, include_sources, exclude_sources)
+        configs_to_process = filter_configs(all_configs, include_sources, exclude_sources, debug)
 
         if not configs_to_process:
             logger.warning("No configurations left to process after filtering. Exiting.")
@@ -1273,7 +1293,7 @@ def run_prepare_data_pipeline(project: str, entity: str, result_artifact_name: s
         configs_with_updated_paths = update_config_paths(configs_to_process, timestamped_cache_root)
         
         # 5. Run the loading tasks in parallel
-        results = run_load_tasks_parallel(configs_with_updated_paths)
+        results = run_load_tasks_parallel(configs_with_updated_paths, debug)
 
         # 6. Filter out failed tasks (represented by None)
         successful_results = [res for res in results if res is not None]
