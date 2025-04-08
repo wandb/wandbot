@@ -165,10 +165,9 @@ def build_vector_store_artifact(
 
         # Keys to remove from the serialized config in metadata
         keys_to_remove = [
-            "vectordb_index_artifact_url", # Often derived or set elsewhere
+            "vectordb_index_artifact_url", 
             "vector_store_auth_token",    # Sensitive
-            "embeddings_query_input_type", # Redundant if embeddings_document_input_type exists
-            # Keep embeddings_document_input_type as it's relevant context
+            "embeddings_query_input_type", 
         ]
         for key in keys_to_remove:
             serialized_config.pop(key, None)
