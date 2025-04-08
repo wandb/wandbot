@@ -18,7 +18,7 @@ class VectorStoreConfig(BaseSettings):
     # Vector Store
     vectordb_collection_name: str = "vectorstore"
     vectordb_index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v49"
+    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v48"
     distance: str = "l2"  # used in retrieval from vectordb 
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
     
@@ -32,8 +32,8 @@ class VectorStoreConfig(BaseSettings):
     
     # Embeddings settings
     embeddings_provider:str = "openai"
-    embeddings_model_name: str = "text-embedding-3-large"
-    embeddings_dimensions: int = 3072  # needed when using OpenAI embeddings
+    embeddings_model_name: str = "text-embedding-3-small"
+    embeddings_dimensions: int = 512  # needed when using OpenAI embeddings
     
     # Embedding input types, e.g. "search_query" or "search_document"
     embeddings_query_input_type: str = "search_query"  # needed when using Cohere embeddings
