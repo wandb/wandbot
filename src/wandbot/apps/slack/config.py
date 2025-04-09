@@ -18,7 +18,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
     "Please do not share any private or sensitive information in your query.\n\n"
-    "Please note that overly long messages (>1024 words) will be truncated.\n\n
+    "Please note that overly long messages (>1024 words) will be truncated.\n\n"
     "Generating response...\n\n"
 )
 
