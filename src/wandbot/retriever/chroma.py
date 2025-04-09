@@ -75,7 +75,7 @@ class ChromaVectorStore:
             host = self.vector_store_config.vector_store_host
             tenant = self.vector_store_config.vector_store_tenant
             database = self.vector_store_config.vector_store_database
-            auth_token = self.vector_store_config.vector_store_auth_token
+            api_key = self.vector_store_config.vector_store_api_key
 
             logger.info(f"Initializing vector store in hosted mode: host={host}, tenant={tenant}, database={database}")
 
@@ -87,16 +87,17 @@ class ChromaVectorStore:
                  raise ValueError("vector_store_database must be set in VectorStoreConfig for hosted mode")
 
             headers = {}
-            if auth_token:
-                logger.info("Adding x-chroma-token header for authentication.")
-                headers['x-chroma-token'] = auth_token
+            if api_key:
+                logger.info("Adding x-chroma-api-key header for authentication.")
+                headers['x-chroma-api-key'] = api_key
             else:
                 # Depending on the hosted provider, lack of token might be an error
-                logger.warning("No vector_store_auth_token found in config for hosted mode. Connecting without authentication header.")
+                logger.warning("No vector_store_api_key found in config for hosted mode. Connecting without authentication header.")
 
             # Note: Removed Settings object approach, using direct parameters now
             self.chroma_vectorstore_client = chromadb.HttpClient(
                 host=host,
+                port=443,  # Explicitly set port to 443 for HTTPS
                 ssl=True,
                 tenant=tenant,
                 database=database,
