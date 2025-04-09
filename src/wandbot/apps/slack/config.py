@@ -65,15 +65,15 @@ class SlackAppEnConfig(BaseSettings):
     APPLICATION: str = Field("Slack_EN")
     SLACK_APP_TOKEN: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_EN_APP_TOKEN"}
+        validation_alias="SLACK_EN_APP_TOKEN"
     )
     SLACK_BOT_TOKEN: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_EN_BOT_TOKEN"}
+        validation_alias="SLACK_EN_BOT_TOKEN"
     )
     SLACK_SIGNING_SECRET: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_EN_SIGNING_SECRET"}
+        validation_alias="SLACK_EN_SIGNING_SECRET"
     )
     INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)
@@ -81,7 +81,7 @@ class SlackAppEnConfig(BaseSettings):
     WARNING_MESSAGE: str = Field(EN_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(
         ..., 
-        json_schema_extra={"validation_alias": "WANDBOT_API_URL"}
+        validation_alias="WANDBOT_API_URL"
     )
     include_sources: bool = True
     bot_language: str = "en"
@@ -97,15 +97,15 @@ class SlackAppJaConfig(BaseSettings):
     APPLICATION: str = Field("Slack_JA")
     SLACK_APP_TOKEN: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_JA_APP_TOKEN"}
+        validation_alias="SLACK_JA_APP_TOKEN"
     )
     SLACK_BOT_TOKEN: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_JA_BOT_TOKEN"}
+        validation_alias="SLACK_JA_BOT_TOKEN"
     )
     SLACK_SIGNING_SECRET: str = Field(
         ..., 
-        json_schema_extra={"validation_alias": "SLACK_JA_SIGNING_SECRET"}
+        validation_alias="SLACK_JA_SIGNING_SECRET"
     )
     INTRO_MESSAGE: str = Field(JA_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(JA_OUTRO_MESSAGE)
@@ -113,7 +113,7 @@ class SlackAppJaConfig(BaseSettings):
     WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(
         ..., 
-        json_schema_extra={"validation_alias": "WANDBOT_API_URL"}
+        validation_alias="WANDBOT_API_URL"
     )
     include_sources: bool = True
     bot_language: str = "ja"

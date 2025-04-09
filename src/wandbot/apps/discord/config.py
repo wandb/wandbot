@@ -39,11 +39,11 @@ class DiscordAppConfig(BaseSettings):
     WAIT_TIME: float = 300.0
     PROD_DISCORD_CHANNEL_ID: int = 1090739438310654023
     TEST_DISCORD_CHANNEL_ID: int = 1088892013321142484
-    DISCORD_BOT_TOKEN: str = Field(..., env="DISCORD_BOT_TOKEN")
+    DISCORD_BOT_TOKEN: str = Field(..., validation_alias="DISCORD_BOT_TOKEN")
     INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(EN_ERROR_MESSAGE)
-    WANDBOT_API_URL: AnyHttpUrl = Field(..., env="WANDBOT_API_URL")
+    WANDBOT_API_URL: AnyHttpUrl = Field(..., validation_alias="WANDBOT_API_URL")
     include_sources: bool = True
     bot_language: str = "en"
 
