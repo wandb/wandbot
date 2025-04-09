@@ -44,10 +44,10 @@ class ChatConfig(BaseSettings):
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "google"
-    response_synthesizer_model: str = "gemini-2.0-flash-001" 
+    response_synthesizer_model: str = "gpt-4o-2024-11-20" 
     response_synthesizer_temperature: float = 0.1
     response_synthesizer_fallback_provider: str = "google"
-    response_synthesizer_fallback_model: str = "gemini-2.0-flash-001" 
+    response_synthesizer_fallback_model: str = "gpt-4o-2024-11-20" 
     response_synthesizer_fallback_temperature: float = 0.1
     
     # Translation models settings
