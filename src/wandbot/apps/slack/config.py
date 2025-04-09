@@ -17,9 +17,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 EN_INTRO_MESSAGE = (
     "Hi <@{user}>:\n\n"
-    "Please note that **wandbot** will experience frequent updates.\n\n"
     "Please do not share any private or sensitive information in your query.\n\n"
-    "Please note that overly long messages (>1024 words) will be truncated!\n\nGenerating response...\n\n"
+    "Please note that overly long messages (>1024 words) will be truncated.\n\n
+    "Generating response...\n\n"
 )
 
 EN_OUTRO_MESSAGE = (
@@ -29,13 +29,12 @@ EN_OUTRO_MESSAGE = (
 )
 
 EN_ERROR_MESSAGE = (
-    "Oops!, Something went wrong. Please retry again in some time"
+    "Oops, Something went wrong. Please try again later"
 )
 
-EN_FALLBACK_WARNING_MESSAGE = (
-    "**Warning: Falling back to {model}**, These results may nor be as good as "
-    "**gpt-4**\n\n"
-)
+# EN_FALLBACK_WARNING_MESSAGE = (
+#     "**Warning: Falling back to {model}**\n\n"
+# )
 
 JA_INTRO_MESSAGE = (
     "こんにちは <@{user}>:\n\n"
@@ -50,9 +49,9 @@ JA_OUTRO_MESSAGE = (
 
 JA_ERROR_MESSAGE = "「おっと、問題が発生しました。しばらくしてからもう一度お試しください。」"
 
-JA_FALLBACK_WARNING_MESSAGE = (
-    "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
-)
+# JA_FALLBACK_WARNING_MESSAGE = (
+#     "**警告: {model}** にフォールバックします。これらの結果は **gpt-4** ほど良くない可能性があります\n\n"
+# )
 
 
 class SlackAppEnConfig(BaseSettings):
@@ -78,7 +77,7 @@ class SlackAppEnConfig(BaseSettings):
     INTRO_MESSAGE: str = Field(EN_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(EN_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(EN_ERROR_MESSAGE)
-    WARNING_MESSAGE: str = Field(EN_FALLBACK_WARNING_MESSAGE)
+    # WARNING_MESSAGE: str = Field(EN_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(
         ..., 
         validation_alias="WANDBOT_API_URL"
@@ -110,7 +109,7 @@ class SlackAppJaConfig(BaseSettings):
     INTRO_MESSAGE: str = Field(JA_INTRO_MESSAGE)
     OUTRO_MESSAGE: str = Field(JA_OUTRO_MESSAGE)
     ERROR_MESSAGE: str = Field(JA_ERROR_MESSAGE)
-    WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
+    # WARNING_MESSAGE: str = Field(JA_FALLBACK_WARNING_MESSAGE)
     WANDBOT_API_URL: AnyHttpUrl = Field(
         ..., 
         validation_alias="WANDBOT_API_URL"
