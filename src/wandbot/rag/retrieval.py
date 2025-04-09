@@ -15,7 +15,7 @@ from wandbot.configs.chat_config import ChatConfig
 from wandbot.retriever.base import VectorStore
 from wandbot.retriever.web_search import _async_run_web_search
 from wandbot.schema.api_status import APIStatus
-from wandbot.schema.document import Document
+from wandbot.schema.document import Document, validate_document_metadata
 from wandbot.schema.retrieval import RetrievalResult
 from wandbot.utils import ErrorInfo, get_error_file_path, run_sync
 
@@ -123,7 +123,14 @@ class FusionRetrievalEngine:
 
     @weave.op
     def dedupe_retrieved_results(self, results: List[Document]) -> List[Document]:
-        return list({doc.metadata["id"]: doc for doc in results}.values())
+        # This deduplication relies on the "id" field in metadata
+        # Required document metadata fields include: "source", "source_type", "has_code", and "id"
+        
+        # First validate and ensure all documents have required metadata fields
+        validated_results = validate_document_metadata(results)
+        
+        # Now deduplicate based on ID
+        return list({doc.metadata["id"]: doc for doc in validated_results}.values())
 
     @weave.op
     async def _run_retrieval_common(self, inputs: Dict[str, Any], use_async: bool) -> Dict[str, Any]:
