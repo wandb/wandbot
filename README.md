@@ -98,7 +98,7 @@ SLACK_JA_SIGNING_SECRET
 DISCORD_BOT_TOKEN
 ```
 
-Then build the app to install all dependencies in a virtual env.
+Then build the app to install all dependencies in a virtual env, note this is heavily tailored for Replit.
 
 ```
 bash build.sh
@@ -110,7 +110,7 @@ Start the Q&A bot application using the following commands:
 bash run.sh
 ```
 
-Then call the endpoint to trigger the final wandbot app initialisation:
+Then call the `/startup` endpoint to trigger the final wandbot app initialisation:
 ```bash
 curl http://localhost:8000/startup
 ```
@@ -233,3 +233,13 @@ To help with debugging, you can use the `steps` and `include_sources` flags to s
 ```
 python -m wandbot.ingestion --steps prepare preprocess --include_sources "weave_documentation" --debug
 ```
+
+#### Note on updating hosted Chroma vector db
+
+A. If you compute a diff between the old dev docs and the new ones
+1. You could use delete() then add(), on the same ids if you have consistent ids across updates
+2. You could call update() or upsert() on the same ids, but if you changed any metadata schemas and want to drop old keys, you'll have to explicitly do that.
+
+B. If you don't compute a diff or want a simple way to do this
+1. You could delete everything in the collection and add it
+2. You could create a new collection and insert the new data into that.
