@@ -312,6 +312,7 @@ of lengths: {[len(r) for r in res['documents']]}")
         else:
             if len(ids) != len(documents):
                 raise ValueError("Number of IDs provided does not match number of documents")
+            final_ids = ids
 
         # Embed the documents using the stored embedding model instance
         logger.info(f"Generating embeddings for {len(texts_to_embed)} documents...")
