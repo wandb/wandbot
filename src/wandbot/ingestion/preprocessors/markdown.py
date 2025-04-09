@@ -7,8 +7,10 @@ from langchain.text_splitter import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import BaseDocumentTransformer
 
+from wandbot.configs.ingestion_config import DocodileEnglishStoreConfig
+from wandbot.schema.document import Document
 from wandbot.utils import FastTextLangDetect, FasttextModelConfig
 
 
@@ -37,8 +39,7 @@ def prefix_headers_based_on_metadata(chunk):
     # Headers ordered by markdown header levels
     markdown_header_prefixes = ["#", "##", "###", "####", "#####", "######"]
     markdown_header_prefixes_map = {
-        f"header_{i}": prefix
-        for i, prefix in enumerate(markdown_header_prefixes)
+        f"header_{i}": prefix for i, prefix in enumerate(markdown_header_prefixes)
     }
 
     # Generate headers from metadata
@@ -56,9 +57,7 @@ def prefix_headers_based_on_metadata(chunk):
         first_newline_index = chunk["content"].find("\n")
         if first_newline_index != -1:
             # Remove the existing header and prefix with generated headers
-            modified_content = (
-                headers_str + chunk["content"][first_newline_index + 1 :]
-            )
+            modified_content = headers_str + chunk["content"][first_newline_index + 1 :]
         else:
             # If there's no newline, the entire content is a header, replace it
             modified_content = headers_str
@@ -88,9 +87,7 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
             strip_headers=False,
         )
 
-    def aggregate_lines_to_chunks(
-        self, lines: List[LineType]
-    ) -> List[Document]:
+    def aggregate_lines_to_chunks(self, lines: List[LineType]) -> List[Document]:
         aggregated_chunks: List[LineType] = []
 
         for line in lines:
@@ -125,8 +122,7 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
 
         # Prefix headers based on metadata
         aggregated_chunks = [
-            prefix_headers_based_on_metadata(chunk)
-            for chunk in aggregated_chunks
+            prefix_headers_based_on_metadata(chunk) for chunk in aggregated_chunks
         ]
         return [
             Document(page_content=chunk["content"], metadata=chunk["metadata"])
@@ -158,11 +154,13 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
     def __init__(
         self,
         lang_detect,
-        chunk_size: int = 512,
+        chunk_size: int,
+        chunk_multiplier: int,
         length_function: Callable[[str], int] = None,
     ):
         self.fasttext_model = lang_detect
         self.chunk_size: int = chunk_size
+        self.chunk_multiplier: int = chunk_multiplier
         self.length_function: Callable[[str], int] = (
             length_function if length_function is not None else len
         )
@@ -174,7 +172,7 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
             length_function=self.length_function,
         )
         self.header_splitter = CustomMarkdownTextSplitter(
-            chunk_size=self.chunk_size * 2,
+            chunk_size=self.chunk_size * self.chunk_multiplier,
         )
 
     def identify_document_language(self, document: Document) -> str:
@@ -200,15 +198,11 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
                 )
                 chunk.metadata["parent_id"] = create_id_from_document(chunk)
                 chunk.metadata["has_code"] = "```" in chunk.page_content
-                chunk.metadata["language"] = self.identify_document_language(
-                    chunk
-                )
+                chunk.metadata["language"] = self.identify_document_language(chunk)
                 chunk.metadata["source_content"] = chunk.page_content
                 chunked_documents.append(chunk)
 
-            split_chunks = self.recursive_splitter.split_documents(
-                chunked_documents
-            )
+            split_chunks = self.recursive_splitter.split_documents(chunked_documents)
 
             for chunk in split_chunks:
                 chunk = Document(
@@ -231,6 +225,7 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
 
 
 if __name__ == "__main__":
+    docodile_en_config = DocodileEnglishStoreConfig()
     lang_detect = FastTextLangDetect(
         FasttextModelConfig(
             fasttext_file_path="/media/mugan/data/wandb/projects/wandbot/data/cache/models/lid.176.bin"
@@ -245,12 +240,12 @@ if __name__ == "__main__":
     source_document = Document(**source_document)
 
     markdown_transformer = MarkdownTextTransformer(
-        lang_detect=lang_detect, chunk_size=768 // 2
+        lang_detect=lang_detect,
+        chunk_size=docodile_en_config.chunk_size,
+        chunk_multiplier=docodile_en_config.chunk_multiplier,
     )
 
-    transformed_documents = markdown_transformer.transform_documents(
-        [source_document]
-    )
+    transformed_documents = markdown_transformer.transform_documents([source_document])
 
     for document in transformed_documents:
         print(document.page_content)

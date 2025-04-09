@@ -1,0 +1,35 @@
+When running tests in this codebase:
+
+# Testing
+1. Use the following pytest flags to prevent early exit issues and ensure complete test output:
+   ```bash
+   python -m pytest tests/ -v --tb=short --capture=tee-sys
+   ```
+
+2. These flags help in the following ways:
+   - `-v`: Verbose output
+   - `--tb=short`: Short traceback format
+   - `--capture=tee-sys`: Proper output capture that prevents early termination
+
+3. This is particularly important for async tests and tests involving API calls or event loops.
+
+4. If you need to debug a specific test, you can run it in isolation:
+   ```bash
+   python -m pytest tests/path_to_test.py::test_name -v --tb=short --capture=tee-sys
+   ```
+
+Remember to use these flags when running tests to ensure reliable test execution and complete output. 
+
+# Using Weave to analyze logged inputs and outputs
+
+The Weave api can be used to analyze logged inputs and outputs. Here is an example of iterating over the 
+input documents to this call and extracting the ids.
+
+Search the Weave documentation for more information on how to use the Weave api.
+
+```python
+import weave
+client = weave.init("wandbot/wandbot-dev")
+candidate_call = client.get_call("0194b427-ba78-77f3-9989-222419262817")
+final_candidate_ids = [doc.metadata["id"] for doc in candidate_call.inputs["inputs"].documents]
+```

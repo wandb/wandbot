@@ -25,10 +25,11 @@ from wandbot.api.routers.database import (
     APIQuestionAnswerRequest,
     APIQuestionAnswerResponse,
 )
-from wandbot.api.routers.retrieve import (
-    APIRetrievalRequest,
-    APIRetrievalResponse,
-)
+
+# from wandbot.api.routers.retrieve import (
+#     APIRetrievalRequest,
+#     APIRetrievalResponse,
+# )
 from wandbot.database.schemas import QuestionAnswer
 
 
@@ -57,14 +58,10 @@ class APIClient:
         self.query_endpoint = urljoin(str(self.url), "chat/query")
         self.feedback_endpoint = urljoin(str(self.url), "data/feedback")
         self.chat_thread_endpoint = urljoin(str(self.url), "data/chat_thread")
-        self.chat_question_answer_endpoint = urljoin(
-            str(self.url), "data/question_answer"
-        )
+        self.chat_question_answer_endpoint = urljoin(str(self.url), "data/question_answer")
         self.retrieve_endpoint = urljoin(str(self.url), "retrieve")
 
-    def _get_chat_thread(
-        self, request: APIGetChatThreadRequest
-    ) -> APIGetChatThreadResponse | None:
+    def _get_chat_thread(self, request: APIGetChatThreadRequest) -> APIGetChatThreadResponse | None:
         """Gets a chat thread from the API.
 
         Args:
@@ -74,9 +71,7 @@ class APIClient:
             The response from the API, or None if the status code is not 200 or 201.
         """
         with requests.Session() as session:
-            with session.get(
-                f"{self.chat_thread_endpoint}/{request.application}/{request.thread_id}"
-            ) as response:
+            with session.get(f"{self.chat_thread_endpoint}/{request.application}/{request.thread_id}") as response:
                 if response.status_code in (200, 201):
                     return APIGetChatThreadResponse(**response.json())
 
@@ -104,9 +99,7 @@ class APIClient:
         else:
             return response.question_answers
 
-    def _create_question_answer(
-        self, request: APIQuestionAnswerRequest
-    ) -> APIQuestionAnswerResponse | None:
+    def _create_question_answer(self, request: APIQuestionAnswerRequest) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 
         Args:
@@ -142,6 +135,7 @@ class APIClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         language: str | None = None,
+        api_call_statuses: dict | None = None,
     ) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 
@@ -189,9 +183,7 @@ class APIClient:
         response = self._create_question_answer(request)
         return response
 
-    def _create_feedback(
-        self, request: APIFeedbackRequest
-    ) -> APIFeedbackResponse | None:
+    def _create_feedback(self, request: APIFeedbackRequest) -> APIFeedbackResponse | None:
         """Creates feedback in the API.
 
         Args:
@@ -201,15 +193,11 @@ class APIClient:
             The response from the API, or None if the status code is not 201.
         """
         with requests.Session() as session:
-            with session.post(
-                self.feedback_endpoint, json=request.model_dump()
-            ) as response:
+            with session.post(self.feedback_endpoint, json=request.model_dump()) as response:
                 if response.status_code == 201:
                     return APIFeedbackResponse(**response.json())
 
-    def create_feedback(
-        self, feedback_id: str, question_answer_id: str, rating: int
-    ):
+    def create_feedback(self, feedback_id: str, question_answer_id: str, rating: int):
         """Creates feedback in the API.
 
         Args:
@@ -271,48 +259,44 @@ class APIClient:
 
         return response
 
-    def _retrieve(
-        self, request: APIRetrievalRequest
-    ) -> APIRetrievalResponse | None:
-        """Retrieves nodes given query.
+    # def _retrieve(self, request: APIRetrievalRequest) -> APIRetrievalResponse | None:
+    #     """Retrieves nodes given query.
 
-        Args:
-            request: The request object containing the query string and language.
+    #     Args:
+    #         request: The request object containing the query string and language.
 
-        Returns:
-            The response from the API. None if the status code is not 200.
-        """
-        with requests.Session() as session:
-            payload = json.loads(request.model_dump_json())
-            with session.post(self.retrieve_endpoint, json=payload) as response:
-                if response.status_code == 200:
-                    return APIRetrievalResponse(**response.json())
-                else:
-                    return None
+    #     Returns:
+    #         The response from the API. None if the status code is not 200.
+    #     """
+    #     with requests.Session() as session:
+    #         payload = json.loads(request.model_dump_json())
+    #         with session.post(self.retrieve_endpoint, json=payload) as response:
+    #             if response.status_code == 200:
+    #                 return APIRetrievalResponse(**response.json())
+    #             else:
+    #                 return None
 
-    def retrieve(
-        self, query: str, language: str, initial_k: int = 50, top_k: int = 10
-    ) -> APIRetrievalResponse:
-        """Retrieves nodes given query.
+    # def retrieve(self, query: str, language: str, initial_k: int = 50, top_k: int = 10) -> APIRetrievalResponse:
+    #     """Retrieves nodes given query.
 
-        Args:
-            query: The query string.
-            language: The language of the query.
-            initial_k: The number of nodes to retrieve.
-            top_k: The number of nodes to return.
+    #     Args:
+    #         query: The query string.
+    #         language: The language of the query.
+    #         initial_k: The number of nodes to retrieve.
+    #         top_k: The number of nodes to return.
 
-        Returns:
-            List of retrieved nodes with scores and sources
-        """
-        request = APIRetrievalRequest(
-            query=query,
-            language=language,
-            initial_k=initial_k,
-            top_k=top_k,
-        )
-        response = self._retrieve(request)
+    #     Returns:
+    #         List of retrieved nodes with scores and sources
+    #     """
+    #     request = APIRetrievalRequest(
+    #         query=query,
+    #         language=language,
+    #         initial_k=initial_k,
+    #         top_k=top_k,
+    #     )
+    #     response = self._retrieve(request)
 
-        return response
+    #     return response
 
 
 class AsyncAPIClient(APIClient):
@@ -331,9 +315,7 @@ class AsyncAPIClient(APIClient):
         """
         super().__init__(url)
 
-    async def _get_chat_thread(
-        self, request: APIGetChatThreadRequest
-    ) -> APIGetChatThreadResponse | None:
+    async def _get_chat_thread(self, request: APIGetChatThreadRequest) -> APIGetChatThreadResponse | None:
         """Private method to get a chat thread from the API.
 
         Args:
@@ -350,9 +332,7 @@ class AsyncAPIClient(APIClient):
                     response = await response.json()
                     return APIGetChatThreadResponse(**response)
 
-    async def get_chat_history(
-        self, application: str, thread_id: str
-    ) -> List[QuestionAnswer] | None:
+    async def get_chat_history(self, application: str, thread_id: str) -> List[QuestionAnswer] | None:
         """Gets the chat history for a given application and thread ID.
 
         Args:
@@ -372,9 +352,7 @@ class AsyncAPIClient(APIClient):
         else:
             return response.question_answers
 
-    async def _create_question_answer(
-        self, request: APIQuestionAnswerRequest
-    ) -> APIQuestionAnswerResponse | None:
+    async def _create_question_answer(self, request: APIQuestionAnswerRequest) -> APIQuestionAnswerResponse | None:
         """Private method to create a question answer in the API.
 
         Args:
@@ -411,6 +389,7 @@ class AsyncAPIClient(APIClient):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         language: str | None = None,
+        api_call_statuses: dict | None = None,
     ) -> APIQuestionAnswerResponse | None:
         """Creates a question answer in the API.
 
@@ -458,9 +437,7 @@ class AsyncAPIClient(APIClient):
         response = await self._create_question_answer(request)
         return response
 
-    async def _create_feedback(
-        self, request: APIFeedbackRequest
-    ) -> APIFeedbackResponse:
+    async def _create_feedback(self, request: APIFeedbackRequest) -> APIFeedbackResponse:
         """Private method to create feedback in the API.
 
         Args:
@@ -478,9 +455,7 @@ class AsyncAPIClient(APIClient):
                     response = await response.json()
                     return APIFeedbackResponse(**response)
 
-    async def create_feedback(
-        self, feedback_id: str, question_answer_id: str, rating: int
-    ):
+    async def create_feedback(self, feedback_id: str, question_answer_id: str, rating: int):
         """Creates feedback in the API.
 
         Args:
@@ -509,9 +484,7 @@ class AsyncAPIClient(APIClient):
             The response from the API, or None if the status code is not 200.
         """
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self.query_endpoint, json=json.loads(request.model_dump_json())
-            ) as response:
+            async with session.post(self.query_endpoint, json=json.loads(request.model_dump_json())) as response:
                 if response.status == 200:
                     response = await response.json()
                     return APIQueryResponse(**response)
@@ -545,48 +518,44 @@ class AsyncAPIClient(APIClient):
 
         return response
 
-    async def _retrieve(
-        self, request: APIRetrievalRequest
-    ) -> APIRetrievalResponse | None:
-        """Private method to retrieve nodes given query.
+    # async def _retrieve(self, request: APIRetrievalRequest) -> APIRetrievalResponse | None:
+    #     """Private method to retrieve nodes given query.
 
-        Args:
-            request: The request object containing the query string and language.
+    #     Args:
+    #         request: The request object containing the query string and language.
 
-        Returns:
-            The response from the API. None if the status code is not 200.
-        """
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self.retrieve_endpoint,
-                json=json.loads(request.model_dump_json()),
-            ) as response:
-                if response.status == 200:
-                    response = await response.json()
-                    return APIRetrievalResponse(**response)
-                else:
-                    return None
+    #     Returns:
+    #         The response from the API. None if the status code is not 200.
+    #     """
+    #     async with aiohttp.ClientSession() as session:
+    #         async with session.post(
+    #             self.retrieve_endpoint,
+    #             json=json.loads(request.model_dump_json()),
+    #         ) as response:
+    #             if response.status == 200:
+    #                 response = await response.json()
+    #                 return APIRetrievalResponse(**response)
+    #             else:
+    #                 return None
 
-    async def retrieve(
-        self, query: str, language: str, initial_k: int = 50, top_k: int = 10
-    ) -> APIRetrievalResponse:
-        """Retrieves nodes given query.
+    # async def retrieve(self, query: str, language: str, initial_k: int = 50, top_k: int = 10) -> APIRetrievalResponse:
+    #     """Retrieves nodes given query.
 
-        Args:
-            query: The query string.
-            language: The language of the query.
-            initial_k: The number of nodes to retrieve.
-            top_k: The number of nodes to return.
+    #     Args:
+    #         query: The query string.
+    #         language: The language of the query.
+    #         initial_k: The number of nodes to retrieve.
+    #         top_k: The number of nodes to return.
 
-        Returns:
-            List of retrieved nodes with scores and sources
-        """
-        request = APIRetrievalRequest(
-            query=query,
-            language=language,
-            initial_k=initial_k,
-            top_k=top_k,
-        )
-        response = await self._retrieve(request)
+    #     Returns:
+    #         List of retrieved nodes with scores and sources
+    #     """
+    #     request = APIRetrievalRequest(
+    #         query=query,
+    #         language=language,
+    #         initial_k=initial_k,
+    #         top_k=top_k,
+    #     )
+    #     response = await self._retrieve(request)
 
-        return response
+    #     return response

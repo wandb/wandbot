@@ -1,62 +1,25 @@
 [tool.poetry]
 name = "wandbot"
-version = "1.2.0"
-description = "A Q&A bot for Weights & Biases documentation"
-authors = ["parambharat <bharat.ramanathan@wandb.com>"]
+version = "1.3.0"
+description = "WandBot is a Q&A bot for Weights & Biases Models and Weave documentation"
+authors = [
+"parambharat <bharat.ramanathan@wandb.com>", 
+"morganmcg1 <morganmcg1@users.noreply.github.com>",
+"ayulockin <ayusht@wandb.com>",
+"ash0ts <anish@wandb.com>"
+]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/wandb/wandbot"
 repository = "https://github.com/wandb/wandbot"
-include = ["src/**/*", "LICENSE", "README.md"]
+packages = [{include = "wandbot", from = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<=3.12.4"
-numpy = "^1.26.1"
-pandas = "^2.1.2"
-pydantic-settings = "^2.0.3"
-gitpython = "^3.1.40"
-giturlparse = "^0.12.0"
-scikit-learn = "^1.3.2"
-python-dotenv = "^1.0.0"
-slack-bolt = "^1.18.0"
-slack-sdk = "^3.21.3"
-discord = "^2.3.2"
-markdown = "^3.5.1"
-fastapi = "^0.109.2"
-tree-sitter-languages = "^1.7.1"
-markdownify = "^0.11.6"
-uvicorn = "^0.24.0"
-openai = "^1.3.2"
-weave = "^0.50.12"
-colorlog = "^6.8.0"
-litellm = "^1.15.1"
-google-cloud-bigquery = "^3.14.1"
-db-dtypes = "^1.2.0"
-python-frontmatter = "^1.1.0"
-pymdown-extensions = "^10.5"
-langchain = "^0.2.2"
-langchain-openai = "^0.1.8"
-langchain-experimental = "^0.0.60"
-langchain-core = "^0.2.2"
-langchain-cohere = "^0.1.3"
-langchain-chroma = "^0.1.2"
-simsimd = "3.7.7"
-nbformat = "^5.10.4"
-nbconvert = "^7.16.4"
-wandb = {extras = ["workspaces"], version = "^0.17.5"}
-tree-sitter = "0.21.3"
-
-[tool.poetry.dev-dependencies]
-
-[tool.poetry.group.eval.dependencies]
-ragas = "^0.1.7"
-dataclasses-json = "^0.6.4"
-llama-index = "^0.10.30"
+python = ">=3.12,<3.14"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
 
 [tool.isort]
 profile = "black"
@@ -66,3 +29,56 @@ skip = [".gitignore", "data", "examples", "notebooks", "artifacts", ".vscode", "
 [tool.black]
 line-length = 80
 skip = [".gitignore", "data", "examples", "notebooks", "artifacts", ".vscode", ".github", ".idea", ".replit", "*.md", "wandb", ".env", ".git", ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests that make real API calls to external services",
+]
+
+[tool.ruff]
+# Line length setting
+line-length = 120
+
+# Enable specific rule categories
+select = [
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+]
+
+# Exclude directories/files
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+# Additional configurations
+unfixable = ["F401"]  # Don't auto-fix unused imports
+
+# Allow unused variables when they start with an underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Specific rule configurations
+[tool.ruff.mccabe]
+max-complexity = 10
+
+[tool.ruff.isort]
+known-first-party = ["mypackage"]  # Replace with your package name
+
+# Per-file ignores
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]  # Ignore unused imports in __init__.py files
+"tests/*.py" = ["E501"]   # Ignore line length in test files

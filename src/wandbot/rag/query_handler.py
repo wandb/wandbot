@@ -1,25 +1,20 @@
 import enum
 import json
-from operator import itemgetter
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
 import weave
-from langchain_core.messages import convert_to_messages, get_buffer_string
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import (
-    Runnable,
-    RunnableLambda,
-    RunnableParallel,
-    RunnablePassthrough,
-)
-from langchain_openai import ChatOpenAI
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field
+from tenacity import after_log, before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from wandbot.rag.utils import ChatModel
+from wandbot.configs.chat_config import ChatConfig
+from wandbot.models.llm import LLMModel
+from wandbot.schema.api_status import APIStatus
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
+retry_chat_config = ChatConfig()
 
 BOT_NAME_PATTERN = re.compile(r"<@U[A-Z0-9]+>|@[a-zA-Z0-9]+")
 
@@ -97,10 +92,15 @@ class Intent(BaseModel):
 
     reasoning: str = Field(
         ...,
-        description="The reason to associate the intent with the query",
+        json_schema_extra={
+            "description": "The reason to associate the intent with the query"
+        }
     )
     label: Labels = Field(
-        ..., description="An intent associated with the query"
+        ..., 
+        json_schema_extra={
+            "description": "An intent associated with the query"
+        }
     )
 
 
@@ -109,8 +109,10 @@ class Keyword(BaseModel):
 
     keyword: str = Field(
         ...,
-        description="A search phrase to get the most relevant information related to Weights & Biases from the web "
-        " This will be used to gather information required to answer the query",
+        json_schema_extra={
+            "description": "A search phrase to get the most relevant information related to Weights & Biases from the web. "
+            "This will be used to gather information required to answer the query"
+        }
     )
 
 
@@ -119,8 +121,10 @@ class SubQuery(BaseModel):
 
     query: str = Field(
         ...,
-        description="The sub query that needs to be answered to answer the query. This will be used to define the "
-        "steps required to answer the query",
+        json_schema_extra={
+            "description": "The sub query that needs to be answered to answer the query. This will be used to define the "
+            "steps required to answer the query"
+        }
     )
 
 
@@ -129,8 +133,10 @@ class VectorSearchQuery(BaseModel):
 
     query: str = Field(
         ...,
-        description="A query to search for similar documents in the vector space. This will be used to find documents "
-        "required to answer the query",
+        json_schema_extra={
+            "description": "A query to search for similar documents in the vector space. This will be used to find documents "
+            "required to answer the query"
+        }
     )
 
 
@@ -139,38 +145,42 @@ class EnhancedQuery(BaseModel):
 
     language: str = Field(
         ...,
-        description="The ISO code of language of the query",
+        json_schema_extra={
+            "description": "The ISO code of language of the query"
+        }
     )
     intents: List[Intent] = Field(
         ...,
-        description=f"A list of one or more intents associated with the query. Here are the possible intents that "
-        f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": f"A list of one or more intents associated with the query (minimum 1, maximum 5). Here are the possible intents that "
+            f"can be associated with a query:\n{json.dumps(INTENT_DESCRIPTIONS)}"
+        }
     )
     keywords: List[Keyword] = Field(
         ...,
-        description="A list of diverse search terms associated with the query.",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of diverse search terms associated with the query (minimum 1, maximum 5)."
+        }
     )
     sub_queries: List[SubQuery] = Field(
         ...,
-        description="A list of sub queries that break the query into smaller parts",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of sub queries that break the query into smaller parts (minimum 1, maximum 5)"
+        }
     )
     vector_search_queries: List[VectorSearchQuery] = Field(
         ...,
-        description="A list of diverse queries to search for similar documents in the vector space",
-        min_items=1,
-        max_items=5,
+        json_schema_extra={
+            "description": "A list of diverse queries to search for similar documents in the vector space (minimum 1, maximum 5)"
+        }
     )
 
     standalone_query: str = Field(
         ...,
-        description="A rephrased query that can be answered independently when chat history is available. If chat "
-        "history is `None`, the original query must be copied verbatim",
+        json_schema_extra={
+            "description": "A rephrased query that can be answered independently when chat history is available. If chat "
+            "history is `None`, the original query must be copied verbatim"
+        }
     )
 
     @property
@@ -241,75 +251,117 @@ class EnhancedQuery(BaseModel):
 
 
 ENHANCER_SYSTEM_PROMPT = (
-    "You are a weights & biases support manager tasked with enhancing support questions from users"
+    "You are a weights & biases support manager tasked with enhancing support questions from users. "
     "You are given a conversation and a follow-up query. "
     "You goal to enhance the user query and render it using the tool provided."
     "\n\nChat History: \n\n"
     "{chat_history}"
 )
 
-ENHANCER_PROMPT_MESSAGES = [
-    ("system", ENHANCER_SYSTEM_PROMPT),
-    ("human", "Question: {query}"),
-    ("human", "!!! Tip: Make sure to answer in the correct format"),
-]
+
+def format_chat_history(chat_history: Optional[List[Tuple[str, str]]]) -> str:
+    """Format chat history into a string"""
+    if not chat_history:
+        return "No chat history available."
+    
+    formatted = []
+    for user_msg, assistant_msg in chat_history:
+        formatted.extend([
+            f"User: {user_msg}",
+            f"Assistant: {assistant_msg}"
+        ])
+    return "\n".join(formatted)
 
 
 class QueryEnhancer:
-    model: ChatModel = ChatModel()
-    fallback_model: ChatModel = ChatModel(max_retries=6)
-
     def __init__(
         self,
-        model: str = "gpt-4-0125-preview",
-        temperature: float = 0.1,
-        fallback_model: str = "gpt-4-0125-preview",
-        fallback_temperature: float = 0.1,
+        model_provider: str,
+        model_name: str,
+        temperature: float,
+        fallback_model_provider: str,
+        fallback_model_name: str,
+        fallback_temperature: float,
+        max_retries: int = 3
     ):
-        self.model = {"model_name": model, "temperature": temperature}  # type: ignore
-        self.fallback_model = {"model_name": fallback_model, "temperature": fallback_temperature}  # type: ignore
-        self.prompt = ChatPromptTemplate.from_messages(ENHANCER_PROMPT_MESSAGES)
-        self._chain = None
-
-    @property
-    def chain(self) -> Runnable:
-        if self._chain is None:
-            base_chain = self._load_chain(self.model)
-            fallback_chain = self._load_chain(self.fallback_model)
-            self._chain = base_chain.with_fallbacks([fallback_chain])
-
-        return self._chain
-
-    def _load_chain(self, model: ChatOpenAI) -> Runnable:
-        query_enhancer_chain = self.prompt | model.with_structured_output(
-            EnhancedQuery
+        self.model = LLMModel(
+            provider=model_provider,
+            model_name=model_name,
+            temperature=temperature,
+            response_model=EnhancedQuery,
+            max_retries=max_retries
+        )
+        self.fallback_model = LLMModel(
+            provider=fallback_model_provider,
+            model_name=fallback_model_name,
+            temperature=fallback_temperature,
+            response_model=EnhancedQuery,
+            max_retries=max_retries
         )
 
-        input_chain = RunnableParallel(
-            query=RunnablePassthrough(),
-            chat_history=(
-                RunnableLambda(lambda x: convert_to_messages(x["chat_history"]))
-                | RunnableLambda(
-                    lambda x: get_buffer_string(x, "user", "assistant")
-                )
-            ),
-        )
+    @weave.op
+    async def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Enhance a query with retries and fallback"""
+        query = inputs.get("query", "")
+        chat_history = inputs.get("chat_history")
+        
+        result = None
+        llm_api_status = None
+        
+        try:
+            # Try primary model
+            result, llm_api_status = await self._try_enhance_query(self.model, query, chat_history)
+            parsed_result = result.parse_output(query, chat_history)
+        except Exception as e:
+            logger.warning(f"Primary Query Enhancer model failed, trying fallback: {str(e)}")
+            try:
+                # Try fallback model
+                result, llm_api_status = await self._try_enhance_query(self.fallback_model, query, chat_history)
+                parsed_result = result.parse_output(query, chat_history)
+            except Exception as e:
+                logger.error(f"Both primary and fallback Query Enhancer models failed: {str(e)}")
+                # If both models fail, raise the error
+                raise Exception(f"Query enhancement failed: {str(e)}")
+        
+        # Only include LLM API status
+        parsed_result["api_statuses"] = {
+            "query_enhancer_llm_api": llm_api_status
+        }
+        return parsed_result
 
-        full_query_enhancer_chain = input_chain | query_enhancer_chain
-
-        intermediate_chain = RunnableParallel(
-            query=itemgetter("query"),
-            chat_history=itemgetter("chat_history"),
-            enhanced_query=full_query_enhancer_chain,
-        )
-        chain = intermediate_chain | RunnableLambda(
-            lambda x: x["enhanced_query"].parse_output(
-                x["query"], convert_to_messages(x["chat_history"])
+    @retry(
+        retry=retry_if_exception_type(Exception),
+        stop=stop_after_attempt(retry_chat_config.llm_max_retries),
+        wait=wait_exponential(multiplier=retry_chat_config.llm_retry_multiplier,
+                               min=retry_chat_config.llm_retry_min_wait, 
+                               max=retry_chat_config.llm_retry_max_wait),
+        before_sleep=lambda retry_state: (
+            before_sleep_log(logger, log_level=logging.WARNING)(retry_state),
+            logger.warning(
+                f"Attempt {retry_state.attempt_number} failed. Retrying in {retry_state.next_action.sleep} seconds..."
             )
-        )
-
-        return chain
-
-    @weave.op()
-    def __call__(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
-        return self.chain.invoke(inputs)
+        )[1],
+        reraise=True,
+        after=after_log(logger, logging.ERROR)
+    )
+    @weave.op
+    async def _try_enhance_query(
+        self,
+        model: LLMModel,
+        query: str,
+        chat_history: Optional[List[Tuple[str, str]]] = None
+    ) -> Tuple[Dict[str, Any], APIStatus]:
+        """Try to enhance a query using the given model"""
+        messages = [
+            {"role": "system", "content": ENHANCER_SYSTEM_PROMPT.format(
+                chat_history=format_chat_history(chat_history)
+            )},
+            {"role": "user", "content": f"Question: {query}"},
+            {"role": "user", "content": "!!! Tip: Make sure to answer in the correct format"}
+        ]
+        
+        response, api_status = await model.create(messages=messages)
+        if not api_status.success:
+            raise Exception(api_status.error_info.error_message)
+            
+        return response, api_status

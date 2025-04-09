@@ -52,11 +52,6 @@ def format_response(
     """
     if response is not None:
         result = response.answer
-        if "gpt-4" not in response.model:
-            warning_message = config.WARNING_MESSAGE.format(
-                model=response.model
-            )
-            result = warning_message + response.answer
 
         if config.include_sources and response.sources and is_last:
             sources_list = deduplicate(

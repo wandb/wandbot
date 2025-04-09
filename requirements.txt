@@ -1,0 +1,40 @@
+# numpy>=2.2.0
+pandas>=2.1.2
+pydantic>=2.10.0
+pydantic-settings>=2.5.1
+gitpython>=3.1.40
+giturlparse>=0.12.0
+scikit-learn>=1.3.2
+python-dotenv>=1.0.0
+slack-bolt>=1.18.0
+slack-sdk>=3.21.3
+discord>=2.3.2
+markdown>=3.5.1
+fastapi>=0.115.0
+uvicorn>=0.24.0
+openai>=1.71.0
+anthropic>=0.49.0
+google-genai>=1.9.0
+cohere>=5.13.0
+langchain >= 0.2.2
+langchain-core >= 0.2.2
+
+# chromadb>=0.6.0
+chromadb == 1.0.3
+weave>=0.51.41
+wandb[workspaces]>=0.19.9
+tiktoken
+fasttext-wheel
+tree-sitter-languages>=1.7.1
+markdownify>=0.11.6
+colorlog>=6.8.0
+google-cloud-bigquery>=3.14.1
+db-dtypes>=1.2.0
+python-frontmatter>=1.1.0
+pymdown-extensions>=10.5
+simsimd==3.7.7
+nbformat>=5.10.4
+nbconvert>=7.16.4
+tree-sitter==0.21.3
+typing_extensions>=4.12.0
+nest-asyncio==1.6.0

@@ -17,6 +17,14 @@ from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.discord.config import DiscordAppConfig
 from wandbot.apps.utils import format_response
 
+from dotenv import load_dotenv
+import pathlib
+# Determine the project root directory (assuming it's 3 levels up from this script)
+project_root = pathlib.Path(__file__).resolve().parents[3]
+dotenv_path = project_root / ".env"
+
+load_dotenv(dotenv_path=dotenv_path)
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -60,7 +68,7 @@ async def on_message(message: discord.Message):
                 or message.channel.id == config.TEST_DISCORD_CHANNEL_ID
             ):
                 thread = await message.channel.create_thread(
-                    name=f"Thread", type=discord.ChannelType.public_thread
+                    name="Thread", type=discord.ChannelType.public_thread
                 )  # currently calling it "Thread" because W&B Support makes it sound too official.
                 is_following = False
         if thread is not None:
@@ -126,8 +134,20 @@ async def on_message(message: discord.Message):
                 await api_client.create_question_answer(
                     thread_id=str(thread.id),
                     question_answer_id=str(sent_message.id),
+                    question=response.question,
+                    answer=response.answer,
+                    system_prompt=response.system_prompt,
+                    model=response.model,
+                    sources=response.sources,
+                    source_documents=response.source_documents,
+                    total_tokens=response.total_tokens,
+                    prompt_tokens=response.prompt_tokens,
+                    completion_tokens=response.completion_tokens,
+                    time_taken=response.time_taken,
+                    start_time=response.start_time,
+                    end_time=response.end_time,
+                    api_call_statuses=response.api_call_statuses,
                     language=config.bot_language,
-                    **response.model_dump(),
                 )
                 # # Add reactions for feedback
                 await sent_message.add_reaction("👍")
@@ -160,12 +180,12 @@ async def on_message(message: discord.Message):
                 else:
                     rating = 0
 
-            # Send feedback to API
-            await api_client.create_feedback(
-                feedback_id=str(uuid.uuid4()),
-                question_answer_id=str(sent_message.id),
-                rating=rating,
-            )
+            # # Send feedback to API
+            # await api_client.create_feedback(
+            #     feedback_id=str(uuid.uuid4()),
+            #     question_answer_id=str(sent_message.id),
+            #     rating=rating,
+            # )
 
         await bot.process_commands(message)
 

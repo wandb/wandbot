@@ -1,7 +1,7 @@
 """A Slack bot that interacts with users and processes their queries.
 
 This module contains the main functionality of the Slack bot. It listens for mentions of the bot in messages,
-processes the text of the message, and sends a response. It also handles reactions added to messages and 
+processes the text of the message, and sends a response. It also handles reactions added to messages and
 saves them as feedback. The bot supports both English and Japanese languages.
 
 The bot uses the Slack Bolt framework for handling events and the langdetect library for language detection.
@@ -12,6 +12,7 @@ It also communicates with an external API for processing queries and storing cha
 import argparse
 import asyncio
 import logging
+import pathlib
 from functools import partial
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -49,9 +50,7 @@ app = AsyncApp(token=config.SLACK_APP_TOKEN)
 api_client = AsyncAPIClient(url=config.WANDBOT_API_URL)
 
 
-async def send_message(
-    say: callable, message: str, thread: str = None
-) -> SlackResponse:
+async def send_message(say: callable, message: str, thread: str = None) -> SlackResponse:
     message = MrkdwnFormatter()(message)
     if thread is not None:
         return await say(text=message, thread_ts=thread)
@@ -60,9 +59,7 @@ async def send_message(
 
 
 @app.event("app_mention")
-async def command_handler(
-    body: dict, say: callable, logger: logging.Logger
-) -> None:
+async def command_handler(body: dict, say: callable, logger: logging.Logger) -> None:
     """
     Handles the command when the app is mentioned in a message.
 
@@ -77,14 +74,10 @@ async def command_handler(
     try:
         query = body["event"].get("text")
         user = body["event"].get("user")
-        thread_id = body["event"].get("thread_ts", None) or body["event"].get(
-            "ts", None
-        )
+        thread_id = body["event"].get("thread_ts", None) or body["event"].get("ts", None)
         say = partial(say, token=config.SLACK_BOT_TOKEN)
 
-        chat_history = await api_client.get_chat_history(
-            application=config.APPLICATION, thread_id=thread_id
-        )
+        chat_history = await api_client.get_chat_history(application=config.APPLICATION, thread_id=thread_id)
 
         if not chat_history:
             # send out the intro message
@@ -107,9 +100,7 @@ async def command_handler(
         )
 
         # send the response
-        sent_message = await send_message(
-            say=say, message=response, thread=thread_id
-        )
+        sent_message = await send_message(say=say, message=response, thread=thread_id)
 
         await app.client.reactions_add(
             channel=body["event"]["channel"],
@@ -128,8 +119,20 @@ async def command_handler(
         await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
+            question=api_response.question,
+            answer=api_response.answer,
+            system_prompt=api_response.system_prompt,
+            model=api_response.model,
+            sources=api_response.sources,
+            source_documents=api_response.source_documents,
+            total_tokens=api_response.total_tokens,
+            prompt_tokens=api_response.prompt_tokens,
+            completion_tokens=api_response.completion_tokens,
+            time_taken=api_response.time_taken,
+            start_time=api_response.start_time,
+            end_time=api_response.end_time,
+            api_call_statuses=api_response.api_call_statuses,
             language=config.bot_language,
-            **api_response.model_dump(),
         )
 
     except Exception as e:
@@ -180,11 +183,11 @@ async def handle_reaction_added(event: dict) -> None:
         thread_ts = messages[0].get("thread_ts")
         if thread_ts:
             rating = parse_reaction(event["reaction"])
-            await api_client.create_feedback(
-                feedback_id=event["event_ts"],
-                question_answer_id=message_ts,
-                rating=rating,
-            )
+            # await api_client.create_feedback(
+            #     feedback_id=event["event_ts"],
+            #     question_answer_id=message_ts,
+            #     rating=rating,
+            # )
 
 
 async def main():

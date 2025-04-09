@@ -1,32 +1,31 @@
 import json
 
-from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate, format_document
-from langchain_openai import ChatOpenAI
 
-from wandbot.retriever.web_search import YouSearchResults
+from wandbot.schema.document import Document
+
+# from langchain_openai import ChatOpenAI
 from wandbot.utils import clean_document_content
 
+# class ChatModel:
+#     def __init__(self, max_retries: int = 2):
+#         self.max_retries = max_retries
 
-class ChatModel:
-    def __init__(self, max_retries: int = 2):
-        self.max_retries = max_retries
+#     def __set_name__(self, owner, name):
+#         self.public_name = name
+#         self.private_name = "_" + name
 
-    def __set_name__(self, owner, name):
-        self.public_name = name
-        self.private_name = "_" + name
+#     def __get__(self, obj, obj_type=None):
+#         value = getattr(obj, self.private_name)
+#         return value
 
-    def __get__(self, obj, obj_type=None):
-        value = getattr(obj, self.private_name)
-        return value
-
-    def __set__(self, obj, value):
-        model = ChatOpenAI(
-            model_name=value["model_name"],
-            temperature=value["temperature"],
-            max_retries=self.max_retries,
-        )
-        setattr(obj, self.private_name, model)
+#     def __set__(self, obj, value):
+#         model = ChatOpenAI(
+#             model_name=value["model_name"],
+#             temperature=value["temperature"],
+#             max_retries=self.max_retries,
+#         )
+#         setattr(obj, self.private_name, model)
 
 
 DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(
@@ -38,10 +37,10 @@ DEFAULT_QUESTION_PROMPT = PromptTemplate.from_template(
 
 # Query Metadata
 
-Language: {language}
+Language: 
+{language}
 
 Intents: 
-
 {intents}
 
 Sub-queries to consider answering: 
@@ -90,20 +89,3 @@ def process_input_for_retrieval(retrieval_input):
     elif not isinstance(retrieval_input, str):
         retrieval_input = str(retrieval_input)
     return retrieval_input
-
-
-def get_web_contexts(web_results: YouSearchResults):
-    output_documents = []
-    if not web_results:
-        return []
-    return (
-        output_documents
-        + [
-            Document(
-                page_content=document["context"], metadata=document["metadata"]
-            )
-            for document in web_results.web_context
-        ]
-        if web_results.web_context
-        else []
-    )

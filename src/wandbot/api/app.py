@@ -1,162 +1,296 @@
-"""This module serves as the main server API for the wandbot application.
-
-It imports and uses the FastAPI framework to define the API and initialize application event handlers like "startup".
-Also, the module includes Python's built-in asyncio library for managing asynchronous tasks related to database backup.
-
-The API includes:
-- APICreateChatThreadRequest
-- APIFeedbackRequest
-- APIFeedbackResponse
-- APIGetChatThreadResponse
-- APIQueryRequest
-- APIQueryResponse
-- APIQuestionAnswerRequest
-- APIQuestionAnswerResponse
-
-Following classes and their functionalities:
-- Chat: Main chat handling class, initialized during startup.
-- ChatConfig: Configuration utility for chat.
-- ChatRequest: Schema to handle requests made to the chat.
-
-It also sets up and interacts with the database through:
-- DatabaseClient: A utility to interact with the database.
-- Base.metadata.create_all(bind=engine): Creates database tables based on the metadata.
-
-The server runs periodic backup of the data to wandb using the backup_db method which runs as a coroutine.
-The backup data is transformed into a Pandas DataFrame and saved as a wandb.Table.
-
-It uses logger from the utils module for logging purposes.
-"""
-
-import asyncio
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime
+from pathlib import Path
 
-import dotenv
-import pandas as pd
-import weave
-from fastapi import BackgroundTasks, FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 
-import wandb
 from wandbot.api.routers import chat as chat_router
-from wandbot.api.routers import database as database_router
-from wandbot.api.routers import retrieve as retrieve_router
-from wandbot.chat.chat import ChatConfig
+from wandbot.configs.app_config import AppConfig
 from wandbot.database.database import engine
 from wandbot.database.models import Base
-from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.retriever import VectorStore
-from wandbot.utils import get_logger
+from wandbot.utils import get_git_info, get_logger, log_disk_usage, log_top_disk_usage
+
+app_config = AppConfig()
+
+# Load environment variables from .env in project root
+ENV_PATH = Path(__file__).parent.parent.parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 logger = get_logger(__name__)
-last_backup = datetime.now().astimezone(timezone.utc)
-
-dotenv_path = os.path.join(os.path.dirname(__file__), "../../../.env")
-dotenv.load_dotenv(dotenv_path)
-
-# turn off chromadb telemetry
-os.environ["ANONYMIZED_TELEMETRY"] = "false"
-
-weave.init(f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}")
 
 is_initialized = False
+is_initializing = False
 
 
 async def initialize():
-    logger.info(f"Initializing wandbot")
-    global is_initialized
-    if not is_initialized:
-        vector_store = VectorStore.from_config(VectorStoreConfig())
-        chat_config = ChatConfig()
-        chat_router.chat = chat_router.Chat(
-            vector_store=vector_store, config=chat_config
-        )
-        logger.info(f"Initialized chat router")
-        database_router.db_client = database_router.DatabaseClient()
-        logger.info(f"Initialized database client")
+    global is_initialized, is_initializing
+    logger.info(
+        f"STARTUP: initialize() function called - is_initialized: {is_initialized}, is_initializing: {is_initializing}"
+    )
 
-        retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
-            vector_store=vector_store,
-            rerank_models={
-                "english_reranker_model": chat_config.english_reranker_model,
-                "multilingual_reranker_model": chat_config.multilingual_reranker_model,
-            },
+    if not is_initialized and not is_initializing:
+        try:
+            is_initializing = True
+            logger.info("STARTUP: ⏳ Beginning initialization")
+
+            # Check disk usage
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                initial_disk_used = disk_info['used_mb']
+                logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
+
+            # 0/3: Initialize Weave
+            try:
+                logger.info("STARTUP: 0/3, Starting Weave...")
+                import weave
+
+                weave.init(
+                    f"{app_config.wandb_entity}/{app_config.wandb_project}"
+                )
+                logger.info("STARTUP: 0/3, ✅ Weave initialized")
+            except Exception as e:
+                logger.error(
+                    f"STARTUP: 0/3, ❌ Weave failed to initialize:{e}"
+                )
+                raise
+
+            # Check disk usage
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_0 = disk_info['used_mb']
+                logger.info(f"STARTUP: 0/3, 💾 Disk usage increment after 0: {round(disk_used_0 - initial_disk_used, 1)} MB")
+            
+            # 1/3: Init Configs
+            try:
+                logger.info("STARTUP: 1/3, 📋 Initializing configs")
+                from wandbot.chat.chat import ChatConfig
+                from wandbot.configs.vector_store_config import VectorStoreConfig
+                
+                chat_config = ChatConfig()
+                vector_store_config = VectorStoreConfig()
+                
+                chat_router.chat_components["chat_config"] = chat_config
+                chat_router.chat_components["vector_store_config"] = vector_store_config
+                
+                # Log safe versions of configs
+                safe_chat_config = {k: v for k, v in vars(chat_config).items() 
+                             if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+                safe_vs_config = {k: v for k, v in vars(vector_store_config).items() 
+                             if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+                
+                logger.info(f"STARTUP: 1/3, 📋 Chat config: {str(safe_chat_config)}")
+                logger.info(f"STARTUP: 1/3, 💿 Vector store config: {safe_vs_config}")
+                logger.info("STARTUP: 1/3 ✅, 📋 Configs initialized")
+            except Exception as e:
+                logger.error("STARTUP: 1/3 ❌, 📋 Config initialization failed.")
+                logger.error(f"STARTUP: 1/3 ❌, Error: {e}")
+                raise
+
+            # Check disk usage
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_1 = disk_info['used_mb']
+                logger.info(f"STARTUP: 1/3, 💾 Disk usage increment after 1: {round(disk_used_1 - disk_used_0, 1)} MB")
+
+            # 2/3: Init Chat
+            try:
+                logger.info("STARTUP: 2/3, 💬 Starting Chat initialization")
+                from wandbot.chat.chat import Chat
+
+                chat_router.chat_components["chat"] = Chat(
+                    vector_store_config=vector_store_config,
+                    chat_config=chat_config,
+                )
+                logger.info("STARTUP: 2/3 ✅, 💬 Chat instance initialized.")
+            except Exception as e:
+                logger.error("STARTUP: 2/3 ❌, 💬 Chat instance initialization failed")
+                logger.error(f"STARTUP: 2/3 ❌, Error: {e}")
+                raise
+
+          # 4/5: Init Retriever
+            # try:
+            #     logger.info(
+            #         "STARTUP 4/5: ⚙️ Starting Retriever engine initialization"
+            #     )
+            #     from wandbot.api.routers import retrieve as retrieve_router
+
+            #     retrieve_router.retriever = retrieve_router.SimpleRetrievalEngine(
+            #         vector_store=vector_store,
+            #         rerank_models={
+            #             "english_reranker_model": chat_config.english_reranker_model,
+            #             "multilingual_reranker_model": chat_config.multilingual_reranker_model,
+            #         },
+            #         chat_config=chat_router.chat_components["chat_config"],
+            #     )
+            #     logger.info("STARTUP 4/5: ✅ ⚙️ Retriever engine initialized")
+            #     app.include_router(retrieve_router.router)
+            #     logger.info("STARTUP 4/5: ✅ ⚙️ Added retrieve router to app.")
+            # except Exception as e:
+            #     logger.error(
+            #         "STARTUP: 4/5 ❌, ⚙️ Retriever instance initializaion failed."
+            #     )
+            #     logger.error(f"STARTUP: 4/5 ❌, Error: {e}")
+            #     raise
+            
+            # Check disk usage
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_2 = disk_info['used_mb']
+                logger.info(f"STARTUP: 2/3, 💾 Disk usage increment after 2: {round(disk_used_2 - disk_used_1, 1)} MB")
+
+            # 3/3: Init Database
+            try:
+                Base.metadata.create_all(bind=engine, checkfirst=True)
+                from wandbot.api.routers import database as database_router
+
+                logger.info("STARTUP: 3/3, 🦉 Starting Database initialization")
+                database_router.db_client = database_router.DatabaseClient()
+                app.include_router(database_router.router)
+                logger.info("STARTUP: 3/3, ✅ 🦉 Initialized database client")
+            except Exception as e:
+                logger.error("STARTUP: 3/3 ❌, 🦉 Database initialization failed.")
+                logger.error(f"STARTUP: 3/3 ❌, Error: {e}")
+                raise
+
+            # Cleanup wandb artifacts cache
+            logger.info("STARTUP: 3/3, 🧹 Cleaning up wandb artifacts cache")
+            os.system("wandb artifact cache cleanup 0.01GB --remove-temp")
+            
+            # Check disk usage
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                disk_info = log_disk_usage()
+                log_top_disk_usage()
+                disk_used_3 = disk_info['used_mb']
+                logger.info(f"STARTUP: 3/3, 💾 Disk usage increment after 3: {round(disk_used_3 - disk_used_2, 1)} MB")
+
+            is_initialized = True
+            is_initializing = False
+            logger.info("STARTUP: ✅ Initialization complete 🎉")
+            if os.getenv("LOG_LEVEL") == "DEBUG":
+                logger.info(f"STARTUP: 💾 Total disk usage increment during initialization: {round(disk_used_3 - initial_disk_used, 1)} MB")
+            return {"startup_status": f"is_initialized: {is_initialized}"}
+
+        except Exception as e:
+            logger.error(f"STARTUP: 💀 Initialization failed: {e}")
+            logger.error(f"STARTUP: 💀 Full error: {repr(e)}")
+            raise
+
+    else:
+        logger.info(
+            f"STARTUP: initialize() not started, is_initialized: {is_initialized}, is_initializing: {is_initializing}"
         )
-        logger.info(f"Initialized retrieve router")
-        logger.info(f"wandbot initialization complete")
-        is_initialized = True
+        return {
+            "startup_status": f"is_initialized: {is_initialized}, is_initializing: {is_initializing}"
+        }
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handles the lifespan of the application.
-
-    This function is called by the Uvicorn server to handle the lifespan of the application.
-    It is used to perform any necessary startup and shutdown operations.
-
-    Returns:
-        None
-    """
-
-    Base.metadata.create_all(bind=engine)
-
-    if os.getenv("WANDBOT_EVALUATION"):
-        logger.info("Lifespan starting, initializing wandbot for evaluation mode.")
+    logger.info("Running preliminary setup...")
+    if os.getenv("WANDBOT_FULL_INIT"):
+        logger.info("Running full wandbot initialization...")
         await initialize()
-
-    async def backup_db():
-        """Periodically backs up the database to a table.
-
-        This function runs periodically and retrieves all question-answer threads from the database since the last backup.
-        It then creates a pandas DataFrame from the retrieved threads and logs it to a table using Weights & Biases.
-        The last backup timestamp is updated after each backup.
-
-        Returns:
-            None
-        """
-        global last_backup
-        while True:
-            chat_threads = database_router.db_client.get_all_question_answers(
-                last_backup
-            )
-            if chat_threads is not None:
-                chat_table = pd.DataFrame(
-                    [chat_thread for chat_thread in chat_threads]
-                )
-                last_backup = datetime.now().astimezone(timezone.utc)
-                logger.info(
-                    f"Backing up database to Table at {last_backup}: Number of chat threads: {len(chat_table)}"
-                )
-                wandb.log(
-                    {"question_answers_db": wandb.Table(dataframe=chat_table)}
-                )
-            await asyncio.sleep(600)
-
-    _ = asyncio.create_task(backup_db())
     yield
-    if wandb.run is not None:
-        wandb.run.finish()
+    logger.info("Shutting down")
 
 
-app = FastAPI(
-    title="Wandbot", name="wandbot", version="1.3.0", lifespan=lifespan
-)
+app = FastAPI(title="Wandbot", version="1.3.0", lifespan=lifespan)
+
+
+@app.get("/startup")
+async def startup():
+    global is_initialized, is_initializing
+
+    if is_initialized:
+        logger.info("✅ Startup already complete.")
+        return {"status": "already_initialized"}
+
+    if is_initializing:
+        logger.info("⏳ Startup initialization already in progress...")
+        return {"status": "initializing"}
+
+    try:
+        logger.info("📦 Main startup initialization triggered.")
+        _ = await initialize()
+        return {"status": "initializing"}
+    except Exception as e:
+        logger.error(f"💀 Startup initialization failed: {str(e)}")
+        is_initializing = False
+        return {"status": "initialization_failed", "error": str(e)}
+
+
+@app.get("/disk-usage")
+async def disk_usage_route():
+    """
+    Route to get disk usage information
+    """
+    return log_disk_usage()
+
+
+@app.get("/configs")
+async def configs():
+    try:
+        safe_chat_config = {k: v for k, v in vars(chat_router.chat_components['chat_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+    
+        safe_vs_config = {k: v for k, v in vars(chat_router.chat_components['vector_store_config']).items() 
+                if not any(sensitive in k.lower() for sensitive in ['key', 'token'])}
+    
+        git_info = get_git_info()
+        if all(v is None for v in git_info.values()):
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to retrieve git information. Ensure this is a git repository."
+            )
+        git_info["timestamp"] = datetime.now().isoformat()
+
+        return {
+            "chat_config": safe_chat_config, 
+            "vector_store_config": safe_vs_config,
+            "git_info": git_info,
+            "app_config": app_config
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving configs: {str(e)}"
+        )
 
 
 @app.get("/")
-async def root(background_tasks: BackgroundTasks):
-    logger.info("Received request to root endpoint")
-    background_tasks.add_task(initialize)
-    logger.info("Added initialize task to background tasks")
-    return {"message": "Initialization started in the background"}
+@app.get("/status")
+async def status():
+    global is_initialized, is_initializing
+    try:
+        from wandbot.api.routers import retrieve as retrieve_router
+    except ImportError:
+        retrieve_router = None
+
+    chat_components = chat_router.chat_components
+
+    c_ls = {}
+    for key in chat_components.keys():
+        c_ls[key] = str(type(chat_components[key]))
+
+    return {
+        "initialized": is_initialized,
+        "initializing": is_initializing,
+        "chat_ready": bool(chat_components.get("chat")),
+        "retriever_ready": hasattr(retrieve_router, "retriever")
+        if retrieve_router
+        else False,
+        "components": c_ls,
+        "chat_type": str(type(chat_components.get("chat")))
+        if chat_components.get("chat")
+        else None,
+    }
 
 
 app.include_router(chat_router.router)
-app.include_router(database_router.router)
-app.include_router(retrieve_router.router)
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="localhost", port=8000)

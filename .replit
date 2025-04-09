@@ -1,19 +1,19 @@
-run = "bash run.sh"
 entrypoint = "main.py"
-modules = ["python-3.10:v18-20230807-322e88b"]
-
-disableInstallBeforeRun = true
-
-hidden = [".pythonlibs"]
+modules = ["python-3.12"]
 
 [nix]
-channel = "stable-23_05"
+channel = "stable-24_05"
+
+[unitTest]
+language = "python3"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["sh", "-c", "bash run.sh"]
-build = ["sh", "-c", "bash build.sh"]
-deploymentTarget = "gce"
+run = ["python3", "main.py"]
+deploymentTarget = "cloudrun"
 
 [[ports]]
-localPort=8000
-externalPort=80
+localPort = 8000
+externalPort = 80

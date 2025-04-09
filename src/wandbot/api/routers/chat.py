@@ -1,20 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from starlette import status
 
-from wandbot.chat.chat import Chat, ChatConfig
 from wandbot.chat.schemas import ChatRequest, ChatResponse
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
-
-chat_config = ChatConfig()
-logger.info(f"Chat config: {chat_config}")
-chat: Chat | None = None
-
-router = APIRouter(
-    prefix="/chat",
-    tags=["chat"],
-)
 
 
 class APIQueryRequest(ChatRequest):
@@ -25,28 +15,38 @@ class APIQueryResponse(ChatResponse):
     pass
 
 
+# Store initialization components
+chat_components = {
+    "vector_store": None,
+    "chat_config": None,
+    "chat": None,  # We'll store the actual Chat instance here
+}
+
+router = APIRouter(prefix="/chat", tags=["chat"])
+
+
 @router.post(
     "/query", response_model=APIQueryResponse, status_code=status.HTTP_200_OK
 )
-def query(
-    request: APIQueryRequest,
-) -> APIQueryResponse:
-    """Executes a query using the chat function and returns the result as an APIQueryResponse.
+async def query(request: APIQueryRequest) -> APIQueryResponse:
+    if not chat_components.get("chat"):
+        raise HTTPException(
+            status_code=503, detail="Chat service is not yet initialized"
+        )
 
-    Args:
-        request: The APIQueryRequest object containing the question and chat history.
-
-    Returns:
-        The APIQueryResponse object containing the result of the query.
-    """
-    result = chat(
-        ChatRequest(
-            question=request.question,
-            chat_history=request.chat_history,
-            language=request.language,
-            application=request.application,
-        ),
-    )
-    result = APIQueryResponse(**result.model_dump())
-
-    return result
+    try:
+        chat_instance = chat_components["chat"]
+        result = await chat_instance.__acall__(
+            ChatRequest(
+                question=request.question,
+                chat_history=request.chat_history,
+                language=request.language,
+                application=request.application,
+            ),
+        )
+        return APIQueryResponse(**result.model_dump())
+    except Exception as e:
+        logger.error(f"Error processing chat query: {e}")
+        raise HTTPException(
+            status_code=500, detail="Error processing chat query"
+        )

@@ -1,145 +1,101 @@
-from operator import itemgetter
-from typing import List
+import asyncio
+from typing import Dict, List
 
 import weave
-from langchain_chroma import Chroma
-from langchain_community.document_transformers import EmbeddingsRedundantFilter
-from langchain_core.documents import Document
-from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 import wandb
-from wandbot.ingestion.config import VectorStoreConfig
-from wandbot.retriever.reranking import CohereRerankChain
-from wandbot.retriever.utils import OpenAIEmbeddingsModel
+from wandbot.configs.chat_config import ChatConfig
+from wandbot.configs.vector_store_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
+from wandbot.retriever.chroma import ChromaVectorStore
+from wandbot.schema.document import Document
+from wandbot.utils import get_logger
 
+logger = get_logger(__name__)
 
 class VectorStore:
-    embeddings_model: OpenAIEmbeddingsModel = OpenAIEmbeddingsModel()
-
-    def __init__(
-        self,
-        config: VectorStoreConfig,
-    ):
-        self.config = config
-        self.embeddings_model = {
-            "embedding_model_name": self.config.embedding_model_name,
-            "tokenizer_model_name": self.config.tokenizer_model_name,
-            "embedding_dimensions": self.config.embedding_dimensions,
-        }  # type: ignore
-        self.vectorstore = Chroma(
-            embedding_function=self.embeddings_model,  # type: ignore
-            collection_name=self.config.collection_name,
-            persist_directory=str(self.config.persist_dir),
-        )
+    """
+    Sets up vector store and embedding model.
+    """
+    
+    def __init__(self, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
+        self.vector_store_config = vector_store_config
+        self.chat_config = chat_config
+        try:
+            self.query_embedding_model = EmbeddingModel(
+                provider = self.vector_store_config.embeddings_provider,
+                model_name = self.vector_store_config.embeddings_model_name,
+                dimensions = self.vector_store_config.embeddings_dimensions,
+                input_type = self.vector_store_config.embeddings_query_input_type,
+                encoding_format = self.vector_store_config.embeddings_encoding_format
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize embedding model:\n{str(e)}\n") from e
+        
+        try:
+            self.chroma_vectorstore = ChromaVectorStore(
+                embedding_model=self.query_embedding_model,
+                vector_store_config=self.vector_store_config,
+                chat_config=self.chat_config
+            )   
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize vector store:\n{str(e)}\n") from e
 
     @classmethod
-    def from_config(cls, config: VectorStoreConfig):
-        if config.persist_dir.exists():
-            return cls(config=config)
-        if wandb.run is None:
+    def from_config(cls, vector_store_config: VectorStoreConfig, chat_config: ChatConfig):
+        if vector_store_config.vectordb_index_dir.exists():
+            return cls(vector_store_config=vector_store_config, chat_config=chat_config)
+        else:
             api = wandb.Api()
-            artifact = api.artifact(config.artifact_url)
-        else:
-            artifact = wandb.run.use_artifact(config.artifact_url)
-        _ = artifact.download(root=str(config.persist_dir))
+            art = api.artifact(vector_store_config.vectordb_index_artifact_url)  # Download vectordb index from W&B
+            _ = art.download(vector_store_config.vectordb_index_dir)
+            return cls(vector_store_config=vector_store_config, chat_config=chat_config)
 
-        return cls(config=config)
-
-    def as_retriever(self, search_type="mmr", search_kwargs=None):
-        if search_kwargs is None:
-            search_kwargs = {"k": 5}
-        return self.vectorstore.as_retriever(
-            search_type=search_type, search_kwargs=search_kwargs
-        )
-
-    def as_parent_retriever(self, search_type="mmr", search_kwargs=None):
-        if search_kwargs is None:
-            search_kwargs = {"k": 5}
-        retriever = self.vectorstore.as_retriever(
-            search_type=search_type, search_kwargs=search_kwargs
-        )
-        parent_retriever = retriever | RunnableLambda(
-            lambda docs: [
-                Document(
-                    page_content=doc.metadata.get(
-                        "source_content", doc.page_content
-                    ),
-                    metadata=doc.metadata,
-                )
-                for doc in docs
-            ]
-        )
-        return parent_retriever
-
-
-class SimpleRetrievalEngine:
-    cohere_rerank_chain = CohereRerankChain()
-
-    def __init__(self, vector_store: VectorStore, rerank_models: dict):
-        self.vector_store = vector_store
-        self.cohere_rerank_chain = rerank_models  # type: ignore
-        self.embeddings_model = self.vector_store.embeddings_model
-        self.redundant_filter = EmbeddingsRedundantFilter(
-            embeddings=self.embeddings_model
-        ).transform_documents
-
-    @weave.op()
-    def __call__(
+    @weave.op
+    def retrieve(
         self,
-        question: str,
-        language: str | None = None,
-        top_k: int = 5,
-        search_type="mmr",
-        sources: List[str] = None,
-    ):
-        filters = {}
-        source_filter = None
-        language_filter = None
-        if sources is not None:
-            source_filter = {"source_type": {"$in": sources}}
-        if language is not None:
-            language_filter = {"language": language}
-        if source_filter and language_filter:
-            filters = {"$and": [source_filter, language_filter]}
-        elif source_filter:
-            filters = source_filter
-        elif language_filter:
-            filters = language_filter
-        if filters:
-            search_kwargs = {"k": top_k * 4, "filter": filters}
-        else:
-            search_kwargs = {"k": top_k * 4}
+        query_texts: List[str],
+        filter_params: dict = None,
+    ) -> Dict[str, List[Document]]:
+        """Retrieve documents using either MMR or similarity search based on chat_config.
+        
+        Args:
+            query_texts: List of queries to search for
+            filter_params: Optional filtering parameters
+                {"filter": dict, "where_document": dict}
+        """
+        filter_params = filter_params or {}
 
-        retriever = self.vector_store.as_parent_retriever(
-            search_type=search_type, search_kwargs=search_kwargs
-        )
-
-        retrieval_chain = (
-            RunnableParallel(
-                question=itemgetter("question"),
-                language=itemgetter("language"),
-                context=(
-                    itemgetter("question") | retriever | self.redundant_filter
-                ),
+        if self.chat_config.search_type == "mmr":
+            # Use fixed parameters for MMR as per retrieval_implementation.md
+            results = self.chroma_vectorstore.max_marginal_relevance_search(
+                query_texts=query_texts,
+                top_k=self.chat_config.top_k_per_query,
+                fetch_k=self.chat_config.fetch_k,
+                lambda_mult=self.chat_config.mmr_lambda_mult,
+                filter=filter_params.get("filter"),
+                where_document=filter_params.get("where_document")
             )
-            | self.cohere_rerank_chain
-        )
-        results = retrieval_chain.invoke(
-            {"question": question, "language": language, "top_k": top_k}
-        )
-        outputs = []
-        for result in results:
-            result_dict = {
-                "text": result.page_content,
-                "score": result.metadata["relevance_score"],
-            }
-            metadata_dict = {
-                k: v
-                for k, v in result.metadata.items()
-                if k
-                not in ["relevance_score", "source_content", "id", "parent_id"]
-            }
-            result_dict["metadata"] = metadata_dict
-            outputs.append(result_dict)
+            logger.debug(f"RETRIEVER: MMR search completed with {len(results)} results")
+        else: 
+            results = self.chroma_vectorstore.similarity_search(
+                query_texts=query_texts,
+                top_k=self.chat_config.top_k_per_query,
+                filter=filter_params.get("filter"),
+                where_document=filter_params.get("where_document")
+            )
+            logger.debug(f"RETRIEVER: Similarity search completed with {len(results)} results")
 
-        return outputs
+        return results
+
+    async def _async_retrieve(
+        self,
+        query_texts: List[str],
+        filter_params: dict = None
+    ) -> Dict[str, List[Document]]:
+        """Async version of retrieve that returns the same dictionary structure."""
+        return await asyncio.to_thread(
+            self.retrieve,
+            query_texts=query_texts,
+            filter_params=filter_params,
+        )

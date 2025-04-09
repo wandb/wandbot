@@ -29,18 +29,24 @@ import logging
 import os
 import pathlib
 import re
+import shutil
 import sqlite3
 import string
-from typing import Any, Coroutine, List, Tuple
+import subprocess
+from pathlib import Path
+from typing import Any, Coroutine, Dict, List, Optional, Tuple
 
 import fasttext
 import nest_asyncio
 import tiktoken
-from langchain_core.documents import Document
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.theme import Theme
 
 import wandb
+from wandbot.schema.document import Document
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -52,9 +58,41 @@ def get_logger(name: str) -> logging.Logger:
     Returns:
         A logger instance with the specified name.
     """
+
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL
+    }
+    
+    # Get log level from environment or default to INFO
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    level = level_map.get(log_level, logging.INFO)  # Default to INFO if invalid level
+
+    # Configure rich console with custom theme
+    theme = Theme({
+        "info": "cyan",
+        "warning": "yellow",
+        "error": "red",
+        "critical": "red bold",
+        "debug": "grey50"
+    })
+    console = Console(theme=theme, width=100, tab_size=4)
+
     logging.basicConfig(
-        format="%(asctime)s : %(levelname)s : %(message)s",
-        level=logging.getLevelName(os.environ.get("LOG_LEVEL", "INFO")),
+        level=level,
+        format="WANDBOT | %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            markup=True,
+            show_time=True,
+            show_path=False,
+            omit_repeated_times=True
+        )]
     )
     logger = logging.getLogger(name)
     return logger
@@ -299,3 +337,198 @@ def filter_smaller_documents(
     return [
         document for document in documents if filter_small_document(document)
     ]
+
+
+def log_disk_usage(dir: str = ".") -> Dict:
+    """
+    Get disk usage information and return it as a dictionary.
+    Can be used both as a helper function and route handler.
+    """
+    try:
+        total, used, free = shutil.disk_usage(dir)
+        current_dir = Path(dir)
+        current_dir_size = sum(
+            f.stat().st_size for f in current_dir.glob("**/*") if f.is_file()
+        )
+        
+        # Calculate values in GB
+        total_gb = round(total / (2**30), 2)
+        used_gb = round(used / (2**30), 2)
+        used_mb = round(used / (2**20), 2)
+        free_gb = round(free / (2**30), 2)
+        current_dir_gb = round(current_dir_size / (2**30), 2)
+        usage_percentage = round((used * 100 / total), 2)
+        
+        # Create response dictionary
+        disk_info = {
+            "total_gb": total_gb,
+            "used_gb": used_gb,
+            "used_mb": used_mb,
+            "free_gb": free_gb,
+            "current_dir_gb": current_dir_gb,
+            "usage_percentage": usage_percentage
+        }
+        
+        # Log the information
+        logger.info(f"DISK USAGE: Total Disk Size: {total_gb} GB")
+        logger.info(f"DISK USAGE: Used Space: {used_gb} GB")
+        logger.info(f"DISK USAGE: Free Space: {free_gb} GB")
+        logger.info(f"DISK USAGE: Current Directory Size: {current_dir_gb} GB")
+        logger.info(f"DISK USAGE: Disk Usage Percentage: {usage_percentage}%")
+        
+        return disk_info
+        
+    except Exception as e:
+        error_msg = f"❌ Error getting disk usage: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg}
+
+
+def log_top_disk_usage(dir: str = ".", top_n: int = 20):
+    try:
+        logger.info("STARTUP: --, 📂 Getting top 20 files/directories by disk usage")
+        import subprocess
+        command = f"du -ah {dir} | sort -rh | head -n {top_n}"
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            logger.info(f"STARTUP: --, 📂 Top {top_n} files/directories by disk usage:\n{result.stdout}\n")
+        else:
+            logger.error(f"STARTUP: -- ❌, Failed to get disk usage, error: {result.stderr}")
+    except Exception as e:
+        logger.error(f"STARTUP: -- ❌, Error getting top {top_n} files/directories by disk usage: {e}")
+
+
+def run_git_command(command: list[str]) -> Optional[str]:
+    """
+    Runs a git command and returns the output.
+    Returns None if the command fails.
+    """
+    try:
+        return subprocess.check_output(
+            command,
+            stderr=subprocess.DEVNULL
+        ).decode('ascii').strip()
+    except subprocess.CalledProcessError:
+        return None
+
+def get_git_info() -> Dict[str, Optional[str]]:
+    """
+    Retrieves comprehensive git information about the current repository.
+    Returns a dictionary with the git information or None values if commands fail.
+    """
+    info = {}
+    
+    # Basic repository info
+    info["commit_hash"] = run_git_command(['git', 'rev-parse', 'HEAD'])
+    info["commit_hash_short"] = run_git_command(['git', 'rev-parse', '--short', 'HEAD'])
+    info["branch"] = run_git_command(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
+    
+    # Get remote URL and repository name
+    remote_url = run_git_command(['git', 'config', '--get', 'remote.origin.url'])
+    if remote_url:
+        info["remote_url"] = remote_url
+        if remote_url.endswith('.git'):
+            remote_url = remote_url[:-4]
+        info["repository"] = remote_url.split('/')[-1]
+    else:
+        info["remote_url"] = None
+        info["repository"] = None
+    
+    # Commit details
+    info["last_commit_date"] = run_git_command(['git', 'log', '-1', '--format=%cd', '--date=iso'])
+    info["last_commit_author"] = run_git_command(['git', 'log', '-1', '--format=%an'])
+    info["last_commit_message"] = run_git_command(['git', 'log', '-1', '--format=%s'])
+    
+    # Repository state
+    info["is_dirty"] = run_git_command(['git', 'status', '--porcelain']) != ""
+    
+    # Tags
+    latest_tag = run_git_command(['git', 'describe', '--tags', '--abbrev=0'])
+    info["latest_tag"] = latest_tag
+    
+    if latest_tag:
+        # Commits since last tag
+        commits_since_tag = run_git_command([
+            'git', 'rev-list', f'{latest_tag}..HEAD', '--count'
+        ])
+        info["commits_since_tag"] = commits_since_tag
+    
+    # Get total number of commits
+    info["total_commits"] = run_git_command(['git', 'rev-list', '--count', 'HEAD'])
+    
+    # Get configured user info
+    info["config_user_name"] = run_git_command(['git', 'config', 'user.name'])
+    
+    # Remote tracking info
+    tracking_branch = run_git_command(['git', 'rev-parse', '--abbrev-ref', '@{upstream}'])
+    if tracking_branch:
+        info["tracking_branch"] = tracking_branch
+        
+        # Get ahead/behind counts
+        ahead_behind = run_git_command([
+            'git', 'rev-list', '--left-right', '--count', f'HEAD...{tracking_branch}'
+        ])
+        if ahead_behind:
+            ahead, behind = ahead_behind.split('\t')
+            info["commits_ahead"] = ahead
+            info["commits_behind"] = behind
+    
+    return info
+
+def run_sync(coro: Coroutine) -> Any:
+    """
+    Safely run an async coroutine in a synchronous context.
+    If no event loop is running, we create one. 
+    Otherwise, we schedule the coroutine on the existing loop.
+
+    Args:
+        coro: The coroutine to run synchronously
+
+    Returns:
+        The result of the coroutine execution
+
+    Example:
+        In practice, from inside a FastAPI endpoint that is already async,
+        you'd typically do:
+           await chat_instance.__acall__(request)
+        But if you have a pure sync path, you can do:
+           result = run_sync(chat_instance.__acall__(request))
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        # If we get here, it means there's already a running loop. 
+        # We'll schedule the coroutine thread-safely:
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
+    except RuntimeError:
+        # No running loop, so create our own
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+
+def get_error_file_path(tb) -> str:
+    """Extract the file path where an error occurred from a traceback.
+    
+    Args:
+        tb: A traceback object from sys.exc_info()[2]
+        
+    Returns:
+        The file path where the error occurred
+    """
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    return tb.tb_frame.f_code.co_filename
+
+class ErrorInfo(BaseModel):
+    """Base model for error information that can be included in any response"""
+    has_error: bool = False
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    component: Optional[str] = None  # e.g. "reranker", "embedding", "llm"
+    stacktrace: Optional[str] = None  # Full stacktrace when error occurs
+    file_path: Optional[str] = None  # File where the error occurred
