@@ -17,6 +17,14 @@ from wandbot.api.client import AsyncAPIClient
 from wandbot.apps.discord.config import DiscordAppConfig
 from wandbot.apps.utils import format_response
 
+from dotenv import load_dotenv
+import pathlib
+# Determine the project root directory (assuming it's 3 levels up from this script)
+project_root = pathlib.Path(__file__).resolve().parents[3]
+dotenv_path = project_root / ".env"
+
+load_dotenv(dotenv_path=dotenv_path)
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
