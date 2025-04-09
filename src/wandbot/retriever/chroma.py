@@ -88,8 +88,8 @@ class ChromaVectorStore:
 
             headers = {}
             if api_key:
-                logger.info("Adding x-chroma-api-key header for authentication.")
-                headers['x-chroma-api-key'] = api_key
+                logger.info("Adding x-chroma-token header for authentication.")
+                headers['x-chroma-token'] = api_key
             else:
                 # Depending on the hosted provider, lack of token might be an error
                 logger.warning("No vector_store_api_key found in config for hosted mode. Connecting without authentication header.")
@@ -97,7 +97,6 @@ class ChromaVectorStore:
             # Note: Removed Settings object approach, using direct parameters now
             self.chroma_vectorstore_client = chromadb.HttpClient(
                 host=host,
-                port=443,  # Explicitly set port to 443 for HTTPS
                 ssl=True,
                 tenant=tenant,
                 database=database,
@@ -111,11 +110,13 @@ class ChromaVectorStore:
         # Prepare metadata to be passed during creation/retrieval
         collection_metadata = {self.vector_store_config.distance_key: self.vector_store_config.distance}
 
+        logger.info(f"ChromaVectorStore: Attempting to get or create collection '{self.vector_store_config.vectordb_collection_name}'...")
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,
             metadata=collection_metadata  # Pass metadata here
         )
+        logger.info(f"ChromaVectorStore: Successfully got or created collection '{self.collection.name}'.")
         
         # Verify metadata after creation/retrieval (optional logging)
         retrieved_metadata = self.collection.metadata or {}
@@ -151,7 +152,7 @@ of lengths: {[len(r) for r in res['documents']]}")
     
     @weave.op
     def embed_query(self, query_texts):
-        return self.embedding_function(query_texts)
+        return self.embedding_model(query_texts)
 
     @weave.op
     def similarity_search(
