@@ -23,6 +23,7 @@ langchain-core >= 0.2.2
 chromadb == 1.0.3
 weave>=0.51.41
 wandb[workspaces]>=0.19.9
+tiktoken
 fasttext-wheel
 tree-sitter-languages>=1.7.1
 markdownify>=0.11.6
