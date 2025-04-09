@@ -31,3 +31,10 @@ def get_run_config() -> IngestionRunConfig:
     parser.add_arguments(IngestionRunConfig, dest="run_config")
     args = parser.parse_args()
     return args.run_config 
+
+STEPS_CHOICES = [
+    "prepare",
+    "preprocess",
+    "vectorstore_report",
+    "all",
+] 
