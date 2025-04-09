@@ -162,18 +162,6 @@ WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
 --http httptools
 ```
 
-alternatively you can also run wandbot with `gunicorn`:
-
-```bash
-WANDBOT_FULL_INIT=1 \
-    ./wandbot_venv/bin/gunicorn wandbot.api.app:app \
-    --preload \
-    --bind 0.0.0.0:8000 \
-    --timeout=200 \
-    --workers=20 \
-    --worker-class uvicorn.workers.UvicornWorker
-```
-
 Testing: You can test that the app is running correctly by making a request to the `chat/query` endpoint, you should receive a response payload back from wandbot after 30 - 90 seconds:
 
 ```bash
