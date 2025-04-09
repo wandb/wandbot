@@ -49,7 +49,7 @@ def get_wandbot_configs(config: EvalConfig = None):
 )
 async def make_request(url: str, question: str, application: str = "api-eval", language: str = "en") -> dict:
     """Make HTTP request to wandbot API with retry logic."""
-    request_timeout = 60.0
+    request_timeout = 120.0
     request_connect_timeout = 30.0
     async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=request_timeout, connect=request_connect_timeout)) as client:
         try:
