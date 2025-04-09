@@ -1,7 +1,10 @@
-import pytest
-from unittest.mock import patch
 import sys
+from unittest.mock import patch
+
+import pytest
+
 from wandbot.evaluation.eval_config import EvalConfig, get_eval_config
+
 
 def test_eval_config_defaults():
     """Test default values of EvalConfig."""

@@ -15,7 +15,7 @@ export WANDB_API_KEY
 # Download index, the index used will be what is set in the src/wandbot/configsvectorstore_config.py files
 rm -rf temp_index
 mkdir -p temp_index
-python download_vectordb_index.py --index_dir=temp_index  # Save index to a new temp dir to avoid mistaken index uploads
+python download_vectordb_index.py --vectordb_index_dir=temp_index  # Save index to a new temp dir to avoid mistaken index uploads
 
 # Build image, docker will copy temp_index dir into the image
 e2b template build --build-arg WANDBOT_COMMIT="${WANDBOT_COMMIT}" -n "wandbot_$WANDBOT_COMMIT" -c "/root/.jupyter/start-up.sh"

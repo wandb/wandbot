@@ -1,16 +1,20 @@
-import pytest
-from unittest.mock import AsyncMock
 import sys
 from dataclasses import dataclass
+from unittest.mock import AsyncMock
 
-from wandbot.evaluation.eval_metrics.correctness import (
-    WandBotCorrectnessEvaluator,
-    CorrectnessEvaluationResult,
-    CorrectnessEvaluationModel
-)
+import pytest
+
 from wandbot.evaluation.eval_config import EvalConfig
+from wandbot.evaluation.eval_metrics.correctness import (
+    SYSTEM_TEMPLATE,
+    USER_TEMPLATE,
+    CorrectnessEvaluationModel,
+    CorrectnessEvaluationResult,
+    WandBotCorrectnessEvaluator,
+)
 from wandbot.models.llm import LLMError
 from wandbot.schema.api_status import APIStatus, ErrorInfo
+
 
 # Mock config for basic unit tests
 @dataclass
@@ -125,7 +129,17 @@ class TestWithMockConfig:
         api_status = APIStatus(component="llm", success=True)
         evaluator.llm.create = AsyncMock(return_value=(mock_response, api_status))
         
-        result = await evaluator._get_completion("", "")
+        # Test with valid prompts
+        result = await evaluator._get_completion(
+            system_prompt=SYSTEM_TEMPLATE,
+            user_prompt=USER_TEMPLATE.format(
+                query="test query",
+                generated_answer="test response",
+                reference_answer="test reference",
+                context_str="test context",
+                reference_notes="test notes"
+            )
+        )
         assert isinstance(result, CorrectnessEvaluationModel)
         assert result.score == 3.0
         assert result.decision == "correct"
@@ -135,13 +149,27 @@ class TestWithMockConfig:
         error_status = APIStatus(component="llm", success=False, error_info=ErrorInfo(has_error=True, error_message="test error"))
         evaluator.llm.create = AsyncMock(return_value=(None, error_status))
         
-        result = await evaluator._get_completion("", "")
+        result = await evaluator._get_completion(
+            system_prompt=SYSTEM_TEMPLATE,
+            user_prompt=USER_TEMPLATE.format(
+                query="test query",
+                generated_answer="test response",
+                reference_answer="test reference",
+                context_str="test context",
+                reference_notes="test notes"
+            )
+        )
         assert isinstance(result, LLMError)
         assert result.error
         assert result.error_message == "test error"
 
         # Test full evaluation with error
-        result = await evaluator.aevaluate(query="test", response="test", reference="test")
+        result = await evaluator.aevaluate(
+            query="test",
+            response="test",
+            reference="test",
+            contexts=["test context"]
+        )
         assert isinstance(result, CorrectnessEvaluationResult)
         assert result.score == 1.0
         assert result.decision == "incorrect"
@@ -163,21 +191,36 @@ class TestWithMockConfig:
         evaluator.llm.create = AsyncMock(return_value=(mock_response, api_status))
         
         # Test missing query
-        result = await evaluator.aevaluate(query=None, response="test", reference="test")
+        result = await evaluator.aevaluate(
+            query=None,
+            response="test",
+            reference="test",
+            contexts=["test context"]
+        )
         assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0
         assert result.decision == "incorrect"
         
         # Test missing response
-        result = await evaluator.aevaluate(query="test", response=None, reference="test")
+        result = await evaluator.aevaluate(
+            query="test",
+            response=None,
+            reference="test",
+            contexts=["test context"]
+        )
         assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0
         assert result.decision == "incorrect"
         
         # Test missing reference
-        result = await evaluator.aevaluate(query="test", response="test", reference=None)
+        result = await evaluator.aevaluate(
+            query="test",
+            response="test",
+            reference=None,
+            contexts=["test context"]
+        )
         assert result.has_error
         assert "query, response, and reference must be provided" in result.error_message
         assert result.score == 1.0

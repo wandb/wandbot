@@ -1,14 +1,10 @@
-import pytest
 import json
 from unittest.mock import patch
-import httpx
 
-from wandbot.evaluation.eval import (
-    get_answer,
-    get_record,
-    WandbotModel,
-    parse_text_to_json
-)
+import httpx
+import pytest
+
+from wandbot.evaluation.eval import WandbotModel, get_answer, get_record, parse_text_to_json
 
 # Test data
 MOCK_API_RESPONSE = {
