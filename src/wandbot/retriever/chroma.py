@@ -210,7 +210,11 @@ of lengths: {[len(r) for r in res['documents']]}")
         # Get query embeddings using the embedding model
         query_embeddings, api_status = self.embedding_model.embed(query_texts)
         if not api_status.success:
-            raise RuntimeError(f"Embedding failed: {api_status.error_info.error_message}")
+            # Safely access error message, provide default if unavailable
+            error_message = "Unknown embedding error"
+            if api_status.error_info and hasattr(api_status.error_info, 'error_message'):
+                error_message = api_status.error_info.error_message
+            raise RuntimeError(f"Embedding failed: {error_message}")
             
         # Get initial results from ChromaDB
         logger.info(f"VECTORSTORE: Fetching {len(query_texts) * fetch_k} results from ChromaDB for MMR search")
