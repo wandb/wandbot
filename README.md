@@ -177,7 +177,11 @@ For debugging purposes during evaluation you can run a single instance of the ap
 
 **Run the evaluation**
 
-Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're virtual envionment is active. By default, a sample will be evaluated 3 times in order to account for both the stochasticity of wandbot and our LLM judge. For debugging, pass the `--debug` flag to only evaluate on a small number of samples. To adjust the number of parallel evaluation calls weave makes use the `--n_weave_parallelism` flag when calling `eval.py` 
+Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're virtual envionment is active. By default, a sample will be evaluated 3 times in order to account for both the stochasticity of wandbot and our LLM judge. 
+
+- For debugging, pass the `--debug` flag to only evaluate on a small number of samples. 
+- To adjust the number of parallel evaluation calls weave makes use the `--n_weave_parallelism` flag when calling `eval.py` 
+- see `eval_config.py` for all evaluation options.
 
 ```
 source wandbot_venv/bin/activate

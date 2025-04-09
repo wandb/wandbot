@@ -134,8 +134,20 @@ async def on_message(message: discord.Message):
                 await api_client.create_question_answer(
                     thread_id=str(thread.id),
                     question_answer_id=str(sent_message.id),
+                    question=response.question,
+                    answer=response.answer,
+                    system_prompt=response.system_prompt,
+                    model=response.model,
+                    sources=response.sources,
+                    source_documents=response.source_documents,
+                    total_tokens=response.total_tokens,
+                    prompt_tokens=response.prompt_tokens,
+                    completion_tokens=response.completion_tokens,
+                    time_taken=response.time_taken,
+                    start_time=response.start_time,
+                    end_time=response.end_time,
+                    api_call_statuses=response.api_call_statuses,
                     language=config.bot_language,
-                    **response.model_dump(),
                 )
                 # # Add reactions for feedback
                 await sent_message.add_reaction("👍")
