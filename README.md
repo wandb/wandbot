@@ -1,25 +1,31 @@
-# wandbot
+# WandBot
 
-WandBot is a question-answering bot designed specifically for Weights & Biases Models and Weave [documentation](https://docs.wandb.ai/).
+WandBot is a support assistant designed for Weights & Biases' Models and Weave.
 
 ## What's New
 
-### wandbot v1.3.0
-**New:**
+<details>
+<summary>wandbot v1.3.0</summary>
 
-- **Move to uv for package management**: Installs and dependency checks cut down from minutes to seconds
-- **Support python 3.12 on replit**
-- **Move to lazing loading in app.py to help with startup**: Replit app deployments can't seen to handle the delay from loading the app, despite attempting async or background tasks
-- **Add wandb artifacts cache cleanup**: Saved 1.2GB of disk space
-- **Turn off web search**: Currently we don't have a web search provider to use.
-- **Refactored EvalConfig and evals script**: Switched config to using simple_parsing for free cli arguments. Added n_trials, debug mode. Undid hardcoding of ja weave eval dataset.
-- **Removed langchain-cohere**: Started hitting dependency errors, removed it in favor of raw cohere client.
-- **wandb Tables Feedback logging disabled in prep for Weave feedback**
-- **Small formatting updates for weave.op**
-- **Add dotenv in app.py for easy env var loads**
+- Up to date wandb docs + code, weave docs + code, example colabs, edu content - using chroma_index:v50
+- Gemini flash-2.0 for query expansion (was gpt-4o)
+- GPT-4o for composing the response (was gpt-4o)
+- Cohere rerank-v3.5 (was rerank-v2.0)
+- Hosted Chroma (was locally hosted chroma)
+- Turned off web-search for now
+- Moved all configs to configs folder
+- Removed most langchain dependencies
+- Implemented LLM and EmbeddingModel classes
+- More robust evaluation pipeline, added retries, error handling and cli args
+- Move package management to use uv
+- Update to use python 3.12
+- Add dotenv for env loading, while developing
+- Add new endpoint, removed retriever endpoint for now
+- Improved error handling and retries for all apis
+</details>
 
-
-### wandbot v1.2.0
+<details>
+<summary>wandbot v1.2.0</summary>
 
 This release introduces a number of exciting updates and improvements:
 
@@ -32,15 +38,22 @@ This release introduces a number of exciting updates and improvements:
 - **API Restructuring**: Redesigned the API into separate routers for retrieval, database, and chat operations.
 
 These updates are part of our ongoing commitment to improve performance and usability.
+</details>
 
 ## Evaluation
 English 
-| wandbot version  | Comment  | response accuracy |
-|---|---|---|
-| 1.0.0 | our baseline wandbot |  53.8 % |
-| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 
-| 1.2.0 | our new enhanced wandbot | 81.6 % |
+| wandbot version  | Comment  | response accuracy | num trials |
+|---|---|---| --- |
+| 1.0.0 | baseline wandbot |  53.8 % | 1 |
+| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 1 |
+| 1.2.0 | our new enhanced wandbot | 81.6 % | 1 |
+| 1.3.0rc | [1.3.0rc with gpt-4-preview judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F0196172b-bed6-77e3-8d43-dc1c31fc9a9b%3FhideTraceTree%3D1) | 71.3 % | 5 |
+| 1.3.0rc | [1.3.0rc with gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F019619b7-6ca1-7cc1-bdb9-d1053a6386d8%3FhideTraceTree%3D1) |88.8 % | 5 |
+| 1.3.0 | [v1.3.0 prod, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F01961c5e-9570-7f93-b3db-572ae83d9dbe%3FhideTraceTree%3D1) | 91.2 % | 5 |
 
+**Note**
+- `1.3.0rc with gpt-4-preview judge` and `1.3.0rc with gpt-4o judge` are the same wandbot system evaluated with different judges. 
+- The ~2.5% improvement between `1.3.0rc (gpt-4o judge)` and `1.3.0 prod` is mostly due to using `reranker-v3.5` (from 2.0) and `flash-2.0-001` (from gpt-4o). However evals previous to the v1.3.0 prod eval had 10-12 errors (out of 490 total calls), so there might be some noise in the results.
 
 Japanese
 | wandbot version  | Comment  | response accuracy |
@@ -51,9 +64,10 @@ Japanese
 ## Features
 
 - WandBot uses:
-  - a local ChromaDB vector store
+  - a hosted ChromaDB vector store
   - OpenAI's v3 embeddings
-  - GPT-4 for query enhancement and response synthesis
+  - Gemini flash-2.0 for query enhancement
+  - GPT-4o for response synthesis
   - Cohere's re-ranking model
 - It features periodic data ingestion and report generation, contributing to the bot's continuous improvement. You can view the latest data ingestion report [here](https://wandb.ai/wandbot/wandbot-dev/reportlist).
 - The bot is integrated with Discord and Slack, facilitating seamless integration with these popular collaboration platforms.
@@ -83,7 +97,6 @@ WANDB_TRACING_ENABLED="true"
 LOG_LEVEL=INFO
 WANDB_PROJECT="wandbot-dev"
 WANDB_ENTITY= <your W&B entity>
-
 ```
 
 If you're running the slack or discord apps you'll also need the following keys/tokens set as env vars:
@@ -123,15 +136,16 @@ Executing these commands will launch the API, Slackbot, and Discord bot applicat
 
 **Eval Config**
 
-Modify the evaluation config file here: `wandbot/src/wandbot/evaluation/config.py`
+The eval config can be found here and includes cli args to set the number of trials, weave parallelism, weave logging details and debug mode : `wandbot/src/wandbot/evaluation/eval_config.py`
 
-`evaluation_strategy_name` : attribute name in Weave Evaluation dashboard
-`eval_dataset` : 
-    - [Latest English evaluation dataset](https://wandb.ai/wandbot/wandbot-eval/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval%2Fobjects%2Fwandbot_eval_data%2Fversions%2FeCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU%3F%26): "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
-    - [Latest Japanese evaluation dataset](https://wandb.ai/wandbot/wandbot-eval-jp/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval-jp%2Fobjects%2Fwandbot_eval_data_jp%2Fversions%2FoCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA%3F%26): "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA" 
-`eval_judge_model` : model used for judge
-`wandb_entity` : wandb entity name for record
-`wandb_project` : wandb project name for record
+The following evaluation sets are used:
+
+[English evaluation dataset](https://wandb.ai/wandbot/wandbot-eval/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval%2Fobjects%2Fwandbot_eval_data%2Fversions%2FeCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU%3F%26)
+- ref: `weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU`
+    
+[Japanese evaluation dataset](https://wandb.ai/wandbot/wandbot-eval-jp/weave/datasets?peekPath=%2Fwandbot%2Fwandbot-eval-jp%2Fobjects%2Fwandbot_eval_data_jp%2Fversions%2FoCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA%3F%26)
+- ref: `weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA`
+
 
 **Dependencies**
 
