@@ -31,21 +31,21 @@ class ChatConfig(BaseSettings):
     
     # Reranker models
     rereanker_provider: str = "cohere"
-    english_reranker_model: str = "rerank-english-v2.0"
-    multilingual_reranker_model: str = "rerank-multilingual-v2.0"
+    english_reranker_model: str = "rerank-v3.5"
+    multilingual_reranker_model: str = "rerank-v3.5"
     
     # Query enhancer settings
-    query_enhancer_model: str = "gpt-4o-2024-11-20" #"gpt-4-0125-preview"
+    query_enhancer_model: str = "gpt-4o-2024-11-20" 
     query_enhancer_temperature: float = 0.1
-    query_enhancer_fallback_model: str = "gpt-4o-2024-11-20" #"gpt-4-0125-preview"
+    query_enhancer_fallback_model: str = "gpt-4o-2024-11-20" 
     query_enhancer_fallback_temperature: float = 0.1
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "openai"
-    response_synthesizer_model: str = "gpt-4o-2024-11-20" # "gpt-4-0125-preview" 
+    response_synthesizer_model: str = "gpt-4o-2024-11-20" 
     response_synthesizer_temperature: float = 0.1
     response_synthesizer_fallback_provider: str = "openai"
-    response_synthesizer_fallback_model: str = "gpt-4o-2024-11-20" #"gpt-4-0125-preview"
+    response_synthesizer_fallback_model: str = "gpt-4o-2024-11-20"
     response_synthesizer_fallback_temperature: float = 0.1
     
     # Translation models settings
