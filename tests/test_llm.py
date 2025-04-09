@@ -1,21 +1,24 @@
+import asyncio
+import os
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
-import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
-import asyncio
 
+from tests.test_model_config import ANTHROPIC_MODELS, OPENAI_MODELS
 from wandbot.models.llm import (
-    AsyncOpenAILLMModel,
     AsyncAnthropicLLMModel,
+    AsyncOpenAILLMModel,
     LLMModel,
     extract_system_and_messages,
 )
-from wandbot.utils import ErrorInfo
 from wandbot.schema.api_status import APIStatus
 
-# Load environment variables from .env
-load_dotenv()
+# Load environment variables from .env in project root
+ENV_PATH = Path(__file__).parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 @pytest_asyncio.fixture(scope="session")
 def event_loop():
@@ -65,19 +68,6 @@ class ResponseModelForTest(BaseModel):
 class SimpleResponse(BaseModel):
     answer: int
 
-anthropic_models = [
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022"
-]
-
-openai_models = [
-    "gpt-4-1106-preview",
-    "gpt-4o-mini-2024-07-18",
-    "gpt-4o-2024-08-06",
-    "o1-2024-12-17",
-    "o1-mini-2024-09-12"
-]
-
 @pytest.fixture
 def messages():
     return [
@@ -108,7 +98,7 @@ def test_extract_system_and_messages_no_system():
 
 # OpenAI model tests
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model_name", openai_models)
+@pytest.mark.parametrize("model_name", OPENAI_MODELS)
 async def test_openai_llm_creation(model_name):
     model = AsyncOpenAILLMModel(model_name=model_name, temperature=0)
     assert model.model_name == model_name
@@ -116,7 +106,7 @@ async def test_openai_llm_creation(model_name):
     assert model.client.api_key == os.getenv("OPENAI_API_KEY")
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model_name", openai_models)
+@pytest.mark.parametrize("model_name", OPENAI_MODELS)
 async def test_openai_llm_create(model_name):
     model = AsyncOpenAILLMModel(model_name=model_name, temperature=0)
     result, api_status = await model.create([
@@ -129,7 +119,7 @@ async def test_openai_llm_create(model_name):
     assert api_status.component == "openai"
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model_name", openai_models)
+@pytest.mark.parametrize("model_name", OPENAI_MODELS)
 async def test_openai_llm_create_with_response_model(model_name):
     model = AsyncOpenAILLMModel(
         model_name=model_name, 
@@ -160,7 +150,7 @@ async def test_openai_invalid_model():
 
 # Anthropic model tests
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model_name", anthropic_models)
+@pytest.mark.parametrize("model_name", ANTHROPIC_MODELS)
 async def test_anthropic_llm_creation(model_name):
     model = AsyncAnthropicLLMModel(model_name=model_name, temperature=0)
     assert model.model_name == model_name
@@ -168,7 +158,7 @@ async def test_anthropic_llm_creation(model_name):
     assert model.client.api_key == os.getenv("ANTHROPIC_API_KEY")
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("model_name", anthropic_models)
+@pytest.mark.parametrize("model_name", ANTHROPIC_MODELS)
 async def test_anthropic_llm_create(model_name):
     model = AsyncAnthropicLLMModel(model_name=model_name, temperature=0)
     result, api_status = await model.create([

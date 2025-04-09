@@ -1,5 +1,7 @@
-from wandbot.configs.chat_config import ChatConfig
 from pydantic import ConfigDict
+
+from wandbot.configs.chat_config import ChatConfig
+
 
 class TestConfig(ChatConfig):
     """Test configuration with minimal retry settings for faster tests"""

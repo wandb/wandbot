@@ -1,15 +1,11 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from pydantic import ValidationError
 
-from wandbot.rag.query_handler import (
-    QueryEnhancer, 
-    EnhancedQuery, 
-    clean_question,
-    format_chat_history,
-    Labels
-)
+from wandbot.rag.query_handler import EnhancedQuery, Labels, QueryEnhancer, clean_question, format_chat_history
 from wandbot.schema.api_status import APIStatus, ErrorInfo
+
 
 @pytest.fixture
 def mock_llm_model():

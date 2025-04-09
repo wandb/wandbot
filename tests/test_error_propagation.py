@@ -1,18 +1,21 @@
-import pytest
 from pathlib import Path
-from wandbot.schema.api_status import APIStatus
+
+import pytest
 from dotenv import load_dotenv
-from wandbot.models.embedding import EmbeddingModel
-from wandbot.rag.retrieval import FusionRetrievalEngine
+
+from tests.test_config import TestConfig
+from wandbot.chat.rag import RAGPipeline
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.configs.vector_store_config import VectorStoreConfig
+from wandbot.models.embedding import EmbeddingModel
+from wandbot.rag.retrieval import FusionRetrievalEngine
 from wandbot.retriever.chroma import ChromaVectorStore
-from wandbot.chat.rag import RAGPipeline
-from tests.test_config import TestConfig
+from wandbot.schema.api_status import APIStatus
 from wandbot.schema.document import Document
 
 # Load environment variables from .env in project root
-load_dotenv(Path(__file__).parent.parent / ".env")
+ENV_PATH = Path(__file__).parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 @pytest.fixture
 def chat_config():

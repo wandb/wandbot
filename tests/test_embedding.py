@@ -1,17 +1,16 @@
-import pytest
 import os
-from dotenv import load_dotenv
-import numpy as np
 from pathlib import Path
 
-from wandbot.models.embedding import (
-    EmbeddingModel, 
-    VALID_COHERE_INPUT_TYPES
-)
+import numpy as np
+import pytest
+from dotenv import load_dotenv
+
+from wandbot.models.embedding import VALID_COHERE_INPUT_TYPES, EmbeddingModel
 from wandbot.schema.api_status import APIStatus
 
 # Load environment variables from .env in project root
-load_dotenv(Path(__file__).parent.parent / ".env")
+ENV_PATH = Path(__file__).parent.parent / '.env'
+load_dotenv(ENV_PATH, override=True)
 
 cohere_models = [
     "embed-english-v3.0",
