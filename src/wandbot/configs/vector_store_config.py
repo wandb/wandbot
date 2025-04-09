@@ -18,7 +18,7 @@ class VectorStoreConfig(BaseSettings):
     # Vector Store
     vectordb_collection_name: str = "vectorstore"
     vectordb_index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
-    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v48"
+    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v50"
     distance: str = "l2"  # used in retrieval from vectordb 
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
     
