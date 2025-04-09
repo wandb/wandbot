@@ -35,9 +35,11 @@ class ChatConfig(BaseSettings):
     multilingual_reranker_model: str = "rerank-v3.5"
     
     # Query enhancer settings
-    query_enhancer_model: str = "gpt-4o-2024-11-20" 
+    query_enhancer_provider: str = "google"
+    query_enhancer_model: str = "gemini-2.0-flash-001" 
     query_enhancer_temperature: float = 0.1
-    query_enhancer_fallback_model: str = "gpt-4o-2024-11-20" 
+    query_enhancer_fallback_provider: str = "google"
+    query_enhancer_fallback_model: str = "gemini-2.0-flash-001" 
     query_enhancer_fallback_temperature: float = 0.1
     
     # Response synthesis model settings
@@ -68,3 +70,9 @@ class ChatConfig(BaseSettings):
     reranker_retry_min_wait: float = 2.0
     reranker_retry_max_wait: float = 180
     reranker_retry_multiplier: float = 2.5
+
+    # Vector Store retry settings
+    vector_store_max_retries: int = 3
+    vector_store_retry_min_wait: float = 1.0  # Start with a short wait
+    vector_store_retry_max_wait: float = 10.0 # Cap the wait time
+    vector_store_retry_multiplier: float = 2.0 # Double wait time each retry

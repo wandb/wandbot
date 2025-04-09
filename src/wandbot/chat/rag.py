@@ -57,8 +57,10 @@ class RAGPipeline:
     ):
         self.vector_store = vector_store
         self.query_enhancer = QueryEnhancer(
+            model_provider = chat_config.query_enhancer_provider,
             model_name = chat_config.query_enhancer_model,
             temperature = chat_config.query_enhancer_temperature,
+            fallback_model_provider = chat_config.query_enhancer_fallback_provider,
             fallback_model_name = chat_config.query_enhancer_fallback_model,
             fallback_temperature = chat_config.query_enhancer_fallback_temperature,
             max_retries=chat_config.llm_max_retries

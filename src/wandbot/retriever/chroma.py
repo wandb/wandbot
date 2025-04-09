@@ -6,6 +6,7 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Identical MMR implementation using cosine similarity
 - Matching query parameters and filtering
 """
+import logging
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -13,6 +14,7 @@ import chromadb
 import numpy as np
 import weave
 from chromadb.config import Settings
+from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.configs.vector_store_config import VectorStoreConfig
@@ -22,6 +24,22 @@ from wandbot.schema.document import Document
 from wandbot.utils import get_logger
 
 logger = get_logger(__name__)
+retry_chat_config = ChatConfig()
+
+# Helper retry decorator configuration
+vector_store_retry_decorator = retry(
+    retry=retry_if_exception_type(Exception),  # Retry on any exception for broad coverage
+    stop=stop_after_attempt(retry_chat_config.vector_store_max_retries),
+    wait=wait_exponential(
+        multiplier=retry_chat_config.vector_store_retry_multiplier,
+        min=retry_chat_config.vector_store_retry_min_wait,
+        max=retry_chat_config.vector_store_retry_max_wait
+    ),
+    before_sleep=lambda retry_state: (
+        before_sleep_log(logger, log_level=logging.WARNING)(retry_state),
+        logger.warning(f"Retrying vector store operation due to {retry_state.outcome.exception()}. Attempt {retry_state.attempt_number} failed. Retrying in {retry_state.next_action.sleep:.2f} seconds...")
+    )
+)
 
 class ChromaVectorStore:
     """Native ChromaDB wrapper that matches langchain-chroma's interface exactly.
@@ -91,8 +109,7 @@ class ChromaVectorStore:
         logger.info(f"Initializing Chroma collection: {self.vector_store_config.vectordb_collection_name}")
         # Prepare metadata to be passed during creation/retrieval
         collection_metadata = {self.vector_store_config.distance_key: self.vector_store_config.distance}
-        logger.info(f"Setting collection metadata on creation: {collection_metadata}")
-        
+
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,
@@ -107,8 +124,9 @@ class ChromaVectorStore:
                             f"This might happen if the collection existed with different settings. Relevance scoring might be affected.")
         else:
             logger.info(f"Successfully confirmed collection metadata: {retrieved_metadata}")
-    
+
     @weave.op
+    @vector_store_retry_decorator
     def query(self, 
               query_texts: Optional[List[str]] = None, 
               query_embeddings: Optional[List[float]] = None,
