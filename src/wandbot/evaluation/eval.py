@@ -49,7 +49,9 @@ def get_wandbot_configs(config: EvalConfig = None):
 )
 async def make_request(url: str, question: str, application: str = "api-eval", language: str = "en") -> dict:
     """Make HTTP request to wandbot API with retry logic."""
-    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=900.0, connect=30.0)) as client:
+    request_timeout = 60.0
+    request_connect_timeout = 30.0
+    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=request_timeout, connect=request_connect_timeout)) as client:
         try:
             response = await client.post(
                 f"{url}/chat/query",
@@ -58,10 +60,10 @@ async def make_request(url: str, question: str, application: str = "api-eval", l
             response.raise_for_status()
             return response.json()
         except httpx.ReadTimeout:
-            logger.error("Request timed out after 900 seconds")
+            logger.error(f"Request timed out after {request_timeout} seconds")
             raise
         except httpx.ConnectTimeout:
-            logger.error("Connection timed out after 30 seconds")
+            logger.error(f"Connection timed out after {request_connect_timeout} seconds")
             raise
 
 async def get_answer(question: str, wandbot_url: str, application: str = "api-eval", language: str = "en") -> str:
