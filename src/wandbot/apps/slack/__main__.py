@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import logging
 from functools import partial
+import pathlib
 
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
@@ -23,6 +24,14 @@ from wandbot.apps.slack.config import SlackAppEnConfig, SlackAppJaConfig
 from wandbot.apps.slack.formatter import MrkdwnFormatter
 from wandbot.apps.utils import format_response
 from wandbot.utils import get_logger
+
+from dotenv import load_dotenv
+
+# Determine the project root directory (assuming it's 3 levels up from this script)
+project_root = pathlib.Path(__file__).resolve().parents[3]
+dotenv_path = project_root / ".env"
+
+load_dotenv(dotenv_path=dotenv_path)
 
 logger = get_logger(__name__)
 

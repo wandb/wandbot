@@ -227,5 +227,5 @@ These datasets are also stored as wandb artifacts in the project defined in the 
 To help with debugging, you can use the `steps` and `include_sources` flags to specify only sub-components of the pipeline and only certain documents sources to run. For example if you wanted to stop the pipeline before it creates the vector db and creates the artifacts and W&B report AND you only wanted to process the Weave documentation, you would do the following:
 
 ```
-python -m wandbot.ingestion --steps prepare preprocess --include_sources "weave_documentation"
+python -m wandbot.ingestion --steps prepare preprocess --include_sources "weave_documentation" --debug
 ```
