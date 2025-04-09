@@ -263,7 +263,7 @@ def run_vectorstore_and_report_pipeline(
             report.blocks = [
                 wr.TableOfContents(),
                 wr.H1("Run Information"),
-                wr.RunDetails(run=run), # Link to the current run
+                wr.P(f"Run Details: [View Run]({run.url})"), # Link to the current run
                 wr.H1("Vector Store"),
                 wr.H2("Vector Store Chunk Counts"),
                 wr.P("Chunk counts per source:"),
