@@ -40,7 +40,7 @@ from wandbot.configs.ingestion_config import (
     DocodileKoreanStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
-    FCReportsStoreConfig,
+    # FCReportsStoreConfig,
     IngestionConfig,
     SDKCodeStoreConfig,
     SDKTestsStoreConfig,
@@ -1098,7 +1098,7 @@ def get_all_data_store_configs() -> List[DataStoreConfig]:
         ExampleNotebookStoreConfig(),
         WandbEduCodeStoreConfig(),
         WandbEduDocStoreConfig(),
-        FCReportsStoreConfig(),
+        # FCReportsStoreConfig(),
     ]
 
 def filter_configs(
