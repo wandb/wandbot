@@ -119,8 +119,20 @@ async def command_handler(body: dict, say: callable, logger: logging.Logger) -> 
         await api_client.create_question_answer(
             thread_id=thread_id,
             question_answer_id=sent_message["ts"],
+            question=api_response.question,
+            answer=api_response.answer,
+            system_prompt=api_response.system_prompt,
+            model=api_response.model,
+            sources=api_response.sources,
+            source_documents=api_response.source_documents,
+            total_tokens=api_response.total_tokens,
+            prompt_tokens=api_response.prompt_tokens,
+            completion_tokens=api_response.completion_tokens,
+            time_taken=api_response.time_taken,
+            start_time=api_response.start_time,
+            end_time=api_response.end_time,
+            api_call_statuses=api_response.api_call_statuses,
             language=config.bot_language,
-            **api_response.model_dump(),
         )
 
     except Exception as e:
