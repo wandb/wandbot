@@ -207,11 +207,16 @@ python src/wandbot/evaluation/eval.py  --n_trials 1
 ### Data Ingestion
 
 The data ingestion module pulls code and markdown from Weights & Biases repositories [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) ingests them into vectorstores for the retrieval augmented generation pipeline.
+
 To ingest the data run the following command from the root of the repository
 
 ```bash
 python -m wandbot.ingestion
 ```
+
+**Note:**
+
+Pay special attention to the configs in `src/wandbot/configs/vector_store_config.py` and `src/wandbot/configs/ingestion_config` as this is where important settings such as the embedding model, embedding dimensions and hosted vs local vector db are set.
 
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 

@@ -31,6 +31,10 @@ WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
 --loop uvloop \
 --http httptools
 
+$VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l en 
+$VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l ja
+$VIRTUAL_ENV/bin/python -m wandbot.apps.discord
+
 # WANDBOT_FULL_INIT=1 && $VIRTUAL_ENV/bin/uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 --workers 1 --timeout-keep-alive 75 --loop uvloop --http httptools --log-level debug
 
 # (WANDBOT_FULL_INIT=1 && $VIRTUAL_ENV/bin/uvicorn wandbot.api.app:app --host="0.0.0.0" --port=8000 \
