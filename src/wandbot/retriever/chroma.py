@@ -7,6 +7,7 @@ dependency while maintaining exact compatibility with its behavior, including:
 - Matching query parameters and filtering
 """
 import logging
+import os
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -108,9 +109,15 @@ class ChromaVectorStore:
             
         logger.info(f"Initializing Chroma collection: {self.vector_store_config.vectordb_collection_name}")
         # Prepare metadata to be passed during creation/retrieval
-        collection_metadata = {self.vector_store_config.distance_key: self.vector_store_config.distance}
+        # Add hnsw:num_threads based on GitHub issue #869
+        # Dynamically set based on available cores (using half, minimum 1)
+        num_threads = max(1, os.cpu_count() // 2) 
+        collection_metadata = {
+            self.vector_store_config.distance_key: self.vector_store_config.distance,
+            'hnsw:num_threads': num_threads 
+        }
 
-        logger.info(f"ChromaVectorStore: Attempting to get or create collection '{self.vector_store_config.vectordb_collection_name}'...")
+        logger.info(f"ChromaVectorStore: Attempting to get or create collection '{self.vector_store_config.vectordb_collection_name}' with metadata {collection_metadata}...")
         self.collection = self.chroma_vectorstore_client.get_or_create_collection(
             name=self.vector_store_config.vectordb_collection_name,
             embedding_function=self.embedding_model,
