@@ -35,17 +35,18 @@ def create_id_from_document(document: Document) -> str:
     return checksum
 
 
+def create_id_from_page_content(page_content: str) -> str:
+    return md5(page_content.encode("utf-8")).hexdigest()
+
+
 def prefix_headers_based_on_metadata(chunk):
     # Headers ordered by markdown header levels
     markdown_header_prefixes = ["#", "##", "###", "####", "#####", "######"]
-    markdown_header_prefixes_map = {
-        f"header_{i}": prefix for i, prefix in enumerate(markdown_header_prefixes)
-    }
+    markdown_header_prefixes_map = {f"header_{i}": prefix for i, prefix in enumerate(markdown_header_prefixes)}
 
     # Generate headers from metadata
     headers_from_metadata = [
-        f"{markdown_header_prefixes_map[level]} {title}"
-        for level, title in chunk["metadata"].items()
+        f"{markdown_header_prefixes_map[level]} {title}" for level, title in chunk["metadata"].items()
     ]
 
     # Join the generated headers with new lines
@@ -97,17 +98,9 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
             for i in range(len(aggregated_chunks) - 1, -1, -1):
                 previous_chunk = aggregated_chunks[i]
                 # Check if the current line's metadata is a child or same level of the previous chunk's metadata
-                if all(
-                    item in line["metadata"].items()
-                    for item in previous_chunk["metadata"].items()
-                ):
-                    potential_new_content = (
-                        previous_chunk["content"] + "  \n\n" + line["content"]
-                    )
-                    if (
-                        self.max_length is None
-                        or len(potential_new_content) <= self.max_length
-                    ):
+                if all(item in line["metadata"].items() for item in previous_chunk["metadata"].items()):
+                    potential_new_content = previous_chunk["content"] + "  \n\n" + line["content"]
+                    if self.max_length is None or len(potential_new_content) <= self.max_length:
                         # If adding the current line does not exceed chunk_size, merge it into the previous chunk
                         aggregated_chunks[i]["content"] = potential_new_content
                         should_append = False
@@ -121,13 +114,8 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
                 aggregated_chunks.append(line)
 
         # Prefix headers based on metadata
-        aggregated_chunks = [
-            prefix_headers_based_on_metadata(chunk) for chunk in aggregated_chunks
-        ]
-        return [
-            Document(page_content=chunk["content"], metadata=chunk["metadata"])
-            for chunk in aggregated_chunks
-        ]
+        aggregated_chunks = [prefix_headers_based_on_metadata(chunk) for chunk in aggregated_chunks]
+        return [Document(page_content=chunk["content"], metadata=chunk["metadata"]) for chunk in aggregated_chunks]
 
     def split_documents(self, documents: List[Document]) -> List[Document]:
         """Split a list of documents into smaller documents.
@@ -140,13 +128,36 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
         """
         split_documents = []
         for document in documents:
-            for chunk in self.split_text(document.page_content):
-                split_documents.append(
-                    Document(
-                        page_content=chunk.page_content,
-                        metadata=document.metadata,
-                    )
+            # Use Langchain's splitter to get basic text chunks and their metadata (like headers)
+            # Note: langchain's split_text may return its own Document type, not ours
+            chunks = self.split_text(document.page_content)
+
+            original_doc_id = document.metadata.get("id")
+            if not original_doc_id:
+                # Fallback if original ID somehow missing (shouldn't happen with prepare_data changes)
+                original_doc_id = create_id_from_document(document)
+
+            for chunk in chunks:
+                # Create new metadata, copying from parent
+                new_metadata = document.metadata.copy()
+                # Update with any specific metadata from the langchain chunk (e.g., header info)
+                new_metadata.update(chunk.metadata)
+
+                # Set parent_id to the original document's ID
+                new_metadata["parent_id"] = original_doc_id
+
+                # Remove the original ID from the new metadata before creating the Document
+                if "id" in new_metadata:
+                    del new_metadata["id"]
+                new_metadata["id"] = create_id_from_page_content(chunk.page_content)
+
+                # Create our Document object
+                new_doc = Document(
+                    page_content=chunk.page_content,
+                    metadata=new_metadata,
                 )
+                split_documents.append(new_doc)
+
         return split_documents
 
 
@@ -156,18 +167,18 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
         lang_detect,
         chunk_size: int,
         chunk_multiplier: int,
+        chunk_overlap: int,
         length_function: Callable[[str], int] = None,
     ):
         self.fasttext_model = lang_detect
         self.chunk_size: int = chunk_size
         self.chunk_multiplier: int = chunk_multiplier
-        self.length_function: Callable[[str], int] = (
-            length_function if length_function is not None else len
-        )
+        self.chunk_overlap: int = chunk_overlap
+        self.length_function: Callable[[str], int] = length_function if length_function is not None else len
         self.recursive_splitter = RecursiveCharacterTextSplitter.from_language(
             language=Language.MARKDOWN,
             chunk_size=self.chunk_size,
-            chunk_overlap=0,
+            chunk_overlap=self.chunk_overlap,
             keep_separator=True,
             length_function=self.length_function,
         )
@@ -196,10 +207,10 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
                     page_content=split.page_content,
                     metadata=split.metadata.copy(),
                 )
-                chunk.metadata["parent_id"] = create_id_from_document(chunk)
-                chunk.metadata["has_code"] = "```" in chunk.page_content
+                chunk.metadata["parent_id"] = document.metadata["id"]
                 chunk.metadata["language"] = self.identify_document_language(chunk)
                 chunk.metadata["source_content"] = chunk.page_content
+                chunk.metadata["has_code"] = "```" in chunk.page_content
                 chunked_documents.append(chunk)
 
             split_chunks = self.recursive_splitter.split_documents(chunked_documents)
@@ -214,9 +225,7 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
 
         return final_chunks
 
-    def transform_documents(
-        self, documents: Sequence[Document], **kwargs: Any
-    ) -> Sequence[Document]:
+    def transform_documents(self, documents: Sequence[Document], **kwargs: Any) -> Sequence[Document]:
         split_documents = self.split_markdown_documents(list(documents))
         transformed_documents = []
         for document in split_documents:
@@ -227,9 +236,7 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
 if __name__ == "__main__":
     docodile_en_config = DocodileEnglishStoreConfig()
     lang_detect = FastTextLangDetect(
-        FasttextModelConfig(
-            fasttext_file_path="/media/mugan/data/wandb/projects/wandbot/data/cache/models/lid.176.bin"
-        )
+        FasttextModelConfig(fasttext_file_path="/media/mugan/data/wandb/projects/wandbot/data/cache/models/lid.176.bin")
     )
 
     data_file = open(

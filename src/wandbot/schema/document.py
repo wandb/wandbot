@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Set
 
 from pydantic import BaseModel, Field, field_validator
 
-# Define required metadata fields
+# Define required metadata fields for initial validation
 REQUIRED_METADATA_FIELDS: Set[str] = {"source", "source_type", "has_code", "id"}
 
 

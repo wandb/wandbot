@@ -479,10 +479,12 @@ class CodeTextTransformer(BaseDocumentTransformer):
         lang_detect,
         chunk_size: int,
         chunk_multiplier: int,
+        chunk_overlap: int,
         length_function: Callable[[str], int] = None,
     ):
         self.lang_detect = lang_detect
         self.chunk_size: int = chunk_size
+        self.chunk_overlap: int = chunk_overlap
         self.chunk_multiplier: int = chunk_multiplier
         self.length_function: Callable[[str], int] = (
             length_function if length_function is not None else len
@@ -497,7 +499,7 @@ class CodeTextTransformer(BaseDocumentTransformer):
 
         # First chunk into parent documents
 
-        chunked_documents = []
+        coarse_chunked_documents = []
         for document in documents:
             file_extension = document.metadata.get("file_type", "")
             if file_extension in [".py", ".js", ".ts"]:
@@ -507,7 +509,7 @@ class CodeTextTransformer(BaseDocumentTransformer):
                     ".ts": Language.JS,
                 }[file_extension]
                 if language == Language.PYTHON:
-                    chunked_documents.extend(
+                    coarse_chunked_documents.extend(
                         self.python_code_splitter.transform_documents(
                             [document]
                         )
@@ -517,53 +519,54 @@ class CodeTextTransformer(BaseDocumentTransformer):
                         RecursiveCharacterTextSplitter.from_language(
                             language=language,
                             chunk_size=self.chunk_size * self.chunk_multiplier,
-                            chunk_overlap=0,
+                            chunk_overlap=self.chunk_overlap,
                             keep_separator=True,
                             length_function=len,
                         )
                     )
-                    chunked_documents.extend(
+                    coarse_chunked_documents.extend(
                         recursive_splitter.split_documents([document])
                     )
             elif file_extension in [".md", ".ipynb"]:
-                chunked_documents.extend(
+                coarse_chunked_documents.extend(
                     CustomMarkdownTextSplitter(
                         chunk_size=self.chunk_size * self.chunk_multiplier
                     ).split_documents([document])
                 )
             else:
-                chunked_documents.extend(
+                coarse_chunked_documents.extend(
                     TokenTextSplitter(
                         chunk_size=self.chunk_size * self.chunk_multiplier
                     ).split_documents([document])
                 )
 
         # make new documents from the chunks with updated metadata
-        parent_documents = []
-        for split in chunked_documents:
-            file_extension = split.metadata.get("file_type", "")
+        # These are the coarse split of the parent, this next section just adds more metadata
+        # and does some text post-processing.  
+        coarse_split_parent_documents = []
+        for coarse_split in coarse_chunked_documents:
+            file_extension = coarse_split.metadata.get("file_type", "")
             if file_extension == ".py":
-                document_content = "\n".join(
-                    split.page_content.strip().split("\n")[3:]
+                coarse_document_content = "\n".join(
+                    coarse_split.page_content.strip().split("\n")[3:]
                 )
             else:
-                document_content = split.page_content
+                coarse_document_content = coarse_split.page_content
 
-            chunk = Document(
-                page_content=document_content,
-                metadata=split.metadata.copy(),
+            coarse_parent_chunk = Document(
+                page_content=coarse_document_content,
+                metadata=coarse_split.metadata.copy(),
             )
-            chunk.metadata["parent_id"] = create_id_from_document(chunk)
-            chunk.metadata["has_code"] = True
-            chunk.metadata["language"] = chunk.metadata.get("language", "en")
-            chunk.metadata["source_content"] = split.metadata.get(
-                "source_content", document_content
+            coarse_parent_chunk.metadata["has_code"] = True
+            coarse_parent_chunk.metadata["language"] = coarse_parent_chunk.metadata.get("language", "en")
+            coarse_parent_chunk.metadata["source_content"] = coarse_split.metadata.get(
+                "source_content", coarse_document_content
             )
-            parent_documents.append(chunk)
+            coarse_split_parent_documents.append(coarse_parent_chunk)
 
-        # now make children documents from the parent documents
+        # now make children documents from the coarse splits of parent documents
         final_chunks = []
-        for document in parent_documents:
+        for document in coarse_split_parent_documents:
             file_extension = document.metadata.get("file_type", "")
             if file_extension in [".py", ".js", ".ts", ".md", ".ipynb"]:
                 language = {
@@ -577,20 +580,24 @@ class CodeTextTransformer(BaseDocumentTransformer):
                     RecursiveCharacterTextSplitter.from_language(
                         language=language,
                         chunk_size=self.chunk_size,
-                        chunk_overlap=0,
+                        chunk_overlap=self.chunk_overlap,
                         keep_separator=True,
                         length_function=self.length_function,
                     )
                 )
-                final_chunks.extend(
-                    recursive_splitter.split_documents([document])
-                )
+                # Need to preserve metadata
+                split_docs_recursive = recursive_splitter.split_documents([document])
+                for sd in split_docs_recursive:
+                    sd.metadata["parent_id"] = document.metadata["id"]
+                final_chunks.extend(split_docs_recursive)
             else:
-                final_chunks.extend(
-                    TokenTextSplitter(
-                        chunk_size=self.chunk_size
-                    ).split_documents([document])
-                )
+                # TokenTextSplitter might not preserve metadata, handle manually if needed
+                split_docs_token = TokenTextSplitter(
+                    chunk_size=self.chunk_size
+                ).split_documents([document])
+                for sd in split_docs_token:
+                    sd.metadata["parent_id"] = document.metadata["id"]
+                final_chunks.extend(split_docs_token)
 
         # now add the ids for the final chunks
         output_chunks = []
@@ -600,6 +607,7 @@ class CodeTextTransformer(BaseDocumentTransformer):
                 metadata=chunk.metadata.copy(),
             )
             chunk.metadata["id"] = create_id_from_document(chunk)
+            chunk.metadata["has_code"] = "```" in chunk.page_content # Recalculate for final chunk
             output_chunks.append(chunk)
 
         return output_chunks
