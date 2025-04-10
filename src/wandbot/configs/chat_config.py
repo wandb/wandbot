@@ -43,11 +43,11 @@ class ChatConfig(BaseSettings):
     query_enhancer_fallback_temperature: float = 1.0
     
     # Response synthesis model settings
-    response_synthesizer_provider: str = "openai"
-    response_synthesizer_model: str = "gpt-4o-2024-11-20" 
+    response_synthesizer_provider: str = "anthropic"
+    response_synthesizer_model: str = "claude-3-7-sonnet-20250219" 
     response_synthesizer_temperature: float = 0.1
-    response_synthesizer_fallback_provider: str = "openai"
-    response_synthesizer_fallback_model: str = "gpt-4o-2024-11-20" 
+    response_synthesizer_fallback_provider: str = "anthropic"
+    response_synthesizer_fallback_model: str = "claude-3-7-sonnet-20250219" 
     response_synthesizer_fallback_temperature: float = 0.1
     
     # Translation models settings
