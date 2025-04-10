@@ -37,10 +37,10 @@ class ChatConfig(BaseSettings):
     # Query enhancer settings
     query_enhancer_provider: str = "google"
     query_enhancer_model: str = "gemini-2.0-flash-001" 
-    query_enhancer_temperature: float = 0.1
+    query_enhancer_temperature: float = 1.0
     query_enhancer_fallback_provider: str = "google"
     query_enhancer_fallback_model: str = "gemini-2.0-flash-001" 
-    query_enhancer_fallback_temperature: float = 0.1
+    query_enhancer_fallback_temperature: float = 1.0
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "anthropic"
