@@ -520,9 +520,13 @@ def get_error_file_path(tb) -> str:
     Returns:
         The file path where the error occurred
     """
-    while tb.tb_next is not None:
-        tb = tb.tb_next
-    return tb.tb_frame.f_code.co_filename
+    try:
+        while tb.tb_next is not None:
+            tb = tb.tb_next
+        return tb.tb_frame.f_code.co_filename
+    except Exception as e:
+        logger.error(f"Error getting error file path from traceback: {e}")
+        return None
 
 class ErrorInfo(BaseModel):
     """Base model for error information that can be included in any response"""

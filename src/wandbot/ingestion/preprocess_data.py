@@ -217,11 +217,12 @@ def run_preprocessing_pipeline(
                 )
             chunk_size = config["chunk_size"]
             chunk_multiplier = config["chunk_multiplier"]
-
+            chunk_overlap = config["chunk_overlap"]
         # 2. Instantiate transformer with specific config
         transformer = DocumentTransformer(
             lang_detect=lang_detect,
             chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             chunk_multiplier=chunk_multiplier,
             min_size=5, # Consider making min_size configurable too?
             length_function=length_function,

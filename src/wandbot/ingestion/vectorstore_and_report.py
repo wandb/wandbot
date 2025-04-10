@@ -93,6 +93,7 @@ def _add_documents_to_vectorstore(client: ChromaVectorStore, documents: List[Doc
         logger.debug(
             f"Adding batch {batch_idx // batch_size + 1} (size: {len(batch)} text chunks) to Chroma."
         )
+        logger.debug(f"First document in batch: {batch[0]}")
         client.add_documents(batch)
     logger.info("Finished adding text chunks to Chroma.")
 

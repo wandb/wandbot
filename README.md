@@ -226,7 +226,7 @@ python src/wandbot/evaluation/eval.py  --n_trials 1
 
 The data ingestion module pulls code and markdown from Weights & Biases repositories [docodile](https://github.com/wandb/docodile) and [examples](https://github.com/wandb/examples) ingests them into vectorstores for the retrieval augmented generation pipeline.
 
-To ingest the data run the following command from the root of the repository
+To ingest the data run the following command from the root of the repository, see `run_ingestion_config.py` for all available arguments.
 
 ```bash
 python -m wandbot.ingestion

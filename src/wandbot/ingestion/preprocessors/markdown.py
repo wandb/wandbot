@@ -209,7 +209,6 @@ class MarkdownTextTransformer(BaseDocumentTransformer):
                 )
                 chunk.metadata["parent_id"] = document.metadata["id"]
                 chunk.metadata["language"] = self.identify_document_language(chunk)
-                chunk.metadata["source_content"] = chunk.page_content
                 chunk.metadata["has_code"] = "```" in chunk.page_content
                 chunked_documents.append(chunk)
 

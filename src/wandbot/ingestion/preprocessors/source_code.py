@@ -559,9 +559,6 @@ class CodeTextTransformer(BaseDocumentTransformer):
             )
             coarse_parent_chunk.metadata["has_code"] = True
             coarse_parent_chunk.metadata["language"] = coarse_parent_chunk.metadata.get("language", "en")
-            coarse_parent_chunk.metadata["source_content"] = coarse_split.metadata.get(
-                "source_content", coarse_document_content
-            )
             coarse_split_parent_documents.append(coarse_parent_chunk)
 
         # now make children documents from the coarse splits of parent documents
