@@ -221,7 +221,7 @@ def run_vectorstore_and_report_pipeline(
         # --- Report Creation Logic (Conditional) ---
         if create_report:
             logger.info("Starting report creation within the same run...")
-            report_title = f"Wandbot Data Ingestion Report: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            report_title = f"Wandbot Data Ingestion Report for ({result_artifact.name}): {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             report_description = f"Vector store creation report for {run.name}."
             if debug:
                 report_title += " (DEBUG RUN)"
