@@ -1086,8 +1086,8 @@ def get_all_data_store_configs() -> List[DataStoreConfig]:
     """Returns a list of all available DataStoreConfig instances."""
     return [
         DocodileEnglishStoreConfig(),
-        DocodileJapaneseStoreConfig(),
-        DocodileKoreanStoreConfig(),
+        # DocodileJapaneseStoreConfig(),
+        # DocodileKoreanStoreConfig(),
         WeaveDocStoreConfig(),
         WeaveCodeStoreConfig(),
         WeaveCookbookStoreConfig(),
