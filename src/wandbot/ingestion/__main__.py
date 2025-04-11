@@ -102,7 +102,8 @@ def main():
             preprocessed_artifact_path=preprocessed_artifact_path,
             vectorstore_artifact_name=vectorstore_artifact_name,
             debug=run_config.debug,
-            create_report=create_report_flag
+            create_report=create_report_flag,
+            upload_to_remote_vector_store=run_config.upload_to_remote_vector_store,
         )
         logger.info(
             f"Combined Vector Store and Report Step completed. Vectorstore artifact: {vectorstore_artifact_path}"
@@ -118,7 +119,7 @@ def main():
         or raw_artifact_path
         or "No artifact generated."
     )
-    print(f"Final artifact from run: {final_artifact}")
+    logger.info(f"Final artifact from run: {final_artifact}")
 
 
 if __name__ == "__main__":

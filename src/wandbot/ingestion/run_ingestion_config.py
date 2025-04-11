@@ -24,6 +24,8 @@ class IngestionRunConfig:
     """Override the default vector store artifact name."""
     debug: bool = False
     """Run in debug mode: process only the first source and first 3 documents, append _debug to artifact names."""
+    upload_to_remote_vector_store: bool = True
+    """Whether to upload the final vector store collection to the configured remote ChromaDB instance."""
 
 def get_run_config() -> IngestionRunConfig:
     """Parses command line arguments for ingestion run configuration."""

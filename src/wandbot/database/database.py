@@ -10,6 +10,8 @@ Typical usage example:
   session = SessionLocal()
 """
 
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -17,7 +19,14 @@ from wandbot.configs.database_config import DataBaseConfig
 
 db_config = DataBaseConfig()
 
+# Ensure the directory for the SQLite database exists
+db_url = db_config.SQLALCHEMY_DATABASE_URL
+if db_url.startswith("sqlite:///"):
+    db_path_str = db_url.split("sqlite:///", 1)[1]
+    db_path = Path(db_path_str)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
 engine = create_engine(
-    db_config.SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    db_url, connect_args=db_config.connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

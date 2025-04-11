@@ -54,6 +54,7 @@ class DataStoreConfig(BaseModel):
     docstore_dir: pathlib.Path = pathlib.Path("docstore")
     chunk_size: int = 512
     chunk_multiplier: int = 2
+    chunk_overlap: int = 0
     language: Optional[str] = None
 
     @model_validator(mode="after")

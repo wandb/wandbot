@@ -68,24 +68,28 @@ class DocumentTransformer(BaseDocumentTransformer):
         lang_detect,
         chunk_size: int,
         chunk_multiplier: int,
+        chunk_overlap: int,
         min_size: int = 5,
         length_function=None,
     ):
         self.lang_detect = lang_detect
         self.chunk_size = chunk_size
         self.chunk_multiplier = chunk_multiplier
+        self.chunk_overlap = chunk_overlap
         self.min_size = min_size
         self.length_function = length_function
         self.markdown_transformer = MarkdownTextTransformer(
             lang_detect=lang_detect,
             chunk_size=self.chunk_size,
             chunk_multiplier=self.chunk_multiplier,
+            chunk_overlap=self.chunk_overlap,
             length_function=self.length_function,
         )
         self.code_transformer = CodeTextTransformer(
             lang_detect=self.lang_detect,
             chunk_size=self.chunk_size,
             chunk_multiplier=self.chunk_multiplier,
+            chunk_overlap=self.chunk_overlap,
             length_function=length_function,
         )
 
@@ -213,11 +217,12 @@ def run_preprocessing_pipeline(
                 )
             chunk_size = config["chunk_size"]
             chunk_multiplier = config["chunk_multiplier"]
-
+            chunk_overlap = config["chunk_overlap"]
         # 2. Instantiate transformer with specific config
         transformer = DocumentTransformer(
             lang_detect=lang_detect,
             chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             chunk_multiplier=chunk_multiplier,
             min_size=5, # Consider making min_size configurable too?
             length_function=length_function,

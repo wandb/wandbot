@@ -20,7 +20,8 @@ import json
 import logging
 import os
 import pathlib
-from multiprocessing import Pool, cpu_count
+from hashlib import md5
+from multiprocessing import cpu_count
 from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -36,8 +37,8 @@ import wandb
 from wandbot.configs.ingestion_config import (
     DataStoreConfig,
     DocodileEnglishStoreConfig,
-    DocodileJapaneseStoreConfig,
-    DocodileKoreanStoreConfig,
+    # DocodileJapaneseStoreConfig,
+    # DocodileKoreanStoreConfig,
     ExampleCodeStoreConfig,
     ExampleNotebookStoreConfig,
     # FCReportsStoreConfig,
@@ -320,6 +321,11 @@ class DocodileDataLoader(DataLoader):
                             f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
                         )
                         document.metadata["tags"] = ["Documentation"]
+                    
+                    # Add id and has_code
+                    document.metadata["id"] = md5(source_url.encode("utf-8")).hexdigest()
+                    document.metadata["has_code"] = "```" in document.page_content
+
                     yield document
                 except Exception as e_load:
                     logger.warning(
@@ -367,6 +373,11 @@ class DocodileDataLoader(DataLoader):
                             f"Failed to extract tags for {f_name} (source: {source_url}) due to: {e_tags}. Setting default tags."
                         )
                         document.metadata["tags"] = ["Documentation"]
+                    
+                    # Add id and has_code
+                    document.metadata["id"] = md5(source_url.encode("utf-8")).hexdigest()
+                    document.metadata["has_code"] = "```" in document.page_content
+
                     yield document
                 except Exception as e_load:
                     logger.warning(
@@ -483,6 +494,11 @@ class CodeDataLoader(DataLoader):
 
                     document.metadata["file_type"] = os.path.splitext(f_name)[-1]
                     document.metadata["source"] = doc_source_url # Set the correct remote source URL
+                    
+                    # Add id and has_code
+                    document.metadata["id"] = md5(doc_source_url.encode("utf-8")).hexdigest()
+                    document.metadata["has_code"] = "```" in document.page_content or document.metadata["source_type"] != "markdown"
+
                     yield document
                 except Exception as e:
                     logger.warning(f"Failed to load code in {f_name} with error {e}")
@@ -562,6 +578,11 @@ class CodeDataLoader(DataLoader):
 
                     document.metadata["file_type"] = os.path.splitext(f_name)[-1]
                     document.metadata["source"] = doc_source_url # Set the correct remote source URL
+                    
+                    # Add id and has_code
+                    document.metadata["id"] = md5(doc_source_url.encode("utf-8")).hexdigest()
+                    document.metadata["has_code"] = "```" in document.page_content or document.metadata["source_type"] != "markdown"
+
                     yield document
                 except Exception as e:
                     logger.warning(f"Failed to load code in {f_name} with error {e}")
@@ -982,15 +1003,19 @@ class FCReportsDataLoader(DataLoader):
         """
         data_dump_fame = self.fetch_data()
         for parsed_row in self.parse_data_dump(data_dump_fame):
+            document_content = parsed_row["content"]
+            document_source = parsed_row["source"]
             document = Document(
-                page_content=parsed_row["content"],
+                page_content=document_content,
                 metadata={
-                    "source": parsed_row["source"],
+                    "source": document_source,
                     "source_type": self.config.source_type,
                     "file_type": ".md",
                     "description": parsed_row["description"],
                     "tags": ["Fully Connected", "Report"]
-                    + self.extract_tags(parsed_row["source"], parsed_row["content"]),
+                    + self.extract_tags(document_source, document_content),
+                    "id": md5(document_source.encode("utf-8")).hexdigest(),
+                    "has_code": "```" in document_content
                 },
             )
             yield document
@@ -1086,8 +1111,8 @@ def get_all_data_store_configs() -> List[DataStoreConfig]:
     """Returns a list of all available DataStoreConfig instances."""
     return [
         DocodileEnglishStoreConfig(),
-        DocodileJapaneseStoreConfig(),
-        DocodileKoreanStoreConfig(),
+        # DocodileJapaneseStoreConfig(),
+        # DocodileKoreanStoreConfig(),
         WeaveDocStoreConfig(),
         WeaveCodeStoreConfig(),
         WeaveCookbookStoreConfig(),
