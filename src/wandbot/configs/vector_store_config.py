@@ -1,8 +1,8 @@
 import logging
 import pathlib
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,9 @@ class VectorStoreConfig(BaseSettings):
     
     # Vector Store
     vectordb_collection_name: str = "vectorstore-chroma_index-v52" #"vectorstore"
-    vectordb_index_dir: pathlib.Path = pathlib.Path("data/cache/vectorstore")
+    vectordb_index_dir: pathlib.Path = Field(
+        pathlib.Path("artifacts/vector_stores"), env="VECTORDB_INDEX_DIR"
+    )
     vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v50"
     distance: str = "l2"  # used in retrieval from vectordb 
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
@@ -43,7 +45,30 @@ class VectorStoreConfig(BaseSettings):
     embeddings_encoding_format: Literal["float", "base64"] = "base64"
     
     # Ingestion settings
-    batch_size: int = 256  # used during ingestion when adding docs to vectorstore
+    batch_size: int = 256
+    persist_directory: Optional[pathlib.Path] = None
+
+    # Remote ChromaDB Upload Configuration - Keys for transformation
+    remote_chroma_keys_to_prepend: List[str] = Field(
+        default_factory=lambda: [
+            "parent_id",
+            "id",
+            "source",
+            "file_type",
+            "has_code",
+            "source_type",
+            "tags",
+            "description",
+        ]
+    )
+    remote_chroma_keys_to_remove: List[str] = Field(
+        default_factory=lambda: [
+            "source_content",
+            "file_type",
+            "tags",
+            "description",
+        ]
+    )
 
     @model_validator(mode="after")
     def _adjust_paths_for_dimension(cls, values: "VectorStoreConfig") -> "VectorStoreConfig":

@@ -1,3 +1,4 @@
+import concurrent.futures
 import copy
 import json
 import math
@@ -191,30 +192,66 @@ def _transform_and_clean_data_for_upload(
 
     return processed_documents, processed_metadatas
 
+# Helper function for parallel upserting
+def _upsert_batch_task(
+    remote_collection: chromadb.Collection,
+    ids_batch: List[str],
+    embeddings_batch: List[List[float]],
+    docs_batch: List[str],
+    metas_batch: List[Optional[Dict]],
+    batch_num: int,
+    num_batches: int,
+    start_index: int,
+    end_index: int,
+    remote_collection_name: str
+) -> Tuple[int, Optional[Exception]]:
+    """Task function to upsert a single batch to ChromaDB."""
+    logger.debug(f"  -> Upserting batch {batch_num}/{num_batches} (items {start_index+1}-{end_index}) to remote collection '{remote_collection_name}'...")
+    try:
+        remote_collection.upsert(
+            ids=ids_batch,
+            embeddings=embeddings_batch,
+            documents=docs_batch,
+            metadatas=metas_batch,
+        )
+        logger.debug(f"  -> Batch {batch_num} upserted successfully.")
+        return len(ids_batch), None
+    except Exception as batch_e:
+        logger.error(
+            f"Error upserting batch {batch_num} (items {start_index+1}-{end_index}) to remote collection '{remote_collection_name}': {batch_e}",
+            exc_info=True
+        )
+        trace_id = "N/A"
+        if "trace ID:" in str(batch_e):
+            try:
+                trace_id = str(batch_e).split("trace ID:")[1].split(")")[0].strip()
+            except IndexError:
+                pass
+        logger.error(f"Trace ID (if available in error): {trace_id}")
+        return 0, batch_e
+
+
 def _upload_to_remote_chroma(
     local_client: ChromaVectorStore,
     remote_client: chromadb.HttpClient,
     remote_collection_name: str,
     vs_config: VectorStoreConfig,
+    max_workers: int = 6 # Number of parallel upload threads
 ):
-    """Fetches data from local Chroma and uploads to remote ChromaDB."""
-    logger.info(f"Starting upload to remote collection: {remote_collection_name}")
+    """Fetches data from local Chroma and uploads to remote ChromaDB in parallel."""
+    logger.info(f"Starting parallel upload to remote collection: {remote_collection_name} with {max_workers} workers.")
 
     try:
-        # The ChromaVectorStore wrapper manages a single collection internally.
-        # Access it directly via the 'collection' attribute.
         local_collection = local_client.collection
         if not local_collection:
             logger.warning("Local client does not have an initialized collection.")
             return
         local_collection_name = local_collection.name
 
-        logger.info(f"Fetching all data from local collection '{local_collection_name}'...")
-        # Note: Fetching all data might be memory-intensive for very large collections.
-        # Consider streaming/batching fetches if needed.
-        local_data = local_collection.get(include=['embeddings', 'documents', 'metadatas'])
-        item_count = len(local_data['ids'])
-        logger.info(f"Fetched {item_count} items from local collection.")
+        logger.info(f"Fetching IDs from local collection '{local_collection_name}'...")
+        all_ids = local_collection.get(include=[])['ids'] # Fetch only IDs first
+        item_count = len(all_ids)
+        logger.info(f"Fetched {item_count} IDs from local collection.")
 
         if item_count == 0:
             logger.info(f"Local collection '{local_collection_name}' is empty. Skipping upload.")
@@ -227,59 +264,87 @@ def _upload_to_remote_chroma(
         )
         logger.info(f"Got remote collection '{remote_collection_name}'.")
 
-        logger.info("Transforming documents and cleaning metadata for upload...")
-        processed_docs, processed_metas = _transform_and_clean_data_for_upload(
-            local_data, vs_config
-        )
-
-        num_batches = math.ceil(item_count / vs_config.batch_size)
+        fetch_upload_batch_size = min(99, vs_config.batch_size)
+        num_batches = math.ceil(item_count / fetch_upload_batch_size)
         logger.info(
-            f"Upserting {item_count} items to remote collection '{remote_collection_name}' in {num_batches} batches of size {vs_config.batch_size}..."
+            f"Fetching from local and preparing {num_batches} batches of size {fetch_upload_batch_size} for parallel upsert to '{remote_collection_name}'..."
         )
 
         total_items_processed = 0
-        for i in trange(0, item_count, vs_config.batch_size):
-            batch_num = (i // vs_config.batch_size) + 1
-            start_index = i
-            end_index = min(i + vs_config.batch_size, item_count)
+        futures = []
+        first_error = None
 
-            ids_batch = local_data['ids'][start_index:end_index]
-            embeddings_batch = local_data['embeddings'][start_index:end_index]
-            docs_batch = processed_docs[start_index:end_index]
-            metas_batch = processed_metas[start_index:end_index]
+        # Use ThreadPoolExecutor for parallel I/O-bound tasks
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all fetch and upsert tasks
+            for i in range(0, item_count, fetch_upload_batch_size):
+                batch_num = (i // fetch_upload_batch_size) + 1
+                start_index = i
+                end_index = min(i + fetch_upload_batch_size, item_count)
+                ids_batch = all_ids[start_index:end_index]
 
-            logger.debug(f"  -> Upserting batch {batch_num}/{num_batches} (items {start_index+1}-{end_index})...")
-            try:
-                remote_collection.upsert(
-                    ids=ids_batch,
-                    embeddings=embeddings_batch,
-                    documents=docs_batch,
-                    metadatas=metas_batch,
+                logger.debug(f"  -> Fetching batch {batch_num}/{num_batches} (items {start_index+1}-{end_index}) from local collection...")
+                try:
+                    local_data_batch = local_collection.get(ids=ids_batch, include=['embeddings', 'documents', 'metadatas'])
+                except Exception as fetch_e:
+                    logger.error(
+                        f"Error fetching batch {batch_num} (items {start_index+1}-{end_index}) from local collection '{local_collection_name}': {fetch_e}",
+                        exc_info=True
+                    )
+                    logger.warning(f"Skipping remainder of upload for collection '{remote_collection_name}' due to local fetch error.")
+                    first_error = fetch_e # Record the error
+                    # Don't submit further tasks if fetch fails
+                    break
+
+                # Extract data for the batch
+                embeddings_batch = local_data_batch['embeddings']
+                docs_batch = local_data_batch['documents']
+                metas_batch = local_data_batch['metadatas']
+
+                # Submit upsert task to the thread pool
+                future = executor.submit(
+                    _upsert_batch_task,
+                    remote_collection,
+                    ids_batch,
+                    embeddings_batch,
+                    docs_batch,
+                    metas_batch,
+                    batch_num,
+                    num_batches,
+                    start_index,
+                    end_index,
+                    remote_collection_name
                 )
-                logger.debug(f"  -> Batch {batch_num} upserted.")
-                total_items_processed += len(ids_batch)
-            except Exception as batch_e:
-                logger.error(
-                    f"Error upserting batch {batch_num} (items {start_index+1}-{end_index}) to remote collection '{remote_collection_name}': {batch_e}",
-                    exc_info=True
-                )
-                trace_id = "N/A"
-                if "trace ID:" in str(batch_e):
-                    try:
-                        trace_id = str(batch_e).split("trace ID:")[1].split(")")[0].strip()
-                    except IndexError:
-                        pass
-                logger.error(f"Trace ID (if available in error): {trace_id}")
-                logger.warning(f"Skipping remainder of upload for collection '{remote_collection_name}' due to batch error.")
-                break # Stop upload for this collection on batch error
+                futures.append(future)
 
-        logger.info(f"Finished upload attempt for collection '{remote_collection_name}'. Total items processed in successful batches: {total_items_processed}")
+            # Wait for submitted tasks to complete and process results
+            logger.info(f"Waiting for {len(futures)} submitted upsert tasks to complete...")
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    count, error = future.result()
+                    total_items_processed += count
+                    if error and not first_error:
+                        first_error = error # Record the first upsert error
+                        # Optional: Cancel remaining futures if needed
+                        # logger.warning("Cancelling remaining upsert tasks due to error.")
+                        # for f in futures:
+                        #     if not f.done():
+                        #         f.cancel()
+                except Exception as exc:
+                    logger.error(f"An unexpected error occurred retrieving result from an upsert task: {exc}", exc_info=True)
+                    if not first_error:
+                        first_error = exc
+
+        if first_error:
+             logger.warning(f"Upload for collection '{remote_collection_name}' completed with errors. First error encountered: {first_error}")
+        logger.info(f"Finished parallel upload attempt for collection '{remote_collection_name}'. Total items processed in successful batches: {total_items_processed}")
 
     except Exception as e:
         logger.error(
             f"Failed to upload data to remote ChromaDB collection '{remote_collection_name}': {e}",
             exc_info=True
         )
+
 
 # --- Main Pipeline Function ---
 
@@ -353,30 +418,29 @@ def run_vectorstore_and_report_pipeline(
         local_persist_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Using local temporary persist directory: {local_persist_dir}")
 
-        # Adjust VectorStoreConfig to use the temporary local path for persistence
-        temp_vs_config = vs_config.model_copy(update={"persist_directory": local_persist_dir})
+        # Adjust VectorStoreConfig for the temporary local store:
+        # 1. Use the temporary persist directory
+        # 2. Use a unique collection name to ensure isolation
+        # 3. Explicitly set the mode to local
+        temp_collection_name = f"{vs_config.vectordb_collection_name}-run_{run.id}"
+        temp_vs_config = vs_config.model_copy(update={
+            "persist_directory": local_persist_dir,
+            "vectordb_collection_name": temp_collection_name,
+            "vector_store_mode": "local" # Ensure the temporary client is local
+        })
+        logger.info(f"Using temporary local collection name: {temp_collection_name}")
 
         transformed_documents, source_doc_counts = _load_and_count_documents(artifact_dir)
 
         local_chroma_client = ChromaVectorStore(
             embedding_model=embedding_fn,
-            vector_store_config=temp_vs_config, # Use config with temp path
+            vector_store_config=temp_vs_config, # Use config with temp path & collection name
             chat_config=chat_config,
         )
 
         _add_documents_to_vectorstore(
             local_chroma_client, transformed_documents, vs_config.batch_size
         )
-
-        # Persist the local ChromaDB data explicitly
-        logger.info(f"Persisting local ChromaDB client to {local_persist_dir}...")
-        # Access the underlying chromadb client and call persist. The method might vary.
-        # Assuming the client object is accessible via local_chroma_client.client
-        if hasattr(local_chroma_client, 'client') and hasattr(local_chroma_client.client, 'persist'):
-             local_chroma_client.client.persist()
-             logger.info("Local ChromaDB persisted.")
-        else:
-             logger.warning("Could not find a 'persist' method on the local Chroma client. Data might not be saved correctly for artifacting.")
 
         logger.info(f"Creating vector store artifact: {vectorstore_artifact_name}")
         # Create metadata *before* removing keys for artifact logging
@@ -423,7 +487,7 @@ def run_vectorstore_and_report_pipeline(
             f"Artifact {result_artifact.name} logged with aliases: {aliases}, version: {logged_artifact_version}, uploading..."
         )
         final_vs_artifact_path = (
-            f"{entity}/{project}/{vectorstore_artifact_name}:v{logged_artifact_version}"
+            f"{entity}/{project}/{vectorstore_artifact_name}:{logged_artifact_version}"
         )
         logger.info(f"Vector store artifact upload complete: {final_vs_artifact_path}")
 
@@ -432,16 +496,17 @@ def run_vectorstore_and_report_pipeline(
             logger.info("Attempting upload to remote ChromaDB...")
             remote_chroma_client = _connect_remote_chroma(vs_config)
             if remote_chroma_client and local_chroma_client and logged_artifact_version:
-                # Construct remote collection name: artifact_name-v<version>(-debug)
-                remote_collection_name = f"{vectorstore_artifact_name}-v{logged_artifact_version}"
+                # Construct remote collection name: artifact_name-<version>(-debug)
+                remote_collection_name = f"{vectorstore_artifact_name}-{logged_artifact_version}"
                 if debug:
                     remote_collection_name += "-debug"
 
                 _upload_to_remote_chroma(
-                    local_chroma_client, # Pass the local client instance
-                    remote_chroma_client,
-                    remote_collection_name,
-                    vs_config,
+                    local_client=local_chroma_client, # Pass the local client instance
+                    remote_client=remote_chroma_client,
+                    remote_collection_name=remote_collection_name,
+                    vs_config=vs_config,
+                    # Optionally adjust max_workers here if needed: max_workers=8
                 )
             else:
                 logger.warning("Skipping remote ChromaDB upload due to connection failure or missing local client/artifact version.")
@@ -451,7 +516,9 @@ def run_vectorstore_and_report_pipeline(
         # --- Report Creation Logic (Conditional) ---
         if create_report:
             logger.info("Starting report creation within the same run...")
-            report_title = f"Wandbot Data Ingestion Report ({vectorstore_artifact_name}-v{logged_artifact_version}): {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            # Ensure logged_artifact_version has 'v' prefix for report title consistency
+            report_version_str = logged_artifact_version if logged_artifact_version and logged_artifact_version.startswith('v') else f'v{logged_artifact_version}'
+            report_title = f"Wandbot Data Ingestion Report ({vectorstore_artifact_name}-{report_version_str}): {datetime.now().strftime('%Y-%m-%d %H:%M')}"
             report_description = f"Vector store creation report for {run.name}."
             if debug:
                 report_title += " (DEBUG RUN)"
@@ -508,6 +575,8 @@ def run_vectorstore_and_report_pipeline(
             if pg_chunks:
                 report.blocks.append(pg_chunks)
 
+            # Ensure logged_artifact_version has 'v' for Weave block
+            weave_block_version = logged_artifact_version if logged_artifact_version and logged_artifact_version.startswith('v') else f'v{logged_artifact_version}'
             report.blocks.extend(
                 [
                     wr.H2("Vector Store Artifact Metadata"),
@@ -521,7 +590,7 @@ def run_vectorstore_and_report_pipeline(
                     wr.WeaveBlockArtifact(
                         run.entity,
                         run.project,
-                        f"{vectorstore_artifact_name}:v{logged_artifact_version}", # Use name + version
+                        f"{vectorstore_artifact_name}:{weave_block_version}", # Use name + correctly prefixed version
                         "overview",
                     ),
                     wr.H1("Remote ChromaDB Upload"),
@@ -542,14 +611,6 @@ def run_vectorstore_and_report_pipeline(
             logger.info(f"Report saved: {report.url}")
         else:
             logger.info("Skipping report creation as per configuration.")
-
-        # Clean up temporary local directory after artifact logging and potential upload
-        # try:
-        #     if local_persist_dir.exists():
-        #         logger.info(f"Cleaning up temporary directory: {local_persist_dir}")
-        #         shutil.rmtree(local_persist_dir)
-        # except Exception as cleanup_e:
-        #     logger.warning(f"Failed to clean up temporary directory {local_persist_dir}: {cleanup_e}")
 
         return final_vs_artifact_path
 

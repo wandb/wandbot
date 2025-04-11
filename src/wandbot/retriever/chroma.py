@@ -67,9 +67,11 @@ class ChromaVectorStore:
 
         # Initialize ChromaDB client based on mode
         if self.vector_store_config.vector_store_mode == "local":
-            logger.info(f"Initializing vector store in local mode from: {self.vector_store_config.vectordb_index_dir}")
+            # Prioritize persist_directory if available in the config
+            persist_path = str(getattr(self.vector_store_config, 'persist_directory', self.vector_store_config.vectordb_index_dir))
+            logger.info(f"Initializing vector store in local mode from path: {persist_path}")
             self.chroma_vectorstore_client = chromadb.PersistentClient(
-                path=str(self.vector_store_config.vectordb_index_dir),
+                path=persist_path,
                 settings=Settings(anonymized_telemetry=False)
             )
         elif self.vector_store_config.vector_store_mode == "hosted":
