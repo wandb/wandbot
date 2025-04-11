@@ -42,16 +42,21 @@ These updates are part of our ongoing commitment to improve performance and usab
 
 ## Evaluation
 English 
-| wandbot version  | Comment  | response accuracy | num trials |
-|---|---|---| --- |
-| 1.0.0 | baseline wandbot |  53.8 % | 1 |
-| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 1 |
-| 1.2.0 | our new enhanced wandbot | 81.6 % | 1 |
-| 1.3.0rc | [1.3.0rc with gpt-4-preview judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F0196172b-bed6-77e3-8d43-dc1c31fc9a9b%3FhideTraceTree%3D1) | 71.3 % | 5 |
-| 1.3.0rc | [1.3.0rc with gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F019619b7-6ca1-7cc1-bdb9-d1053a6386d8%3FhideTraceTree%3D1) |88.8 % | 5 |
-| 1.3.0 | [v1.3.0 prod, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F01961c5e-9570-7f93-b3db-572ae83d9dbe%3FhideTraceTree%3D1) | 91.2 % | 5 |
+| wandbot version  | Comment  | Response Correctness | Num Trials | Data ingestion Report |
+|---|---|---| --- | --- |
+| 1.0.0 | baseline wandbot |  53.8 % | 1 |  |
+| 1.1.0 | improvement over baseline; in production for the longest | 72.5 %  | 1 |  |
+| 1.2.0 | our new enhanced wandbot | 81.6 % | 1 |  |
+| 1.3.0rc | [1.3.0rc with gpt-4-preview judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F0196172b-bed6-77e3-8d43-dc1c31fc9a9b%3FhideTraceTree%3D1) | 71.3 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg) |
+| 1.3.0rc | [1.3.0rc with gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F019619b7-6ca1-7cc1-bdb9-d1053a6386d8%3FhideTraceTree%3D1) |88.8 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg) |
+| 1.3.0 | [v1.3.0 prod, v50 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F01961c5e-9570-7f93-b3db-572ae83d9dbe%3FhideTraceTree%3D1) | 91.2 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg)  |
+| 1.3.1 | [v1.3.1 prod, v52 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/calls/01962210-44be-7f53-986d-4dc529660ad1?hideTraceTree=1) | 91.2 % | 5 | [v52](https://wandb.ai/wandbot/wandbot-dev/reports/Wandbot-Data-Ingestion-Report-for-chroma_index-v52-2025-04-10-23-28--VmlldzoxMjIzMDczNQ)
+
 
 **Note**
+- v1.3.1 uses:
+  - claude Sonnet-3.7 for the response synthesizer, updated from gpt-4o-2024-11-20
+  - an updated index that exludes korean and japanese versions of the docs as well as excludes the blog posts from Fully Connected.
 - `1.3.0rc with gpt-4-preview judge` and `1.3.0rc with gpt-4o judge` are the same wandbot system evaluated with different judges. 
 - The ~2.5% improvement between `1.3.0rc (gpt-4o judge)` and `1.3.0 prod` is mostly due to using `reranker-v3.5` (from 2.0) and `flash-2.0-001` (from gpt-4o). However evals previous to the v1.3.0 prod eval had 10-12 errors (out of 490 total calls), so there might be some noise in the results.
 
