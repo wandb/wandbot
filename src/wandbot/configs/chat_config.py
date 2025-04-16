@@ -35,20 +35,20 @@ class ChatConfig(BaseSettings):
     multilingual_reranker_model: str = "rerank-v3.5"
     
     # Query enhancer settings
-    query_enhancer_provider: str = "openai" # "google"
-    query_enhancer_model: str = "gpt-4.1-nano-2025-04-14" # "gemini-2.0-flash-001" 
-    query_enhancer_temperature: Optional[float] = None
-    query_enhancer_fallback_provider: str = "openai" # "google"
-    query_enhancer_fallback_model: str = "gpt-4.1-nano-2025-04-14" # "gemini-2.0-flash-001" 
-    query_enhancer_fallback_temperature: Optional[float] = None
+    query_enhancer_provider: str = "google"
+    query_enhancer_model: str = "gemini-2.0-flash-001" 
+    query_enhancer_temperature: Optional[float] = 0.1
+    query_enhancer_fallback_provider: str = "google"
+    query_enhancer_fallback_model: str = "gemini-2.0-flash-001" 
+    query_enhancer_fallback_temperature: Optional[float] = 0.1
     
     # Response synthesis model settings
-    response_synthesizer_provider: str = "anthropic"
-    response_synthesizer_model: str = "claude-3-7-sonnet-20250219" 
-    response_synthesizer_temperature: Optional[float] = 0.1
-    response_synthesizer_fallback_provider: str = "anthropic"
-    response_synthesizer_fallback_model: str = "claude-3-7-sonnet-20250219" 
-    response_synthesizer_fallback_temperature: Optional[float] = 0.1
+    response_synthesizer_provider: str = "openai"
+    response_synthesizer_model: str = "gpt-4.1-mini-2025-04-14" 
+    response_synthesizer_temperature: Optional[float] = None
+    response_synthesizer_fallback_provider: str = "openai"
+    response_synthesizer_fallback_model: str = "gpt-4.1-mini-2025-04-14" 
+    response_synthesizer_fallback_temperature: Optional[float] = None
     
     # Translation models settings
     ja_translation_model_name: str = "gpt-4o-2024-08-06"
