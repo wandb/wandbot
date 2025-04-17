@@ -44,10 +44,10 @@ class ChatConfig(BaseSettings):
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "openai"
-    response_synthesizer_model: str = "o3-2025-04-03" # "gpt-4.1-mini-2025-04-14" 
+    response_synthesizer_model: str = "o3-2025-04-16" # "gpt-4.1-mini-2025-04-14" 
     response_synthesizer_temperature: Optional[float] = None
     response_synthesizer_fallback_provider: str = "openai"
-    response_synthesizer_fallback_model: str = "o3-2025-04-03" #"gpt-4.1-mini-2025-04-14" 
+    response_synthesizer_fallback_model: str = "o3-2025-04-16" #"gpt-4.1-mini-2025-04-14" 
     response_synthesizer_fallback_temperature: Optional[float] = None
     
     # Translation models settings
