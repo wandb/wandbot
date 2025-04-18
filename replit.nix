@@ -1,5 +1,7 @@
 { pkgs }: {
   deps = with pkgs; [
+    python313
+    
     # Core system libraries
     stdenv.cc.cc.lib
     libstdcxx5
@@ -13,7 +15,6 @@
     hydrus
     gitFull
     glibcLocales
-    python311
   ];
 
   env = {
