@@ -133,6 +133,15 @@ Then call the `/startup` endpoint to trigger the final wandbot app initialisatio
 curl http://localhost:8000/startup
 ```
 
+Finally, make a test query to wandbot:
+
+```bash
+curl -X POST \
+  http://localhost:8000/chat/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question": "How do I log a W&B artifact?"}'
+```
+
 For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
 Executing these commands will launch the API, Slackbot, and Discord bot applications, enabling you to interact with the bot and ask questions related to the Weights & Biases documentation.

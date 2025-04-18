@@ -1,5 +1,5 @@
 entrypoint = "main.py"
-modules = ["python-3.13"]
+modules = ["python-3.12"]
 
 [nix]
 channel = "stable-24_05"
@@ -11,8 +11,9 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["python3", "main.py"]
-deploymentTarget = "cloudrun"
+run = ["sh", "-c", "bash run.sh"]
+deploymentTarget = "gce"
+build = ["sh", "-c", "bash build.sh"]
 
 [[ports]]
 localPort = 8000

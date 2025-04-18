@@ -1,6 +1,6 @@
 { pkgs }: {
   deps = with pkgs; [
-    python313
+    python312
     
     # Core system libraries
     stdenv.cc.cc.lib
