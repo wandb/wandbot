@@ -1,6 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/wandb/wandb/refs/heads/main/assets/logo-dark.svg#gh-dark-mode-only" width="600" alt="Weights & Biases" />
-  <img src="https://raw.githubusercontent.com/wandb/wandb/refs/heads/main/assets/logo-light.svg#gh-light-mode-only" width="600" alt="Weights & Biases" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wandb/wandb/main/assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/wandb/wandb/main/assets/logo-light.svg">
+    <img src="https://raw.githubusercontent.com/wandb/wandb/main/assets/logo-light.svg" width="600" alt="Weights & Biases">
+  </picture>
 </p>
 
 # WandBot
