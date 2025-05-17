@@ -1,6 +1,11 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/wandb/wandb/refs/heads/main/assets/logo-dark.svg#gh-dark-mode-only" width="600" alt="Weights & Biases" />
+  <img src="https://raw.githubusercontent.com/wandb/wandb/refs/heads/main/assets/logo-light.svg#gh-light-mode-only" width="600" alt="Weights & Biases" />
+</p>
+
 # WandBot
 
-WandBot is a support assistant designed for Weights & Biases' Models and Weave.
+WandBot is a support assistant designed for Weights & Biases' Experiment Tracking and Weave.
 
 ## What's New
 
