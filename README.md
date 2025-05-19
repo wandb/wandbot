@@ -216,6 +216,12 @@ source wandbot_venv/bin/activate
 uv run src/wandbot/evaluation/eval.py
 ```
 
+When running evals before prod, we always run 5 trials per eval sample. It can also be a good idea to reduce weave parallelism in order to avoid api rate limiting issues which might skew eval results:
+
+```
+caffeinate uv run src/wandbot/evaluation/eval.py --experiment_name <insert eval name> --n_trials 5 --n_weave_parallelism 4
+```
+
 Debugging, only running evals on 1 sample and for 1 trial:
 
 ```
