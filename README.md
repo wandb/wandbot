@@ -180,7 +180,7 @@ You can either use `uvicorn` or `gunicorn` to launch N workers to be able to ser
 
 `uvicorn`
 ```bash
-WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
+WANDBOT_FULL_INIT=1 uv run uvicorn wandbot.api.app:app \
 --host 0.0.0.0 \
 --port 8000 \
 --workers 8 \
@@ -213,25 +213,25 @@ Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're 
 ```
 source wandbot_venv/bin/activate
 
-python src/wandbot/evaluation/eval.py
+uv run src/wandbot/evaluation/eval.py
 ```
 
 Debugging, only running evals on 1 sample and for 1 trial:
 
 ```
-python src/wandbot/evaluation/eval.py  --debug --n_debug_samples=1 --n_trials=1
+uv run src/wandbot/evaluation/eval.py  --debug --n_debug_samples=1 --n_trials=1
 ```
 
 Evaluate on Japanese dataset:
 
 ```
-python src/wandbot/evaluation/eval.py  --lang ja
+uv run src/wandbot/evaluation/eval.py  --lang ja
 ```
 
 To only evaluate each sample once:
 
 ```
-python src/wandbot/evaluation/eval.py  --n_trials 1
+uv run src/wandbot/evaluation/eval.py  --n_trials 1
 ```
 
 
@@ -242,7 +242,7 @@ The data ingestion module pulls code and markdown from Weights & Biases reposito
 To ingest the data run the following command from the root of the repository, see `run_ingestion_config.py` for all available arguments.
 
 ```bash
-python -m wandbot.ingestion
+uv run src/wandbot/ingestion/__main__.py
 ```
 
 **Note:**
@@ -258,7 +258,7 @@ These datasets are also stored as wandb artifacts in the project defined in the 
 To help with debugging, you can use the `steps` and `include_sources` flags to specify only sub-components of the pipeline and only certain documents sources to run. For example if you wanted to stop the pipeline before it creates the vector db and creates the artifacts and W&B report AND you only wanted to process the Weave documentation, you would do the following:
 
 ```
-python -m wandbot.ingestion --steps prepare preprocess --include_sources "weave_documentation" --debug
+uv run src/wandbot/ingestion/__main__.py --steps prepare preprocess --include_sources "weave_documentation" --debug
 ```
 
 #### Note on updating hosted Chroma vector db
