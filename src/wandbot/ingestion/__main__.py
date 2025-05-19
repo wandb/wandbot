@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from wandbot.configs.ingestion_config import IngestionConfig
 from wandbot.ingestion.prepare_data import run_prepare_data_pipeline
 from wandbot.ingestion.preprocess_data import run_preprocessing_pipeline
@@ -11,6 +12,7 @@ logger = get_logger(__name__)
 
 
 def main():
+    load_dotenv()
     # Parse command-line arguments
     run_config: IngestionRunConfig = get_run_config()
     logger.info(f"Running ingestion with config: {run_config}")
