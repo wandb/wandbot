@@ -59,6 +59,9 @@ English
 | 1.3.0rc | [1.3.0rc with gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F019619b7-6ca1-7cc1-bdb9-d1053a6386d8%3FhideTraceTree%3D1) |88.8 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg) |
 | 1.3.0 | [v1.3.0 prod, v50 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F01961c5e-9570-7f93-b3db-572ae83d9dbe%3FhideTraceTree%3D1) | 91.2 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg)  |
 | 1.3.1 | [v1.3.1 prod, v52 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/calls/01962210-44be-7f53-986d-4dc529660ad1?hideTraceTree=1) | 91.2 % | 5 | [v52](https://wandb.ai/wandbot/wandbot-dev/reports/Wandbot-Data-Ingestion-Report-for-chroma_index-v52-2025-04-10-23-28--VmlldzoxMjIzMDczNQ)
+| 1.3.2 | [v1.3.2 prod, v54 index, gpt-4o judge. Knowledge base update](https://wandb.ai/wandbot/wandbot-eval/weave/calls/01962210-44be-7f53-986d-4dc529660ad1?hideTraceTree=1) | 90.4 % | 5 | [v54](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-2-Wandbot-Data-Ingestion-Report-chroma_index-v54-2025-05-19-20-37--VmlldzoxMjg0ODMzNQ)
+
+
 
 
 **Note**
