@@ -279,3 +279,16 @@ A. If you compute a diff between the old dev docs and the new ones
 B. If you don't compute a diff or want a simple way to do this
 1. You could delete everything in the collection and add it
 2. You could create a new collection and insert the new data into that.
+
+
+## Release Checklist
+
+[] **Evaluation:** Run evaluations, ensure no performance drop or justify why drop is acceptable/expected
+[] **Evaluation:** Prefix eval name in Weave evals with "Prod vX.X.X -" for easy identification (in wandbot/wandbot-eval)
+[] **Knowlege Update:** If knowlege base is updated then update the ingestion report with "Prod vX.X.X -" for easy identification (in wandbot/wandbot-dev)
+[] **Deployment Testing:** Clone the repo to a staging env (e.g. test Replit app). Install and run via shell, sure no issues, ping local endpoint and ensure no errors. 
+[] **Deployment Testing:** Then create a staged deployment and again ensure no errors. Ping staged endpoint to ensure correct response is received.
+[] **Deployment:** Clone the repo to a prod environment. Deploy updated version. Test via cli and slackbot that the endpoint is working and the correctg response is received.
+[] [] **GitHub:** Update evaluation table at top of README with latest eval score, weave Eval link and data ingestion Report link
+[] **GitHub:** Update git tag
+[] **GitHub:** Create gthub release
