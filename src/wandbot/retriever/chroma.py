@@ -113,7 +113,7 @@ class ChromaVectorStore:
         # Prepare metadata to be passed during creation/retrieval
         # Add hnsw:num_threads based on GitHub issue #869
         # Dynamically set based on available cores (using half, minimum 1)
-        num_threads = max(1, os.cpu_count() // 2) 
+        num_threads = max(1, int(os.cpu_count()) // 2) 
         collection_metadata = {
             self.vector_store_config.distance_key: self.vector_store_config.distance,
             'hnsw:num_threads': num_threads 
@@ -155,7 +155,13 @@ class ChromaVectorStore:
             where_document=where_document,
             include=include
         )
-        logger.debug(f"VECTORSTORE: {len(query_texts) if query_texts is not None else len(query_embeddings)} queries, {len(res)} vector store `.query` results \
+        num_queries = 0
+        if query_texts is not None:
+            num_queries = len(query_texts)
+        elif query_embeddings is not None:
+            num_queries = len(query_embeddings)
+
+        logger.debug(f"VECTORSTORE: {num_queries} queries, {len(res)} vector store `.query` results \
 of lengths: {[len(r) for r in res['documents']]}")
         return res
     
@@ -255,11 +261,52 @@ of lengths: {[len(r) for r in res['documents']]}")
             include=['documents', 'metadatas', 'distances', 'embeddings']
         )
         
+        if fetch_k > 0:
+            if not retrieved_results.get("documents"):
+                raise ValueError(
+                    f"ChromaDB query returned no 'documents' key when {fetch_k} documents were requested (fetch_k). "
+                    f"This typically indicates an issue with the ChromaDB query setup or response structure. "
+                    f"Number of query embeddings: {len(query_embeddings)}."
+                )
+            
+            if not retrieved_results["documents"] and query_embeddings:
+                raise ValueError(
+                    f"ChromaDB query returned an empty list for 'documents' (i.e., no results for any query) "
+                    f"despite {len(query_embeddings)} query embedding(s) being provided and fetch_k={fetch_k} requested. "
+                    f"This may indicate that no matching documents were found for any of the queries."
+                )
+
+            if len(retrieved_results["documents"]) != len(query_embeddings):
+                raise ValueError(
+                    f"ChromaDB query returned an unexpected structure for 'documents'. "
+                    f"Expected {len(query_embeddings)} list(s) of documents, but got {len(retrieved_results['documents'])}. "
+                    f"fetch_k={fetch_k}."
+                )
+
+            for i, doc_list_for_query in enumerate(retrieved_results["documents"]):
+                if not doc_list_for_query:
+                    query_text_info = ""
+                    if query_texts and i < len(query_texts):
+                        query_text_info = f" for query text: '{query_texts[i][:100]}...' (index {i})"
+                    else:
+                        query_text_info = f" for query embedding at index {i}"
+                    
+                    raise ValueError(
+                        f"ChromaDB query returned no documents{query_text_info} "
+                        f"when {fetch_k} documents were requested (fetch_k). "
+                        f"This indicates no matches found for this specific query."
+                    )
+        
         # Log shapes and structure
         logger.debug("VECTORSTORE: Retrieved results structure:")
-        logger.debug(f"- documents shape: {len(retrieved_results['documents'])} lists of {len(retrieved_results['documents'][0])} docs each")
-        logger.debug(f"- embeddings shape: {len(retrieved_results['embeddings'])} lists of {len(retrieved_results['embeddings'][0])} embeddings each")
-        logger.debug(f"- First document from first query: {retrieved_results['documents'][0][0][:100]}...")
+        doc_lengths = [len(doc_list) for doc_list in retrieved_results['documents']] if retrieved_results['documents'] else []
+        logger.debug(f"- documents: {len(retrieved_results['documents'])} lists, lengths: {doc_lengths}")
+        emb_lengths = [len(emb_list) for emb_list in retrieved_results['embeddings']] if retrieved_results['embeddings'] else []
+        logger.debug(f"- embeddings: {len(retrieved_results['embeddings'])} lists, lengths: {emb_lengths}")
+        if retrieved_results['documents'] and retrieved_results['documents'][0]:
+            logger.debug(f"- First document from first query: {retrieved_results['documents'][0][0][:100]}...")
+        else:
+            logger.debug("- No documents found for the first query.")
         
         # Process each query sequentially since we can't use asyncio.gather with lists
         results = []
@@ -359,8 +406,11 @@ of lengths: {[len(r) for r in res['documents']]}")
             score = relevance_score_fn(dist)
             meta["relevance_score"] = meta.get("relevance_score", score) 
             content = meta.get("source_content", doc)
-            doc_id = meta.get("id", None) 
-            processed_docs.append(Document(page_content=content, metadata=meta, id=doc_id))
+            doc_id_val = meta.get("id") 
+            if doc_id_val is not None:
+                processed_docs.append(Document(page_content=content, metadata=meta, id=doc_id_val))
+            else:
+                processed_docs.append(Document(page_content=content, metadata=meta))
         return processed_docs
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:

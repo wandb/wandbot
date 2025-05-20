@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+
 from wandbot.configs.ingestion_config import IngestionConfig
 from wandbot.ingestion.prepare_data import run_prepare_data_pipeline
 from wandbot.ingestion.preprocess_data import run_preprocessing_pipeline

@@ -59,6 +59,9 @@ English
 | 1.3.0rc | [1.3.0rc with gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F019619b7-6ca1-7cc1-bdb9-d1053a6386d8%3FhideTraceTree%3D1) |88.8 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg) |
 | 1.3.0 | [v1.3.0 prod, v50 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F01961c5e-9570-7f93-b3db-572ae83d9dbe%3FhideTraceTree%3D1) | 91.2 % | 5 | [v50](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-Wandbot-Data-Ingestion-Report-2025-04-09-15-44-45--VmlldzoxMjIwNzI0Mg)  |
 | 1.3.1 | [v1.3.1 prod, v52 index, gpt-4o judge](https://wandb.ai/wandbot/wandbot-eval/weave/calls/01962210-44be-7f53-986d-4dc529660ad1?hideTraceTree=1) | 91.2 % | 5 | [v52](https://wandb.ai/wandbot/wandbot-dev/reports/Wandbot-Data-Ingestion-Report-for-chroma_index-v52-2025-04-10-23-28--VmlldzoxMjIzMDczNQ)
+| 1.3.2 | [v1.3.2 prod, v54 index, gpt-4o judge. Knowledge base update](https://wandb.ai/wandbot/wandbot-eval/weave/evaluations?view=evaluations_2025-05-20_09-37-33-681&pin=%7B%22left%22%3A%5B%22summary.weave.trace_name%22%2C%22feedback%22%2C%22output.WandbotCorrectnessScorer.answer_correct.true_fraction%22%2C%22output.model_output.api_call_statuses.chat_error_info.has_error.true_count%22%2C%22output.model_output.api_call_statuses.chat_success.true_count%22%2C%22summary.weave.status%22%5D%2C%22right%22%3A%5B%5D%7D&peekPath=%2Fwandbot%2Fwandbot-eval%2Fcalls%2F0196ea1b-f8cb-7cf2-a22d-a8254ef6f67f%3FhideTraceTree%3D1) | 90.4 % | 5 | [v54](https://wandb.ai/wandbot/wandbot-dev/reports/Prod-v1-3-2-Wandbot-Data-Ingestion-Report-chroma_index-v54-2025-05-19-20-37--VmlldzoxMjg0ODMzNQ)
+
+
 
 
 **Note**
@@ -180,7 +183,7 @@ You can either use `uvicorn` or `gunicorn` to launch N workers to be able to ser
 
 `uvicorn`
 ```bash
-WANDBOT_FULL_INIT=1 uvicorn wandbot.api.app:app \
+WANDBOT_FULL_INIT=1 uv run uvicorn wandbot.api.app:app \
 --host 0.0.0.0 \
 --port 8000 \
 --workers 8 \
@@ -213,25 +216,31 @@ Launch W&B Weave evaluation in the root `wandbot` directory. Ensure that you're 
 ```
 source wandbot_venv/bin/activate
 
-python src/wandbot/evaluation/eval.py
+uv run src/wandbot/evaluation/eval.py
+```
+
+When running evals before prod, we always run 5 trials per eval sample. It can also be a good idea to reduce weave parallelism in order to avoid api rate limiting issues which might skew eval results:
+
+```
+caffeinate uv run src/wandbot/evaluation/eval.py --experiment_name <insert eval name> --n_trials 5 --n_weave_parallelism 4
 ```
 
 Debugging, only running evals on 1 sample and for 1 trial:
 
 ```
-python src/wandbot/evaluation/eval.py  --debug --n_debug_samples=1 --n_trials=1
+uv run src/wandbot/evaluation/eval.py  --debug --n_debug_samples=1 --n_trials=1
 ```
 
 Evaluate on Japanese dataset:
 
 ```
-python src/wandbot/evaluation/eval.py  --lang ja
+uv run src/wandbot/evaluation/eval.py  --lang ja
 ```
 
 To only evaluate each sample once:
 
 ```
-python src/wandbot/evaluation/eval.py  --n_trials 1
+uv run src/wandbot/evaluation/eval.py  --n_trials 1
 ```
 
 
@@ -242,7 +251,7 @@ The data ingestion module pulls code and markdown from Weights & Biases reposito
 To ingest the data run the following command from the root of the repository, see `run_ingestion_config.py` for all available arguments.
 
 ```bash
-python -m wandbot.ingestion
+uv run src/wandbot/ingestion/__main__.py
 ```
 
 **Note:**
@@ -258,7 +267,7 @@ These datasets are also stored as wandb artifacts in the project defined in the 
 To help with debugging, you can use the `steps` and `include_sources` flags to specify only sub-components of the pipeline and only certain documents sources to run. For example if you wanted to stop the pipeline before it creates the vector db and creates the artifacts and W&B report AND you only wanted to process the Weave documentation, you would do the following:
 
 ```
-python -m wandbot.ingestion --steps prepare preprocess --include_sources "weave_documentation" --debug
+uv run src/wandbot/ingestion/__main__.py --steps prepare preprocess --include_sources "weave_documentation" --debug
 ```
 
 #### Note on updating hosted Chroma vector db
