@@ -262,7 +262,73 @@ You will notice that the data is ingested into the `data/cache` directory and st
 
 These datasets are also stored as wandb artifacts in the project defined in the environment variable `WANDB_PROJECT` and can be accessed from the [wandb dashboard](https://wandb.ai/wandb/wandbot-dev).
 
-#### Ingestion pipeline debugging
+### Evaluating a file with Precomputed Answers 
+
+Instead of hitting the wandbot endpoint, you can also pass a `.json` file of precomputed answers for evaluation by the `WandbotCorrectnessScorer`. To do so, pass a filepath to the `precomputed_answers_json_path` parameter in the `EvalConfig`), it should be a JSON file containing a list of objects. Each object should have a question and a precomputed answer.
+
+The evaluation system will try to match questions from your evaluation dataset (defined by `eval_dataset` in `EvalConfig`) to the `question` field in these objects using exact string matching (after stripping leading/trailing whitespace).
+
+Each object in the JSON list should have the following structure:
+
+**Required Fields:**
+
+*   `question` (string): The question text. This is used to match against questions in the evaluation dataset.
+*   `generated_answer` (string): The precomputed answer text. This will be used as `EvalChatResponse.answer`.
+
+**Fields for Contextual Scoring:**
+To enable context-based scoring (e.g., by `WandbotCorrectnessScorer`), you can provide the context information through one of the following fields in each JSON object, although its not essential:
+
+*   `retrieved_contexts` (List of Dicts): A list of context documents. Each dictionary in the list should represent a document and ideally have `"source"` (string, URL) and `"content"` (string, text of the document) keys. Minimally, a `"content"` key is needed for the scorer.
+    *Example*: `[{"source": "http://example.com/doc1", "content": "Context snippet 1."}, {"content": "Context snippet 2."}]`
+*   **OR** `source_documents` (string): A raw string representation of source documents that can be parsed by the system (specifically, by the `parse_text_to_json` function in `eval.py`). This string usually contains multiple documents, each prefixed by something like "source: http://...".
+
+If only `source_documents` (string) is provided and `retrieved_contexts` (list) is not, the system will attempt to parse `source_documents` to populate the `retrieved_contexts` field for the `EvalChatResponse`. If neither is provided, context-based scoring for that precomputed answer will operate with empty context.
+
+**Optional Fields (to fully populate `EvalChatResponse` and mimic live API calls):**
+
+*   `system_prompt` (string): The system prompt used.
+*   `sources` (string): A string listing sources (can be similar to `source_documents` or a different format).
+*   `model` (string): The name of the model that generated the answer (e.g., "precomputed_gpt-4").
+*   `total_tokens` (int): Total tokens used.
+*   `prompt_tokens` (int): Prompt tokens used.
+*   `completion_tokens` (int): Completion tokens used.
+*   `time_taken` (float): Time taken for the call.
+*   `api_call_statuses` (dict): Dictionary of API call statuses.
+*   `start_time` (string): ISO 8601 formatted start time of the call (e.g., `"2023-10-27T10:00:00Z"`).
+*   `end_time` (string): ISO 8601 formatted end time of the call.
+*   `has_error` (boolean): Set to `true` if this precomputed item represents an error response.
+*   `error_message` (string): The error message if `has_error` is `true`.
+
+**Example Object:**
+```json
+{
+  "question": "What is Weights & Biases?",
+  "generated_answer": "Weights & Biases is an MLOps platform.",
+  "retrieved_contexts": [
+      {"source": "http://example.com/docA", "content": "Content of document A talking about W&B."},
+      {"content": "Another piece of context."}
+  ],
+  "model": "precomputed_from_file",
+  "system_prompt": "You are a helpful assistant.",
+  "total_tokens": 50,
+  "has_error": false
+}
+```
+Or using `source_documents`:
+```json
+{
+  "question": "What is Weights & Biases?",
+  "generated_answer": "Weights & Biases is an MLOps platform.",
+  "source_documents": "source: http://example.com/docA\\nContent of document A talking about W&B.\\nsource: http://example.com/docB\\nContent of document B.",
+  "model": "precomputed_from_file",
+  "system_prompt": "You are a helpful assistant.",
+  "total_tokens": 50,
+  "has_error": false
+}
+```
+
+
+### Ingestion pipeline debugging
 
 To help with debugging, you can use the `steps` and `include_sources` flags to specify only sub-components of the pipeline and only certain documents sources to run. For example if you wanted to stop the pipeline before it creates the vector db and creates the artifacts and W&B report AND you only wanted to process the Weave documentation, you would do the following:
 
