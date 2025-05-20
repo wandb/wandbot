@@ -4,10 +4,10 @@ set -e # Exit on error
 # export VIRTUAL_ENV=wandbot_venv
 # export PATH="$VIRTUAL_ENV/bin:$PATH"
 # export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
-export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.venv/lib/python3.12/site-packages
+export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages
 
 # source wandbot_venv/bin/activate
-source .venv/bin/activate
+source .pythonlibs/bin/activate
 
 echo "Starting Wandbot application..."
 

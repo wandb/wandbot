@@ -23,19 +23,21 @@ done
 rm -rf .venv
 
 # Use uv for faster installs
-pip install --no-user pip uv --upgrade
+
+pip install --user pip uv --upgrade
+# pip install --no-user pip uv --upgrade
 
 # python3.12 -m venv wandbot_venv --clear
 # source wandbot_venv/bin/activate
 uv venv --python python3.12
-source .venv/bin/activate
+source .pythonlibs/bin/activate
 
 # export VIRTUAL_ENV=wandbot_venv
 # export PATH="$VIRTUAL_ENV/bin:$PATH"
 # export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
 # Only set a narrow python path, excludes numpy 1.24
 # export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/wandbot_venv/lib/python3.12/site-packages
-export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.venv/lib/python3.12/site-packages
+export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages
 
 uv pip install "numpy>=2.2.0" --force-reinstall
 
