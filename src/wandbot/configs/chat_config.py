@@ -44,10 +44,10 @@ class ChatConfig(BaseSettings):
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "anthropic"
-    response_synthesizer_model: str = "claude-3-7-sonnet-20250219" 
+    response_synthesizer_model: str = "claude-4-opus-20250514" # "claude-4-sonnet-20250514"  #"claude-3-7-sonnet-20250219" 
     response_synthesizer_temperature: float = 0.1
     response_synthesizer_fallback_provider: str = "anthropic"
-    response_synthesizer_fallback_model: str = "claude-3-7-sonnet-20250219" 
+    response_synthesizer_fallback_model: str = "claude-4-opus-20250514" # "claude-4-sonnet-20250514"  # "claude-3-7-sonnet-20250219" 
     response_synthesizer_fallback_temperature: float = 0.1
     
     # Translation models settings
