@@ -22,12 +22,14 @@ class EvalConfig:
     n_debug_samples: int = 3
     max_evaluator_retries: int = 3
     evaluator_timeout: int = 60
+    precomputed_answers_json_path: str | None = sp.field(default=None, help="Path to a JSON file containing precomputed answers. If provided, network calls to wandbot will be skipped.")
 
+    # Links to evaluation datasets stored in Weave
     @property
     def eval_dataset(self) -> str:
         if self.lang == "ja":
-            return "weave:///wandbot/wandbot-eval-jp/object/wandbot_eval_data_jp:oCWifIAtEVCkSjushP0bOEc5GnhsMUYXURwQznBeKLA"
-        return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:eCQQ0GjM077wi4ykTWYhLPRpuGIaXbMwUGEB7IyHlFU"
+            return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data_jp:I2BlFnw1VnPn8lFG72obBWN1sCokB3EYk4G4vSKg23g"
+        return "weave:///wandbot/wandbot-eval/object/wandbot_eval_data:ZZUQa2CCAqPDFWiB90VANCm4EdT8qtc125NazaWUrdI"
 
 def get_eval_config() -> EvalConfig:
     return sp.parse(EvalConfig)
