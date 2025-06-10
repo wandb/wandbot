@@ -3,7 +3,7 @@ import base64
 import os
 import sys
 import traceback
-from typing import Any, Dict, List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import weave
@@ -24,7 +24,7 @@ class BaseEmbeddingModel:
     
     def __init__(self, 
                  model_name: str,
-                 n_parallel_api_calls: int = 50,
+                 n_parallel_api_calls: int = 10,
                  max_retries: int = 3,
                  timeout: int = 30,
                  **kwargs):
@@ -34,10 +34,10 @@ class BaseEmbeddingModel:
         self.timeout = timeout
 
     @weave.op
-    def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
+    def embed(self, input: Union[str, List[str]]) -> Tuple[Optional[List[List[float]]], APIStatus]:
         raise NotImplementedError("Subclasses must implement embed method")
 
-    def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
+    def __call__(self, input: Union[str, List[str]]) -> List[List[float]]:
         embeddings, api_status = self.embed(input)
         if not api_status.success:
             raise RuntimeError(api_status.error_info.error_message)
@@ -53,10 +53,16 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         from openai import AsyncOpenAI
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_retries=self.max_retries, timeout=self.timeout)
 
-    async def _run_openai_embeddings(self, inputs: List[str]) -> Tuple[List[List[float]], APIStatus]:
+    async def _run_openai_embeddings(self, inputs: List[str]) -> Tuple[Optional[List[List[float]]], APIStatus]:
         api_status = APIStatus(component=self.COMPONENT_NAME, success=True)
         try:
             semaphore = asyncio.Semaphore(self.n_parallel_api_calls)
+            
+            @retry(
+                stop=stop_after_attempt(self.max_retries),
+                wait=wait_exponential(multiplier=1, min=4, max=60),
+                reraise=True
+            )
             async def get_single_openai_embedding(text):
                 async with semaphore:
                     response = await self.client.embeddings.create(
@@ -111,14 +117,14 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                 error_info=error_info
             )
 
-    def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
+    def embed(self, input: Union[str, List[str]]) -> Tuple[Optional[List[List[float]]], APIStatus]:
         inputs = [input] if isinstance(input, str) else input
         return asyncio.run(self._run_openai_embeddings(inputs))
 
 class CohereEmbeddingModel(BaseEmbeddingModel):
     COMPONENT_NAME = "cohere_embedding"
     
-    def __init__(self, model_name: str, input_type: str, dimensions: int = None, **kwargs):
+    def __init__(self, model_name: str, input_type: str, dimensions: Optional[int] = None, **kwargs):
         super().__init__(model_name, **kwargs)
         if not input_type:
             raise ValueError("input_type must be specified for Cohere embeddings")
@@ -135,7 +141,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             logger.error(f'Unable to initialise Cohere client:\n{e}')
             raise
 
-    def embed(self, input: Union[str, List[str]]) -> Tuple[List[List[float]], APIStatus]:
+    def embed(self, input: Union[str, List[str]]) -> Tuple[Optional[List[List[float]]], APIStatus]:
         api_status = APIStatus(component=self.COMPONENT_NAME, success=True)
         try:
             inputs = [input] if isinstance(input, str) else input
@@ -187,13 +193,13 @@ class EmbeddingModel:
         
         self.model = self.PROVIDER_MAP[provider](**kwargs)
 
-    def embed(self, input: Union[str, List[str]] = None) -> Tuple[List[List[float]], APIStatus]:
+    def embed(self, input: Union[str, List[str]]) -> Tuple[Optional[List[List[float]]], APIStatus]:
         """Required interface for Chroma's EmbeddingFunction"""
         # No try-except here - let errors propagate up
         embeddings, api_status = self.model.embed(input)
         return embeddings, api_status
 
-    def __call__(self, input: Union[str, List[str]] = None) -> List[List[float]]:
+    def __call__(self, input: Union[str, List[str]]) -> List[List[float]]:
         """Required interface for Chroma's EmbeddingFunction"""
         embeddings, api_status = self.embed(input)
         if not api_status.success:
