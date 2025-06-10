@@ -2,14 +2,13 @@ import concurrent.futures
 import copy
 import json
 import math
-import os
 import pathlib
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import chromadb
-from tqdm import trange
 from chromadb.config import Settings
+from tqdm import trange
 
 import wandb
 import wandb.apis.reports as wr
@@ -408,6 +407,7 @@ def run_vectorstore_and_report_pipeline(
             dimensions=vs_config.embeddings_dimensions,
             input_type=vs_config.embeddings_document_input_type,
             encoding_format=vs_config.embeddings_encoding_format,
+            n_parallel_api_calls=ingestion_config.embeddings_n_parallel_api_calls
         )
 
         # Ensure local persist directory exists and is *unique* for this run
