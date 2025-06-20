@@ -21,8 +21,8 @@ langchain-core >= 0.2.2
 
 # chromadb>=0.6.0
 chromadb == 1.0.3
-weave>=0.51.47
-wandb[workspaces]>=0.19.9
+weave>=0.51.51
+wandb[workspaces]>=0.20.1
 tiktoken
 fasttext-wheel
 tree-sitter-languages

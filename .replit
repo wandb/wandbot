@@ -10,6 +10,9 @@ language = "python3"
 [gitHubImport]
 requiredFiles = [".replit", "replit.nix"]
 
+[env]
+REPLIT_DISABLE_PACKAGE_LAYER="1"
+
 [deployment]
 run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"

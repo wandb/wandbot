@@ -20,25 +20,15 @@ for dir in /nix/store/*-gcc-*/lib64 /nix/store/*-stdenv-*/lib /nix/store/*-libst
 done
 
 # Create virtualenv & set up
-rm -rf .venv
-
 # Use uv for faster installs
-
 pip install --user pip uv --upgrade
-# pip install --no-user pip uv --upgrade
-
-# python3.12 -m venv wandbot_venv --clear
-# source wandbot_venv/bin/activate
-uv venv --python python3.12
+uv venv .pythonlibs --python python3.12 --clear
 source .pythonlibs/bin/activate
 
-# export VIRTUAL_ENV=wandbot_venv
-# export PATH="$VIRTUAL_ENV/bin:$PATH"
-# export PYTHONPATH="$(pwd)/src:$PYTHONPATH" 
-# Only set a narrow python path, excludes numpy 1.24
-# export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/wandbot_venv/lib/python3.12/site-packages
+# Ensure the correct python path is set
 export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages
 
+# Force reinstall numpy to avoid version conflicts
 uv pip install "numpy>=2.2.0" --force-reinstall
 
 # Clear any existing installations that might conflict
@@ -47,6 +37,7 @@ rm -rf $VIRTUAL_ENV/lib/python*/site-packages/pydantic*
 rm -rf $VIRTUAL_ENV/lib/python*/site-packages/fastapi*
 
 # Install dependencies
+uv pip install wandb
 uv pip install -r requirements.txt --no-cache
 
 # Re-install problematic package
@@ -60,7 +51,6 @@ python -c "import wandbot; print('Wandbot package installed successfully')"
 
 # Free up disk space
 pip cache purge
-
 mkdir -p ./data/cache
 
 # Debug information
