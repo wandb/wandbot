@@ -127,22 +127,56 @@ SLACK_JA_SIGNING_SECRET
 DISCORD_BOT_TOKEN
 ```
 
-Then build the app to install all dependencies in a virtual env, note this is heavily tailored for Replit.
+Then build the app to install all dependencies in a virtual env:
 
 ```
 bash build.sh
 ```
 
-Start the Q&A bot application using the following commands:
+#### Local Development
+
+Start the Q&A bot application locally using the following commands:
 
 ```bash
+# Run API server only with uvicorn
+uv run uvicorn wandbot.api.app:app --host 0.0.0.0 --port 8000
+
+# Run Slack and Discord bots locally (requires API to be running)
+# Make sure to activate your virtual environment first
+source wandbot_venv/bin/activate  # or wherever your venv is located
+($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l en) & \
+($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l ja) & \
+($VIRTUAL_ENV/bin/python -m wandbot.apps.discord)
+
+# Or run everything including bots with one command
 bash run.sh
 ```
 
-Then call the `/startup` endpoint to trigger the final wandbot app initialisation:
+The app will initialize automatically when started.
+
+#### Modal Deployment
+
+Wandbot can be deployed on [Modal](https://modal.com) for serverless hosting with auto-scaling and low latency. The deployment is split into two separate Modal apps:
+- **wandbot-api**: The FastAPI server
+- **wandbot-bots**: Discord and Slack bots
+
 ```bash
-curl http://localhost:8000/startup
+# Deploy everything (API server and bots)
+cd modal
+./deploy_all.sh
+
+# Or deploy individually from project root
+modal deploy modal/modal_app.py    # Deploy API only
+modal deploy modal/modal_bots.py   # Deploy bots only
 ```
+
+The `deploy_all.sh` script will:
+1. Deploy the API server
+2. Deploy the bot application
+3. Start the bots immediately (they run for 24 hours)
+4. Set up an hourly cron job to ensure bots stay running
+
+See [MODAL_DEPLOYMENT.md](./MODAL_DEPLOYMENT.md) for detailed Modal deployment instructions.
 
 For more detailed instructions on installing and running the bot, please refer to the [run.sh](./run.sh) file located in the root of the repository.
 
@@ -179,11 +213,11 @@ poetry install
 Make sure to set the environment variables (i.e. LLM provider keys etc) from the `.env` file.
 
 **Launch the wandbot app**
-You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation. The `WANDBOT_FULL_INIT` env var triggers the full wandbot app initialization.
+You can either use `uvicorn` or `gunicorn` to launch N workers to be able to serve eval requests in parallel. Note that weave Evaluations also have a limit on the number of parallel calls make, set via the `WEAVE_PARALLELISM` env variable, which is set further down in the `eval.py` file using the `n_weave_parallelism` flag. Launch wandbot with 8 workers for faster evaluation.
 
 `uvicorn`
 ```bash
-WANDBOT_FULL_INIT=1 uv run uvicorn wandbot.api.app:app \
+uv run uvicorn wandbot.api.app:app \
 --host 0.0.0.0 \
 --port 8000 \
 --workers 8 \
