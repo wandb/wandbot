@@ -247,9 +247,20 @@ def run_web_search(query: str, top_k: int, avoid=False) -> WebSearchResults:
                 web_contexts=[],
             )
         
-        # Run web search
-        yousearch = YouSearch(YouSearchConfig())
-        web_results = yousearch(query)
+        # Disable web search
+        web_results = YouSearchResults(
+            api_status=APIStatus(
+                component="web_search",
+                success=False,
+                error_info=ErrorInfo(
+                    component="web_search",
+                    has_error=True,
+                    error_message="Web search is disabled",
+                    error_type="WebSearchDisabled"
+                )
+            ),
+            web_context=[],
+        )
         if web_results.api_status.success:
             web_contexts = get_web_contexts(web_results)[:top_k]
         else:
