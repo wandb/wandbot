@@ -7,6 +7,8 @@ __pycache__/
 temp_index/
 e2b*
 
+.vscode/
+
 # C extensions
 *.so
 
