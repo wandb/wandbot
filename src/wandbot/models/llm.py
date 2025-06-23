@@ -44,8 +44,11 @@ def extract_google_system_and_messages(messages: List[Dict[str, Any]]) -> tuple:
     chat_messages: List[Dict[str, Any]] = []  # Change type hint for clarity
 
     for msg in messages:
-        role = msg.get("role")
+        role = msg.get("role").lower()
         content = msg.get("content")
+
+        logger.debug(f"ROLE: {role}, CONTENT: {content[:100]}")
+        print(f"ROLE: {role}, CONTENT: {content[:100]}")
 
         if not role or not content:
             logger.warning(f"Skipping message with missing role or content: {msg}")
@@ -54,6 +57,7 @@ def extract_google_system_and_messages(messages: List[Dict[str, Any]]) -> tuple:
         if role == "system" or role == "developer":
             if system_msg is None:  # Take first system message only
                 system_msg = content
+                logger.debug(f"SYSTEM MESSAGE DEBUG:\n{system_msg[:100]}\n\n")
             else:
                  logger.warning("Multiple system/developer messages found. Only the first one will be used as system instruction.")
         elif role == "assistant":  # Google uses 'model' role
