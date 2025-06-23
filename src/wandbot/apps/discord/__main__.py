@@ -190,5 +190,10 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
 
 
+async def main():
+    """Main entry point for the Discord bot"""
+    await bot.start(config.DISCORD_BOT_TOKEN)
+
+
 if __name__ == "__main__":
-    bot.run(config.DISCORD_BOT_TOKEN)
+    asyncio.run(main())
