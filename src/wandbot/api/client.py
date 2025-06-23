@@ -483,13 +483,23 @@ class AsyncAPIClient(APIClient):
         Returns:
             The response from the API, or None if the status code is not 200.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         async with aiohttp.ClientSession() as session:
-            async with session.post(self.query_endpoint, json=json.loads(request.model_dump_json())) as response:
-                if response.status == 200:
-                    response = await response.json()
-                    return APIQueryResponse(**response)
-                else:
-                    return None
+            try:
+                logger.info(f"Querying API at: {self.query_endpoint}")
+                async with session.post(self.query_endpoint, json=json.loads(request.model_dump_json())) as response:
+                    if response.status == 200:
+                        response_data = await response.json()
+                        return APIQueryResponse(**response_data)
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"API query failed with status {response.status}: {error_text}")
+                        return None
+            except Exception as e:
+                logger.error(f"Exception during API query: {str(e)}")
+                return None
 
     async def query(
         self,
