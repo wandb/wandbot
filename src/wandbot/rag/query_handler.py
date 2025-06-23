@@ -282,6 +282,7 @@ class QueryEnhancer:
         fallback_model_provider: str,
         fallback_model_name: str,
         fallback_temperature: float,
+        thinking_budget: float | str,
         max_retries: int = 3
     ):
         self.model = LLMModel(
@@ -289,14 +290,16 @@ class QueryEnhancer:
             model_name=model_name,
             temperature=temperature,
             response_model=EnhancedQuery,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
         self.fallback_model = LLMModel(
             provider=fallback_model_provider,
             model_name=fallback_model_name,
             temperature=fallback_temperature,
             response_model=EnhancedQuery,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
 
     @weave.op

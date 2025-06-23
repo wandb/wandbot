@@ -63,6 +63,7 @@ class RAGPipeline:
             fallback_model_provider = chat_config.query_enhancer_fallback_provider,
             fallback_model_name = chat_config.query_enhancer_fallback_model,
             fallback_temperature = chat_config.query_enhancer_fallback_temperature,
+            thinking_budget = chat_config.query_enhancer_thinking_budget,
             max_retries=chat_config.llm_max_retries
         )
         self.retrieval_engine = FusionRetrievalEngine(
@@ -76,6 +77,7 @@ class RAGPipeline:
             fallback_provider=chat_config.response_synthesizer_fallback_provider,
             fallback_model_name=chat_config.response_synthesizer_fallback_model,
             fallback_temperature=chat_config.response_synthesizer_fallback_temperature,
+            thinking_budget=chat_config.response_synthesizer_thinking_budget,
             max_retries=chat_config.llm_max_retries
         )
 

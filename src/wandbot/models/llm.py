@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 import weave
 from anthropic import AsyncAnthropic
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -251,6 +251,7 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
         self.client = genai.Client(api_key=api_key)
+        self.thinking_budget = kwargs.get("thinking_budget")
 
     @weave.op
     async def create(self, 
@@ -270,9 +271,12 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
                 generation_config_args["response_mime_type"] = "application/json"
                 generation_config_args["response_schema"] = self.response_model
                 generation_config_args["system_instruction"] = system_instruction_content if system_instruction_content else None
-                
+
+            if "2.5" in self.model_name and self.thinking_budget is not None:
+                generation_config_args["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=self.thinking_budget)    
+
             # Create the config object
-            gen_config = types.GenerateContentConfig(**generation_config_args)
+            gen_config = genai_types.GenerateContentConfig(**generation_config_args)
 
             async with self.semaphore: # Apply semaphore for rate limiting
                 # Use client.aio.models.generate_content for the async call

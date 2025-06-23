@@ -164,19 +164,22 @@ class ResponseSynthesizer:
         fallback_provider: str,
         fallback_model_name: str,
         fallback_temperature: float,
+        thinking_budget: float | str,
         max_retries: int = 3
     ):
         self.model = LLMModel(
             provider=primary_provider,
             model_name=primary_model_name,
             temperature=primary_temperature,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
         self.fallback_model = LLMModel(
             provider=fallback_provider,
             model_name=fallback_model_name,
             temperature=fallback_temperature,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
 
     async def _try_generate_response(
