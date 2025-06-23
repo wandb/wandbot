@@ -3,7 +3,7 @@ name = "wandbot"
 version = "1.3.3"
 description = "WandBot is a Q&A bot for Weights & Biases Models and Weave documentation"
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "parambharat", email = "bharat.ramanathan@wandb.com"},
@@ -33,7 +33,7 @@ dependencies = [
     "langchain>=0.2.2",
     "langchain-core>=0.2.2",
     "chromadb==1.0.3",
-    "weave>=0.51.51",
+    "weave>=0.51.54",
     "wandb>=0.20.1",
     "wandb[workspaces]>=0.19.9",
     "tiktoken",
