@@ -6,14 +6,14 @@ echo ""
 
 # Deploy the API
 echo "📦 Deploying API server..."
-modal deploy modal_app.py
+modal deploy modal/modal_app.py
 
 # Deploy the bots
 echo "🤖 Deploying bots..."
-modal deploy modal_bots.py
+modal deploy modal/modal_bots.py
 
 echo "🔄 Starting bots..."
-modal run --detach modal_bots.py::run_all_bots 
+modal run --detach modal/modal_bots.py::run_all_bots 
 
 echo ""
 echo "✅ Deployment complete!"

@@ -24,8 +24,8 @@ bot_image = (
     getattr(Image, modal_config.base_image)(python_version=modal_config.python_version)
     .apt_install("git", "curl", "ca-certificates")
     .pip_install("uv")
-    .add_local_file("../pyproject.toml", "/app/pyproject.toml", copy=True)
-    .add_local_dir("../src", "/app/src", copy=True)
+    .add_local_file("./pyproject.toml", "/app/pyproject.toml", copy=True)
+    .add_local_dir("./src", "/app/src", copy=True)
     .workdir("/app")
     # Install only bot dependencies using the optional dependency group
     .run_commands("uv pip install --system --compile-bytecode -e '.[bots]'")
