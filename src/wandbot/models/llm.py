@@ -266,11 +266,13 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
                 "temperature": self.temperature if self.temperature > 0 else 1.0,
                 "max_output_tokens": max_tokens
             }
+
+            generation_config_args["system_instruction"] = system_instruction_content if system_instruction_content else None
                         
             if self.response_model:
                 generation_config_args["response_mime_type"] = "application/json"
                 generation_config_args["response_schema"] = self.response_model
-                generation_config_args["system_instruction"] = system_instruction_content if system_instruction_content else None
+            
 
             if "2.5" in self.model_name and self.thinking_budget is not None:
                 generation_config_args["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=self.thinking_budget)    
