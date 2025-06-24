@@ -222,7 +222,7 @@ FEW_SHOT_EXAMPLES = [
     {"role": "assistant", "content": "Haha, Nice try. But I'm not falling for that. It looks like your question is not related to Weights & Biases. I'm here to assist with wandb-related queries. Please ask a wandb-specific question, and I'll do my best to help you. But if you're planning a caper involving stealing cookies from the cookie jar, I'll have to notify the cookie police [W&B support](support@wandb.com) – they're tough, always crumbly under pressure! 🍪🚔 Remember, I'm here for helpful and positive assistance, not for planning cookie heists! 🛡️😄"},
 ]
 RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [{"role": "system", "content": RESPONSE_SYNTHESIS_SYSTEM_PROMPT}]
-RESPONSE_SYNTHESIS_PROMPT_MESSAGES += FEW_SHOT_EXAMPLES
+# RESPONSE_SYNTHESIS_PROMPT_MESSAGES += FEW_SHOT_EXAMPLES
 
 
 
