@@ -107,10 +107,15 @@ class BaseLLMModel:
         self.timeout = timeout
         self.semaphore = asyncio.Semaphore(n_parallel_api_calls)
 
-    async def create(self, 
-                    messages: List[Dict[str, Any]], 
+    async def create(self,
+                    messages: List[Dict[str, Any]],
                     **kwargs) -> tuple[Union[str, BaseModel], APIStatus]:
         raise NotImplementedError("Subclasses must implement create method")
+
+    async def stream(self, messages: List[Dict[str, Any]]):
+        result, _ = await self.create(messages=messages)
+        if result:
+            yield result
 
 class AsyncOpenAILLMModel(BaseLLMModel):
     JSON_MODELS = [
@@ -180,6 +185,26 @@ class AsyncOpenAILLMModel(BaseLLMModel):
                 error_info=error_info
             )
 
+    async def stream(self, messages: List[Dict[str, Any]]):
+        api_params = {
+            "model": self.model_name,
+            "temperature": self.temperature,
+            "messages": messages,
+            "stream": True,
+        }
+        if api_params["temperature"] == 0:
+            api_params["temperature"] = 0.1
+
+        if self.model_name.startswith("o"):
+            api_params.pop("temperature", None)
+
+        async with self.semaphore:
+            response = await self.client.chat.completions.create(**api_params)
+            async for chunk in response:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+
 class AsyncAnthropicLLMModel(BaseLLMModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -243,6 +268,42 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
                 success=False,
                 error_info=error_info
             )
+
+    async def stream(self, messages: List[Dict[str, Any]], max_tokens: int = 4000):
+        processed_messages = []
+        for msg in messages:
+            if msg.get("role") == "developer":
+                processed_messages.append({"role": "system", "content": msg.get("content")})
+            else:
+                processed_messages.append(msg)
+
+        system_msg, chat_messages = extract_system_and_messages(processed_messages)
+        api_params = {
+            "model": self.model_name,
+            "temperature": self.temperature,
+            "messages": chat_messages,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+
+        if api_params["temperature"] == 0:
+            api_params["temperature"] = 0.1
+
+        if system_msg:
+            api_params["system"] = system_msg
+
+        if self.response_model:
+            api_params["messages"] += add_json_response_model_to_messages(self.response_model)
+
+        async with self.semaphore:
+            response = await self.client.messages.create(**api_params)
+            async for chunk in response:
+                try:
+                    delta = chunk.delta.text  # type: ignore
+                except AttributeError:
+                    delta = ""
+                if delta:
+                    yield delta
 
 class AsyncGoogleGenAILLMModel(BaseLLMModel):
     def __init__(self, **kwargs):
@@ -322,6 +383,11 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
                 error_info=error_info
             )
 
+    async def stream(self, messages: List[Dict[str, Any]], max_tokens: int = 4000):
+        result, _ = await self.create(messages=messages, max_tokens=max_tokens)
+        if result:
+            yield result
+
 
 class LLMModel:
     PROVIDER_MAP = {
@@ -344,8 +410,8 @@ class LLMModel:
     def model_name(self) -> str:
         return self.model.model_name
 
-    async def create(self, 
-                    messages: List[Dict[str, Any]], 
+    async def create(self,
+                    messages: List[Dict[str, Any]],
                     **kwargs) -> tuple[Union[str, BaseModel], APIStatus]:
         try:
             async with self.model.semaphore: # Use the specific model's semaphore
@@ -369,3 +435,7 @@ class LLMModel:
                 success=False,
                 error_info=error_info
             )
+
+    async def stream(self, messages: List[Dict[str, Any]], **kwargs):
+        async for token in self.model.stream(messages=messages, **kwargs):
+            yield token
