@@ -8,6 +8,7 @@ temp_index/
 e2b*
 
 .vscode/
+temp/
 
 # C extensions
 *.so
