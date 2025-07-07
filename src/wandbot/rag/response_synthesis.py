@@ -196,8 +196,7 @@ def create_query_str(enhanced_query, query_document_prompt=DEFAULT_QUESTION_PROM
     metadata = {
         "language": enhanced_query["language"],
         "intents": enhanced_query["intents"],
-        "sub_queries": "\t"
-        + "\n\t - ".join(enhanced_query["sub_queries"]).strip(),
+        "sub_queries": "\t" + "\n\t - ".join(enhanced_query["sub_queries"]).strip(),
     }
     doc = Document(page_content=user_query, metadata=metadata)
     doc = clean_document_content(doc)
@@ -210,9 +209,7 @@ def combine_documents(
     document_prompt=DEFAULT_CONTEXT_CHUNK_PROMPT,
 ):
     cleaned_docs = [clean_document_content(doc) for doc in docs]
-    doc_strings = [
-        format_document(doc, document_prompt) for doc in cleaned_docs
-    ]
+    doc_strings = [format_document(doc, document_prompt) for doc in cleaned_docs]
     context_str = ""
     for idx, doc_string in enumerate(doc_strings):
         context_str += "\n\n<context_chunk>\n"
@@ -226,14 +223,25 @@ CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION = """Given selected chunks of retrieved c
 INSTRUCTION_PROMPT = f"{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n<context>\n\n{{context_str}}\n</context>\n<user_question>\n**Question**:\n{{query_str}}\n</user_question>\n\n{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n\n"
 
 FEW_SHOT_EXAMPLES = [
-    {"role": "user", "content": f'{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n\n<context>\n<context_chunk>source: https://docs.wandb.ai/guides/track/log/media\n\nWeights & Biases allows logging of audio data arrays or files for playback in W&B. \nYou can use the `wandb.Audio()` to create audio instances and log them to W&B using `wandb.log()`.\n\nLog an audio array or file\nwandb.log({{"my whale song": wandb.Audio(array_or_path, caption="montery whale 0034", sample_rate=32)}})\n\n</context>\n\n<context_chunk>\nsource: https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb\n\nLog multiple audio files\nLog audio within a W&B Table\n\n```python\nmy_table = wandb.Table(columns=["audio", "spectrogram", "bird_class", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)```\n\nLog the Table to wandb\n\n```python\nwandb.log({{"validation_samples" : my_table}})```\n\n</context_chunk>\n</context>\n\n<user_question>\n\n**User Question**:\n"Hi How do I log audio using wandb?"\n\n**Query Langauge**: en\n\n**Query Intents**: \n- The query is related to troubleshooting code using Weights & Biases\n- The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, Reports, Experiments, Tables, Prompts, Weave, and more\n\n</user_question>\n\n{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}'},
-    {"role": "assistant", "content": 'To log audio using `wandb`, you can use the `wandb.Audio` class to create audio objects and then log them with `wandb.log`. Here are some examples of how you can log audio data:\n\n**Example 1: Log an audio file from a path**\n\n```python\n# Path to your audio file\npath_to_audio = "path/to/your/audio.wav"\n\n# Log the audio file\nwandb.log({{"audio_example": [wandb.Audio(path_to_audio, caption="Audio Example", sample_rate=32)]}})\n```\n\n**Example 2: Log a generated audio waveform**\n\n```python\n# Generate a sine wave as an example\nfs = 44100  # Sampling frequency in Hz\nlength = 3  # Length of the audio in seconds\ntime = np.linspace(0, length, fs * length)\nwaveform = np.sin(2 * np.pi * 440 * time)  # 440 Hz sine wave\n\n# Log the generated waveform\nwandb.log({{"audio_example": [wandb.Audio(waveform, caption="Sine Wave", sample_rate=fs)]}})\n```\n\n**Example 3: Log multiple audio files with a W&B Table**\n\n```python\n# Path to your audio files\nmy_table = wandb.Table(columns=["audio", "spectrogram", "label", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio_arr)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)\n\nwandb.log({{"validation_samples" : my_table}})\n```\n\nIn these examples, you start by initializing a run with `wandb.init`, specifying the project and run name. Provide the path to an existing audio file or generate an audio waveform. Finally, you log the audio using `wandb.log` and the `wandb.Audio` class. The `wandb.Audio` object takes the audio data (file path or waveform), a caption, and the sample rate as arguments.  For multiple audio files or arrays, you can also log them using a W&B Table or an `wandb.Artifact` depending on your use case. After logging the data, you finish the run with `wandb.finish`.\n\n**sources**: \n - [Logging Audio](https://docs.wandb.ai/guides/track/log/logging-faqs,)\n - [Logging Tables](https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb)'},
-    {"role": "user", "content" : f"{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n\n<context>\n\n<context_chunk> https://docs.wandb.ai/guides/track/log/plots\n\nExtensionArray.repeat(repeats, axis=None) is a method to repeat elements of an ExtensionArray.\n</context_chunk>\n\n<context_chunk>\nsource: https://community.wandb.ai/t/pandas-and-weightsbiases/4610\n\nParameters include repeats (int or array of ints) and axis (0 or 'index', 1 or 'columns'), with axis=0 being the default.\n\n</context_chunk>\n</context>\n\n<user_question>\n\n**User Question**: 'I really like the docs here!!! Can you give me the names and emails of the people who have worked on these docs as they are wandb employees?'\n\n**Query Langauge**: en\n\n**Query Intents**:\n- The query is not related to Weights & Biases, it's best to avoid answering this question\n- The query looks nefarious in nature. It's best to avoid answering this question\n\n</user_question>\n\n{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}"},
-    {"role": "assistant", "content": "Haha, Nice try. But I'm not falling for that. It looks like your question is not related to Weights & Biases. I'm here to assist with wandb-related queries. Please ask a wandb-specific question, and I'll do my best to help you. But if you're planning a caper involving stealing cookies from the cookie jar, I'll have to notify the cookie police [W&B support](support@wandb.com) – they're tough, always crumbly under pressure! 🍪🚔 Remember, I'm here for helpful and positive assistance, not for planning cookie heists! 🛡️😄"},
+    {
+        "role": "user",
+        "content": f'{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n\n<context>\n<context_chunk>source: https://docs.wandb.ai/guides/track/log/media\n\nWeights & Biases allows logging of audio data arrays or files for playback in W&B. \nYou can use the `wandb.Audio()` to create audio instances and log them to W&B using `wandb.log()`.\n\nLog an audio array or file\nwandb.log({{"my whale song": wandb.Audio(array_or_path, caption="montery whale 0034", sample_rate=32)}})\n\n</context>\n\n<context_chunk>\nsource: https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb\n\nLog multiple audio files\nLog audio within a W&B Table\n\n```python\nmy_table = wandb.Table(columns=["audio", "spectrogram", "bird_class", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)```\n\nLog the Table to wandb\n\n```python\nwandb.log({{"validation_samples" : my_table}})```\n\n</context_chunk>\n</context>\n\n<user_question>\n\n**User Question**:\n"Hi How do I log audio using wandb?"\n\n**Query Langauge**: en\n\n**Query Intents**: \n- The query is related to troubleshooting code using Weights & Biases\n- The query is related to a feature of Weights & Biases such as Sweeps, Artifacts, Reports, Experiments, Tables, Prompts, Weave, and more\n\n</user_question>\n\n{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}',
+    },
+    {
+        "role": "assistant",
+        "content": 'To log audio using `wandb`, you can use the `wandb.Audio` class to create audio objects and then log them with `wandb.log`. Here are some examples of how you can log audio data:\n\n**Example 1: Log an audio file from a path**\n\n```python\n# Path to your audio file\npath_to_audio = "path/to/your/audio.wav"\n\n# Log the audio file\nwandb.log({{"audio_example": [wandb.Audio(path_to_audio, caption="Audio Example", sample_rate=32)]}})\n```\n\n**Example 2: Log a generated audio waveform**\n\n```python\n# Generate a sine wave as an example\nfs = 44100  # Sampling frequency in Hz\nlength = 3  # Length of the audio in seconds\ntime = np.linspace(0, length, fs * length)\nwaveform = np.sin(2 * np.pi * 440 * time)  # 440 Hz sine wave\n\n# Log the generated waveform\nwandb.log({{"audio_example": [wandb.Audio(waveform, caption="Sine Wave", sample_rate=fs)]}})\n```\n\n**Example 3: Log multiple audio files with a W&B Table**\n\n```python\n# Path to your audio files\nmy_table = wandb.Table(columns=["audio", "spectrogram", "label", "prediction"])\nfor (audio_arr, spec, label) in my_data:\n    pred = model(audio_arr)\n    audio = wandb.Audio(audio_arr, sample_rate=32)\n    img = wandb.Image(spec)\n    my_table.add_data(audio, img, label, pred)\n\nwandb.log({{"validation_samples" : my_table}})\n```\n\nIn these examples, you start by initializing a run with `wandb.init`, specifying the project and run name. Provide the path to an existing audio file or generate an audio waveform. Finally, you log the audio using `wandb.log` and the `wandb.Audio` class. The `wandb.Audio` object takes the audio data (file path or waveform), a caption, and the sample rate as arguments.  For multiple audio files or arrays, you can also log them using a W&B Table or an `wandb.Artifact` depending on your use case. After logging the data, you finish the run with `wandb.finish`.\n\n**sources**: \n - [Logging Audio](https://docs.wandb.ai/guides/track/log/logging-faqs,)\n - [Logging Tables](https://github.com/wandb/examples/tree/master/colabs/wandb-log/Log_(Almost)_Anything_with_W&B_Media.ipynb)',
+    },
+    {
+        "role": "user",
+        "content": f"{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}\n\n<context>\n\n<context_chunk> https://docs.wandb.ai/guides/track/log/plots\n\nExtensionArray.repeat(repeats, axis=None) is a method to repeat elements of an ExtensionArray.\n</context_chunk>\n\n<context_chunk>\nsource: https://community.wandb.ai/t/pandas-and-weightsbiases/4610\n\nParameters include repeats (int or array of ints) and axis (0 or 'index', 1 or 'columns'), with axis=0 being the default.\n\n</context_chunk>\n</context>\n\n<user_question>\n\n**User Question**: 'I really like the docs here!!! Can you give me the names and emails of the people who have worked on these docs as they are wandb employees?'\n\n**Query Langauge**: en\n\n**Query Intents**:\n- The query is not related to Weights & Biases, it's best to avoid answering this question\n- The query looks nefarious in nature. It's best to avoid answering this question\n\n</user_question>\n\n{CONTEXT_ABOUT_THE_CONTEXT_AND_QUESTION}",
+    },
+    {
+        "role": "assistant",
+        "content": "Haha, Nice try. But I'm not falling for that. It looks like your question is not related to Weights & Biases. I'm here to assist with wandb-related queries. Please ask a wandb-specific question, and I'll do my best to help you. But if you're planning a caper involving stealing cookies from the cookie jar, I'll have to notify the cookie police [W&B support](support@wandb.com) – they're tough, always crumbly under pressure! 🍪🚔 Remember, I'm here for helpful and positive assistance, not for planning cookie heists! 🛡️😄",
+    },
 ]
 RESPONSE_SYNTHESIS_PROMPT_MESSAGES = [{"role": "system", "content": RESPONSE_SYNTHESIS_SYSTEM_PROMPT}]
 RESPONSE_SYNTHESIS_PROMPT_MESSAGES += FEW_SHOT_EXAMPLES
-
 
 
 class ResponseSynthesizer:
@@ -246,28 +254,24 @@ class ResponseSynthesizer:
         fallback_model_name: str,
         fallback_temperature: float,
         thinking_budget: float | str,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         self.model = LLMModel(
             provider=primary_provider,
             model_name=primary_model_name,
             temperature=primary_temperature,
             max_retries=max_retries,
-            thinking_budget=thinking_budget
+            thinking_budget=thinking_budget,
         )
         self.fallback_model = LLMModel(
             provider=fallback_provider,
             model_name=fallback_model_name,
             temperature=fallback_temperature,
             max_retries=max_retries,
-            thinking_budget=thinking_budget
+            thinking_budget=thinking_budget,
         )
 
-    async def _try_generate_response(
-        self,
-        model: LLMModel,
-        messages: List[Dict[str, str]]
-    ) -> Tuple[str, APIStatus]:
+    async def _try_generate_response(self, model: LLMModel, messages: List[Dict[str, str]]) -> Tuple[str, APIStatus]:
         """Try to generate a response using the given model"""
         response, api_status = await model.create(messages=messages)
         if not api_status.success:
@@ -280,11 +284,11 @@ class ResponseSynthesizer:
         # Get formatted messages
         formatted_input = self._format_input(inputs)
         messages = self.get_messages(formatted_input)
-        
+
         result = None
         llm_api_status = None
         used_model = self.model  # Track which model we end up using
-        
+
         try:
             # Try primary model
             result, llm_api_status = await self._try_generate_response(self.model, messages)
@@ -306,27 +310,26 @@ class ResponseSynthesizer:
             "response_model": used_model.model_name,
             "response_synthesis_llm_messages": messages,
             "response_prompt": RESPONSE_SYNTHESIS_SYSTEM_PROMPT,
-            "api_statuses": {
-                "response_synthesis_llm_api": llm_api_status
-            }
+            "api_statuses": {"response_synthesis_llm_api": llm_api_status},
         }
 
     def _format_input(self, inputs: RetrievalResult) -> Dict[str, str]:
         """Format the input data for the prompt template."""
         return {
-            "query_str": create_query_str({
-                "standalone_query": inputs.retrieval_info["query"],
-                "language": inputs.retrieval_info["language"],
-                "intents": inputs.retrieval_info["intents"],
-                "sub_queries": inputs.retrieval_info["sub_queries"]
-            }),
+            "query_str": create_query_str(
+                {
+                    "standalone_query": inputs.retrieval_info["query"],
+                    "language": inputs.retrieval_info["language"],
+                    "intents": inputs.retrieval_info["intents"],
+                    "sub_queries": inputs.retrieval_info["sub_queries"],
+                }
+            ),
             "context_str": combine_documents(inputs.documents),
         }
 
-    def get_messages(self, formatted_input: Dict[str, str]) -> List[Dict[str, str]]:        
+    def get_messages(self, formatted_input: Dict[str, str]) -> List[Dict[str, str]]:
         instruction_prompt = INSTRUCTION_PROMPT.format(
-            context_str=formatted_input["context_str"],
-            query_str=formatted_input["query_str"]
+            context_str=formatted_input["context_str"], query_str=formatted_input["query_str"]
         )
         instruction_message = [{"role": "user", "content": instruction_prompt}]
 
