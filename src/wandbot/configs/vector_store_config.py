@@ -16,16 +16,16 @@ class VectorStoreConfig(BaseSettings):
     )
     
     # Vector Store
-    vectordb_collection_name: str = "chroma_index-v54" #"vectorstore", vectorstore-chroma_index-v54
+    vectordb_collection_name: str = "vectorstore-chroma_index-v52-run_xwyhhej9" #"vectorstore", vectorstore-chroma_index-v54
     vectordb_index_dir: pathlib.Path = Field(
-        pathlib.Path("artifacts/vector_stores"), env="VECTORDB_INDEX_DIR"
+        pathlib.Path("artifacts/vector_stores_512"), env="VECTORDB_INDEX_DIR"
     )
     vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v54"
     distance: str = "l2"  # used in retrieval from vectordb 
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
     
     # ChromaDB Client Mode
-    vector_store_mode: Literal["local", "hosted"] = "hosted"
+    vector_store_mode: Literal["local", "hosted"] = "local"
     # Settings for hosted mode (using direct HttpClient parameters)
     vector_store_host: Optional[str] = "api.trychroma.com"  # e.g., 'api.trychroma.com'
     vector_store_tenant: Optional[str] = '3c66fbfc-98ce-41ff-92ec-ef16e71c8c0a' # Tenant ID for hosted Chroma
@@ -46,7 +46,9 @@ class VectorStoreConfig(BaseSettings):
     
     # Ingestion settings
     batch_size: int = 256
-    persist_directory: Optional[pathlib.Path] = None
+    persist_directory: Optional[pathlib.Path] = Field(
+        pathlib.Path("artifacts/vector_stores_512"), env="VECTORDB_PERSIST_DIR"
+    )
 
     # Remote ChromaDB Upload Configuration - Keys for transformation
     remote_chroma_keys_to_prepend: List[str] = Field(
