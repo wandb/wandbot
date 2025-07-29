@@ -1,13 +1,17 @@
 set -e # Exit on error
 
-# Ensure we're using the virtual environment from build.sh
-# export VIRTUAL_ENV=wandbot_venv
-# export PATH="$VIRTUAL_ENV/bin:$PATH"
-# export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
-export PYTHONPATH=/home/runner/workspace/src:/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages
+# Set PYTHONPATH for the project
+export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
 
-# source wandbot_venv/bin/activate
-source .pythonlibs/bin/activate
+# Load environment variables from .env file
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+# Set working directory to src for uv
+cd src
 
 echo "Starting Wandbot application..."
 
@@ -23,8 +27,6 @@ start_service() {
 # Print all python prints
 export PYTHONUNBUFFERED=1
 
-# Start all services
+# Start all services using uv
 (uv run uvicorn wandbot.api.app:app --host 0.0.0.0 --port 8000 --workers 2) & \
-($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l en) & \
-($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l ja) & \
-($VIRTUAL_ENV/bin/python -m wandbot.apps.discord)
+(uv run python -m wandbot.apps.slack -l ja)
