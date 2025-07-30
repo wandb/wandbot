@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 import weave
 from anthropic import AsyncAnthropic
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -44,8 +44,11 @@ def extract_google_system_and_messages(messages: List[Dict[str, Any]]) -> tuple:
     chat_messages: List[Dict[str, Any]] = []  # Change type hint for clarity
 
     for msg in messages:
-        role = msg.get("role")
+        role = msg.get("role").lower()
         content = msg.get("content")
+
+        logger.debug(f"ROLE: {role}, CONTENT: {content[:100]}")
+        print(f"ROLE: {role}, CONTENT: {content[:100]}")
 
         if not role or not content:
             logger.warning(f"Skipping message with missing role or content: {msg}")
@@ -54,6 +57,7 @@ def extract_google_system_and_messages(messages: List[Dict[str, Any]]) -> tuple:
         if role == "system" or role == "developer":
             if system_msg is None:  # Take first system message only
                 system_msg = content
+                logger.debug(f"SYSTEM MESSAGE DEBUG:\n{system_msg[:100]}\n\n")
             else:
                  logger.warning("Multiple system/developer messages found. Only the first one will be used as system instruction.")
         elif role == "assistant":  # Google uses 'model' role
@@ -251,6 +255,7 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
         self.client = genai.Client(api_key=api_key)
+        self.thinking_budget = kwargs.get("thinking_budget")
 
     @weave.op
     async def create(self, 
@@ -265,14 +270,19 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
                 "temperature": self.temperature if self.temperature > 0 else 1.0,
                 "max_output_tokens": max_tokens
             }
+
+            generation_config_args["system_instruction"] = system_instruction_content if system_instruction_content else None
                         
             if self.response_model:
                 generation_config_args["response_mime_type"] = "application/json"
                 generation_config_args["response_schema"] = self.response_model
-                generation_config_args["system_instruction"] = system_instruction_content if system_instruction_content else None
-                
+            
+
+            if "2.5" in self.model_name and self.thinking_budget is not None:
+                generation_config_args["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=self.thinking_budget)    
+
             # Create the config object
-            gen_config = types.GenerateContentConfig(**generation_config_args)
+            gen_config = genai_types.GenerateContentConfig(**generation_config_args)
 
             async with self.semaphore: # Apply semaphore for rate limiting
                 # Use client.aio.models.generate_content for the async call

@@ -26,6 +26,7 @@ is_initializing = False
 
 async def initialize():
     global is_initialized, is_initializing
+    print(f"STARTUP: initialize() function called - is_initialized: {is_initialized}, is_initializing: {is_initializing}")
     logger.info(
         f"STARTUP: initialize() function called - is_initialized: {is_initialized}, is_initializing: {is_initializing}"
     )
@@ -196,103 +197,130 @@ async def initialize():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Running preliminary setup...")
-    if os.getenv("WANDBOT_FULL_INIT"):
-        logger.info("Running full wandbot initialization...")
-        await initialize()
+    """Lifespan events for application startup and shutdown"""
+    print("🔄 Starting initialization...")
+    logger.info("🔄 Starting initialization...")
+    await initialize()
+    print("✅ Initialization complete!")
+    logger.info("✅ Initialization complete!")
     yield
-    logger.info("Shutting down")
+    print("🔄 Shutting down...")
+    logger.info("Shutting down...")
 
 
-app = FastAPI(title="Wandbot", version="1.3.0", lifespan=lifespan)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application"""
+    app = FastAPI(title="Wandbot", version=app_config.wandbot_version or "1.3.3", lifespan=lifespan)
+    
+    # Configure all routes
+    configure_routes(app)
+    
+    # Include routers
+    app.include_router(chat_router.router)
+    
+    return app
 
 
-@app.get("/startup")
-async def startup():
-    global is_initialized, is_initializing
+def configure_routes(app: FastAPI) -> None:
+    """Configure all application routes"""
+    
+    @app.get("/disk-usage")
+    async def disk_usage_route():
+        """
+        Route to get disk usage information
+        """
+        return log_disk_usage()
 
-    if is_initialized:
-        logger.info("✅ Startup already complete.")
-        return {"status": "already_initialized"}
+    @app.get("/configs")
+    async def configs():
+        try:
+            safe_chat_config = {
+                k: v
+                for k, v in vars(chat_router.chat_components["chat_config"]).items()
+                if not any(sensitive in k.lower() for sensitive in ["key", "token"])
+            }
 
-    if is_initializing:
-        logger.info("⏳ Startup initialization already in progress...")
-        return {"status": "initializing"}
+            safe_vs_config = {
+                k: v
+                for k, v in vars(chat_router.chat_components["vector_store_config"]).items()
+                if not any(sensitive in k.lower() for sensitive in ["key", "token"])
+            }
 
-    try:
-        logger.info("📦 Main startup initialization triggered.")
-        _ = await initialize()
-        return {"status": "initializing"}
-    except Exception as e:
-        logger.error(f"💀 Startup initialization failed: {str(e)}")
-        is_initializing = False
-        return {"status": "initialization_failed", "error": str(e)}
+            git_info = get_git_info()
+            if all(v is None for v in git_info.values()):
+                raise HTTPException(
+                    status_code=500, detail="Unable to retrieve git information. Ensure this is a git repository."
+                )
+            git_info["timestamp"] = datetime.now().isoformat()
 
+            return {
+                "chat_config": safe_chat_config,
+                "vector_store_config": safe_vs_config,
+                "git_info": git_info,
+                "app_config": app_config,
+            }
 
-@app.get("/disk-usage")
-async def disk_usage_route():
-    """
-    Route to get disk usage information
-    """
-    return log_disk_usage()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error retrieving configs: {str(e)}") from e
 
+    @app.post("/initialize")
+    async def initialize_endpoint():
+        """Manual initialization endpoint for development with multiple workers"""
+        result = await initialize()
+        return result
 
-@app.get("/configs")
-async def configs():
-    try:
-        safe_chat_config = {
-            k: v
-            for k, v in vars(chat_router.chat_components["chat_config"]).items()
-            if not any(sensitive in k.lower() for sensitive in ["key", "token"])
-        }
+    @app.get("/")
+    @app.get("/status")
+    async def status():
+        global is_initialized, is_initializing
+        try:
+            from wandbot.api.routers import retrieve as retrieve_router
+        except ImportError:
+            retrieve_router = None
 
-        safe_vs_config = {
-            k: v
-            for k, v in vars(chat_router.chat_components["vector_store_config"]).items()
-            if not any(sensitive in k.lower() for sensitive in ["key", "token"])
-        }
+        chat_components = chat_router.chat_components
 
-        git_info = get_git_info()
-        if all(v is None for v in git_info.values()):
-            raise HTTPException(
-                status_code=500, detail="Unable to retrieve git information. Ensure this is a git repository."
-            )
-        git_info["timestamp"] = datetime.now().isoformat()
+        c_ls = {}
+        for key in chat_components.keys():
+            c_ls[key] = str(type(chat_components[key]))
 
         return {
-            "chat_config": safe_chat_config,
-            "vector_store_config": safe_vs_config,
-            "git_info": git_info,
-            "app_config": app_config,
+            "initialized": is_initialized,
+            "initializing": is_initializing,
+            "chat_ready": bool(chat_components.get("chat")),
+            "retriever_ready": hasattr(retrieve_router, "retriever") if retrieve_router else False,
+            "components": c_ls,
+            "chat_type": str(type(chat_components.get("chat"))) if chat_components.get("chat") else None,
+            "worker_info": {
+                "process_id": os.getpid(),
+                "note": "Each worker process has its own state when using --workers > 1"
+            }
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving configs: {str(e)}") from e
+
+# Create app instance
+app = create_app()
+
+def get_app() -> FastAPI:
+    """Get the FastAPI application instance"""
+    return app
 
 
-@app.get("/")
-@app.get("/status")
-async def status():
-    global is_initialized, is_initializing
-    try:
-        from wandbot.api.routers import retrieve as retrieve_router
-    except ImportError:
-        retrieve_router = None
+# For running locally without Modal
+if __name__ == "__main__":
+    import uvicorn
 
-    chat_components = chat_router.chat_components
-
-    c_ls = {}
-    for key in chat_components.keys():
-        c_ls[key] = str(type(chat_components[key]))
-
-    return {
-        "initialized": is_initialized,
-        "initializing": is_initializing,
-        "chat_ready": bool(chat_components.get("chat")),
-        "retriever_ready": hasattr(retrieve_router, "retriever") if retrieve_router else False,
-        "components": c_ls,
-        "chat_type": str(type(chat_components.get("chat"))) if chat_components.get("chat") else None,
-    }
-
-
-app.include_router(chat_router.router)
+    # Start the FastAPI server only (no bots)
+    print("🚀 Starting Wandbot API on http://localhost:8000")
+    print("📚 API docs available at http://localhost:8000/docs")
+    print("ℹ️  Note: This only starts the API server, not the Slack/Discord bots")
+    print("   To run bots locally, see README.md for instructions")
+    
+    # Use the string import path for better reload support
+    uvicorn.run(
+        "wandbot.api.app:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # Enable auto-reload in development
+        log_level="info",
+    )

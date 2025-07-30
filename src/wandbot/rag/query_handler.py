@@ -250,13 +250,23 @@ class EnhancedQuery(BaseModel):
         }
 
 
-ENHANCER_SYSTEM_PROMPT = (
-    "You are a weights & biases support manager tasked with enhancing support questions from users. "
-    "You are given a conversation and a follow-up query. "
-    "You goal to enhance the user query and render it using the tool provided."
-    "\n\nChat History: \n\n"
-    "{chat_history}"
-)
+ENHANCER_SYSTEM_PROMPT = """# Goal
+The goal is to create new, related queries to the original user query in order to retrieve more relevant \
+context from W&B docs and code samples.
+
+## Role
+You are a Weights & Biases support manager tasked with enhancing and expanding support questions from users.
+
+## Task
+You are given a conversation and a follow-up query.
+You goal to enhance the user query and render it using the tool provided.
+
+## Chat History:
+Below is any available chat history between the user and the assistant.
+<chat_history>
+{chat_history}
+</chat_history>
+"""
 
 
 def format_chat_history(chat_history: Optional[List[Tuple[str, str]]]) -> str:
@@ -282,21 +292,24 @@ class QueryEnhancer:
         fallback_model_provider: str,
         fallback_model_name: str,
         fallback_temperature: float,
-        max_retries: int = 3
+        thinking_budget: float | str,
+        max_retries: int
     ):
         self.model = LLMModel(
             provider=model_provider,
             model_name=model_name,
             temperature=temperature,
             response_model=EnhancedQuery,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
         self.fallback_model = LLMModel(
             provider=fallback_model_provider,
             model_name=fallback_model_name,
             temperature=fallback_temperature,
             response_model=EnhancedQuery,
-            max_retries=max_retries
+            max_retries=max_retries,
+            thinking_budget=thinking_budget
         )
 
     @weave.op
@@ -356,7 +369,7 @@ class QueryEnhancer:
             {"role": "system", "content": ENHANCER_SYSTEM_PROMPT.format(
                 chat_history=format_chat_history(chat_history)
             )},
-            {"role": "user", "content": f"Question: {query}"},
+            {"role": "user", "content": f"User question: {query}"},
             {"role": "user", "content": "!!! Tip: Make sure to answer in the correct format"}
         ]
         

@@ -93,6 +93,16 @@ async def command_handler(body: dict, say: callable, logger: logging.Logger) -> 
             language=config.bot_language,
             application=config.APPLICATION,
         )
+        
+        if api_response is None:
+            logger.error(f"API returned None response for query: {query}")
+            await send_message(
+                say=say,
+                message=config.ERROR_MESSAGE,
+                thread=thread_id,
+            )
+            return
+        
         response = format_response(
             config,
             api_response,

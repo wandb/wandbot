@@ -12,4 +12,5 @@ class AppConfig(BaseSettings):
     
     wandb_project: str | None = Field("wandbot-dev")
     wandb_entity: str | None = Field("wandbot")
+    wandbot_version: str | None = Field("1.3.3")
     log_level: str | None = Field("INFO")

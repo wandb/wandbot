@@ -71,30 +71,42 @@ def get_logger(name: str) -> logging.Logger:
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = level_map.get(log_level, logging.INFO)  # Default to INFO if invalid level
 
-    # Configure rich console with custom theme
-    theme = Theme({
-        "info": "cyan",
-        "warning": "yellow",
-        "error": "red",
-        "critical": "red bold",
-        "debug": "grey50"
-    })
-    console = Console(theme=theme, width=100, tab_size=4)
-
-    logging.basicConfig(
-        level=level,
-        format="WANDBOT | %(message)s",
-        datefmt="%H:%M:%S",
-        handlers=[RichHandler(
+    # Get the logger instance
+    logger = logging.getLogger(name)
+    
+    # Set the logger level explicitly
+    logger.setLevel(level)
+    
+    # Only add handler if the logger doesn't already have handlers
+    if not logger.handlers:
+        # Configure rich console with custom theme
+        theme = Theme({
+            "info": "cyan",
+            "warning": "yellow",
+            "error": "red",
+            "critical": "red bold",
+            "debug": "grey50"
+        })
+        console = Console(theme=theme, width=130, tab_size=4)
+        
+        # Create and configure the handler
+        handler = RichHandler(
             console=console,
             rich_tracebacks=True,
             markup=True,
             show_time=True,
             show_path=False,
             omit_repeated_times=True
-        )]
-    )
-    logger = logging.getLogger(name)
+        )
+        handler.setFormatter(logging.Formatter("WANDBOT | %(message)s"))
+        handler.setLevel(level)
+        
+        # Add handler to logger
+        logger.addHandler(handler)
+    
+    # Prevent propagation to avoid duplicate logs
+    logger.propagate = False
+    
     return logger
 
 
