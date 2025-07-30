@@ -159,6 +159,9 @@ class Chat:
                 result_dict = result.model_dump()
                 api_call_statuses.update(result_dict.get("api_call_statuses", {}))
 
+                # for guardrails
+                _generate_output(chat_request.question, result_dict["answer"])
+
                 # Handle Japanese translation of response
                 if original_language == "ja":
                     try:
@@ -233,3 +236,8 @@ class Chat:
     @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         return run_sync(self.__acall__(chat_request))
+
+
+@weave.op()
+def _generate_output(prompt, output):
+    return output
