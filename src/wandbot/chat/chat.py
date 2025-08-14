@@ -233,3 +233,36 @@ class Chat:
     @weave.op
     def __call__(self, chat_request: ChatRequest) -> ChatResponse:
         return run_sync(self.__acall__(chat_request))
+
+    async def astream(self, chat_request: ChatRequest):
+        """Stream the chat response tokens asynchronously."""
+        original_language = chat_request.language
+
+        working_request = chat_request
+
+        if original_language == "ja":
+            translated_question = translate_ja_to_en(
+                chat_request.question, self.chat_config.ja_translation_model_name
+            )
+            working_request = ChatRequest(
+                question=translated_question,
+                chat_history=chat_request.chat_history,
+                application=chat_request.application,
+                language="en",
+            )
+
+        async for token in self.rag_pipeline.astream(
+            working_request.question, working_request.chat_history or []
+        ):
+            yield token
+
+        result = self.rag_pipeline.stream_result
+        result_dict = result.model_dump()
+
+        if original_language == "ja":
+            result_dict["answer"] = translate_en_to_ja(
+                result_dict["answer"], self.chat_config.ja_translation_model_name
+            )
+
+        result_dict.update({"application": chat_request.application})
+        self.last_stream_response = ChatResponse(**result_dict)
