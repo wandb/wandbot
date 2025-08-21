@@ -95,14 +95,17 @@ Japanese
 The project is built with Python version `3.12` and utilizes `uv` for dependency management. Follow the steps below to install the necessary dependencies:
 
 ```bash
-bash build.sh
+uv venv
+uv sync
+source .venv/bin/activate
+uv pip install .
 ```
 
 ## Usage
 
 ### Running WandBot
 
-Before running the Q&A bot, ensure the following environment variables are set:
+Before running the wandbot, ensure the following environment variables are set:
 
 ```bash
 OPENAI_API_KEY
@@ -127,15 +130,15 @@ SLACK_JA_SIGNING_SECRET
 DISCORD_BOT_TOKEN
 ```
 
-Then build the app to install all dependencies in a virtual env:
+Then install the app to install all dependencies in a virtual env:
 
 ```
-bash build.sh
+uv pip install .
 ```
 
 #### Local Development
 
-Start the Q&A bot application locally using the following commands:
+Start the wandbot locally using the following commands:
 
 ```bash
 # Run API server only with uvicorn
@@ -147,9 +150,6 @@ source wandbot_venv/bin/activate  # or wherever your venv is located
 ($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l en) & \
 ($VIRTUAL_ENV/bin/python -m wandbot.apps.slack -l ja) & \
 ($VIRTUAL_ENV/bin/python -m wandbot.apps.discord)
-
-# Or run everything including bots with one command
-bash run.sh
 ```
 
 The app will initialize automatically when started.
@@ -207,10 +207,10 @@ The following evaluation sets are used:
 Ensure wandbot is installed by installing the production depenencies, activate the virtual env that was created and then install the evaluation dependencies
 
 ```
-bash build.sh
-source wandbot_venv/bin/activate
-uv pip install -r eval_requirements.txt
-poetry install
+uv venv
+uv sync
+source .venv/bin/activate
+uv pip install .
 ```
 
 **Environment variables**
@@ -242,7 +242,6 @@ curl -X POST \
 
 **Debugging**
 For debugging purposes during evaluation you can run a single instance of the app by chaning the `uvicorn` command above to use `--workers 1` 
-```
 
 **Run the evaluation**
 
@@ -289,6 +288,13 @@ The data ingestion module pulls code and markdown from Weights & Biases reposito
 
 To ingest the data run the following command from the root of the repository, see `run_ingestion_config.py` for all available arguments.
 
+To clone the repos you will need to have a .ssh key at `~/.ssh/id_rsa` or generate one if you don't have one already:
+
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+```
+
+Then run the ingestion pipeline script:
 ```bash
 uv run src/wandbot/ingestion/__main__.py
 ```
