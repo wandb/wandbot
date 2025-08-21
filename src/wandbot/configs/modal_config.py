@@ -33,3 +33,9 @@ class ModalConfig(BaseSettings):
     # Image settings
     python_version: str = Field("3.12", description="Python version for base image")
     base_image: str = Field("debian_slim", description="Base image type")
+    
+    # API URL settings
+    api_url: str = Field(
+        "https://weightsandbiases-wandbot--wandbot-api-wandbotapi-serve.modal.run/",
+        description="Modal API URL for bot connections"
+    )

@@ -6,14 +6,14 @@ echo ""
 
 # Deploy the API
 echo "📦 Deploying API server..."
-modal deploy modal/modal_app.py
+uv run modal deploy --env wandbot modal/modal_app.py
 
 # Deploy the bots
 echo "🤖 Deploying bots..."
-modal deploy modal/modal_bots.py
+uv run modal deploy --env wandbot modal/modal_bots.py
 
 echo "🔄 Starting bots..."
-modal run --detach modal/modal_bots.py::run_all_bots 
+uv run modal run --env wandbot --detach modal/modal_bots.py::run_all_bots 
 
 echo ""
 echo "✅ Deployment complete!"

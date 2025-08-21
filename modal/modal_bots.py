@@ -51,8 +51,10 @@ async def run_all_bots():
     import sys
     import signal
     
-    # Set the Modal API URL
-    os.environ["WANDBOT_API_URL"] = "https://morg--wandbot-api-wandbotapi-serve.modal.run"
+    # Set the Modal API URL from config or environment
+    if not os.environ.get("WANDBOT_MODAL_API_URL"):
+        os.environ["WANDBOT_MODAL_API_URL"] = modal_config.api_url
+    
     sys.path.insert(0, "/app/src")
     
     # Track running tasks for graceful shutdown
@@ -105,7 +107,8 @@ async def run_all_bots():
     try:
         # Run all bots concurrently
         logger.info("🚀 Starting all bots...")
-        logger.info(f"📡 API URL set to: {os.environ.get('WANDBOT_API_URL')}")
+        logger.info(f"📡 Modal API URL set to: {os.environ.get('WANDBOT_MODAL_API_URL')}")
+        logger.info(f"📡 WANDBOT_API_URL set to: {os.environ.get('WANDBOT_API_URL')}")
         
         bot_tasks = [
             asyncio.create_task(run_slack_bot_en()),

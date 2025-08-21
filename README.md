@@ -160,10 +160,15 @@ Wandbot can be deployed on [Modal](https://modal.com) for serverless hosting wit
 - **wandbot-api**: The FastAPI server
 - **wandbot-bots**: Discord and Slack bots
 
+The modal api url is set in `modal_config.py` and you can also overwrite this by settting `WANDBOT_MODAL_API_URL` in `.env`.
+
 ```bash
+# Set up your environment
+uv venv
+uv sync
+
 # Deploy everything (API server and bots)
-cd modal
-./deploy_all.sh
+./modal/deploy_all.sh
 
 # Or deploy individually from project root
 modal deploy modal/modal_app.py    # Deploy API only
