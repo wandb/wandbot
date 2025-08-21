@@ -301,7 +301,7 @@ uv run src/wandbot/ingestion/__main__.py
 
 **Note:**
 
-Pay special attention to the configs in `src/wandbot/configs/vector_store_config.py` and `src/wandbot/configs/ingestion_config` as this is where important settings such as the embedding model, embedding dimensions and hosted vs local vector db are set.
+Pay special attention to the configs in `src/wandbot/configs/vector_store_config.py` and `src/wandbot/configs/ingestion_config` as this is where important settings such as the embedding model, embedding dimensions and hosted vs local vector db are set. Ensure your `VECTOR_STORE_API_KEY` env var is set in `.env`.
 
 You will notice that the data is ingested into the `data/cache` directory and stored in three different directories `raw_data`, `vectorstore` with individual files for each step of the ingestion process.
 

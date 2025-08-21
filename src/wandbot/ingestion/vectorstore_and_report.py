@@ -492,6 +492,7 @@ def run_vectorstore_and_report_pipeline(
         logger.info(f"Vector store artifact upload complete: {final_vs_artifact_path}")
 
         # --- Remote ChromaDB Upload (Conditional) ---
+        remote_collection_name = None  # Initialize variable
         if upload_to_remote_vector_store:
             logger.info("Attempting upload to remote ChromaDB...")
             remote_chroma_client = _connect_remote_chroma(vs_config)
@@ -595,7 +596,7 @@ def run_vectorstore_and_report_pipeline(
                     ),
                     wr.H1("Remote ChromaDB Upload"),
                     wr.P("Upload to remote ChromaDB was attempted." if upload_to_remote_vector_store else "Upload to remote ChromaDB was skipped."),
-                    wr.P(f"Remote Collection Name (if uploaded): `{remote_collection_name}`") if upload_to_remote_vector_store and logged_artifact_version else wr.P(""),
+                    wr.P(f"Remote Collection Name (if uploaded): `{remote_collection_name}`") if remote_collection_name else wr.P(""),
                     wr.H1("Raw Data Sources"),
                     wr.P(
                         f"Raw data loaded from artifact: `{_get_artifact_base_name(raw_artifact_path)}`"
