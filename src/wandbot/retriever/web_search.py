@@ -1,9 +1,8 @@
 import asyncio
-import os
 import sys
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 import weave
@@ -32,7 +31,7 @@ class YouSearchResults(BaseModel):
     web_context: List[Dict[str, Any]] = Field(
         [{}], description="context for the response"
     )
-    api_status: APIStatus = Field(..., description="Status of the API call")
+    api_status: APIStatus
 
 
 class YouSearchConfig(BaseSettings):
@@ -40,7 +39,7 @@ class YouSearchConfig(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="allow"
     )
     you_api_key: str = Field(
-        ...,
+        default="y1234567890",
         description="API key for you.com search API",
         env="YOU_API_KEY",
         validation_alias="you_api_key",
@@ -56,11 +55,10 @@ class YouSearchConfig(BaseSettings):
 
 
 class YouSearch:
-    config: YouSearchConfig = YouSearchConfig()
+    config: YouSearchConfig
 
-    def __init__(self, config: YouSearchConfig = None):
-        if config is not None:
-            self.config = config
+    def __init__(self, config: Optional[YouSearchConfig] = None):
+        self.config = config or YouSearchConfig()
 
     def _rag(self, query: str) -> YouSearchResults:
         """Retrieve."""
@@ -162,15 +160,40 @@ class YouSearch:
             }
             response = requests.get(url, headers=headers, params=querystring)
             if response.status_code != 200:
+                error_info = ErrorInfo(component="web_search")
                 logger.error(
+                    "Error in retrieve web search, Status code: %s", response.status_code
+                )
+                error_info.has_error = True
+                error_info.error_message = (
                     f"Error in retrieve web search, Status code: {response.status_code}"
                 )
-                return YouSearchResults(success=False)
+                error_info.error_type = "HTTPError"
+                return YouSearchResults(
+                    api_status=APIStatus(
+                        component="web_search",
+                        success=False,
+                        error_info=error_info,
+                    )
+                )
             elif response.json()["error_code"].lower() == "payment required":
+                error_info = ErrorInfo(component="web_search")
                 logger.error(
+                    "Error in retrieve web search, error code: %s",
+                    response.json()["error_code"],
+                )
+                error_info.has_error = True
+                error_info.error_message = (
                     f"Error in retrieve web search, error code: {response.json()['error_code']}"
                 )
-                return YouSearchResults(success=False)
+                error_info.error_type = "PaymentRequired"
+                return YouSearchResults(
+                    api_status=APIStatus(
+                        component="web_search",
+                        success=False,
+                        error_info=error_info,
+                    )
+                )
             else:
                 results = response.json()
 
@@ -197,11 +220,23 @@ class YouSearch:
             return YouSearchResults(
                 web_answer="",
                 web_context=search_hits[: self.config.top_k],
-                success=True,
+                api_status=APIStatus(component="web_search", success=True),
             )
         except Exception as e:
-            logger.error(f"Error in retrieve web search: {e}")
-            return YouSearchResults(success=False)
+            logger.error("Error in retrieve web search: %s", e)
+            error_info = ErrorInfo(component="web_search")
+            error_info.has_error = True
+            error_info.error_message = f"Error in retrieve web search: {e}"
+            error_info.error_type = type(e).__name__
+            error_info.stacktrace = ''.join(traceback.format_exc())
+            error_info.file_path = get_error_file_path(sys.exc_info()[2])
+            return YouSearchResults(
+                api_status=APIStatus(
+                    component="web_search",
+                    success=False,
+                    error_info=error_info,
+                )
+            )
 
     def __call__(
         self,

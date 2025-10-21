@@ -9,7 +9,6 @@ from typing import Any, Dict, List
 import cohere
 import weave
 from tenacity import after_log, retry, stop_after_attempt, wait_exponential
-from weave.trace.autopatch import autopatch
 
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.retriever.base import VectorStore
@@ -22,7 +21,6 @@ from wandbot.utils import ErrorInfo, get_error_file_path, run_sync
 logger = logging.getLogger(__name__)
 retry_chat_config = ChatConfig()
 
-autopatch()
 
 class FusionRetrievalEngine:
     def __init__(
