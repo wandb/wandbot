@@ -16,13 +16,13 @@ class VectorStoreConfig(BaseSettings):
     )
     
     # Vector Store
-    vectordb_collection_name: str = "chroma_index-v59" #"vectorstore", vectorstore-chroma_index-v54
+    vectordb_collection_name: str = "chroma_index-v61" #"vectorstore", vectorstore-chroma_index-v54
     vectordb_index_dir: pathlib.Path = Field(
         pathlib.Path("artifacts/vector_stores"), env="VECTORDB_INDEX_DIR"
     )
-    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v59"
-    distance: str = "l2"  # used in retrieval from vectordb 
-    distance_key: str = "hnsw:space"  # used in retrieval from vectordb 
+    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v61"
+    distance: str = "l2"  # used in retrieval from vectordb
+    distance_key: str = "hnsw:space"  # used in retrieval from vectordb
     
     # ChromaDB Client Mode
     vector_store_mode: Literal["local", "hosted"] = "hosted"

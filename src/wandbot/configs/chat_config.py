@@ -36,21 +36,21 @@ class ChatConfig(BaseSettings):
     
     # Query enhancer settings
     query_enhancer_provider: str = "google"
-    query_enhancer_model: str = "gemini-2.5-flash-lite-preview-06-17" #"gemini-2.0-flash-001" 
+    query_enhancer_model: str = "gemini-2.5-flash-lite"
     query_enhancer_temperature: float = 1.0
     query_enhancer_fallback_provider: str = "google"
-    query_enhancer_fallback_model: str = "gemini-2.5-flash-lite-preview-06-17" #"gemini-2.0-flash-001" 
+    query_enhancer_fallback_model: str = "gemini-2.5-flash-lite"
     query_enhancer_fallback_temperature: float = 1.0
     query_enhancer_thinking_budget: float | str = 0
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "google"
-    response_synthesizer_model: str = "gemini-2.5-flash" #"claude-3-7-sonnet-20250219" 
+    response_synthesizer_model: str = "gemini-2.5-flash"
     response_synthesizer_temperature: float = 0.1
     response_synthesizer_fallback_provider: str = "google"
-    response_synthesizer_fallback_model: str = "gemini-2.5-flash" #"claude-3-7-sonnet-20250219" 
+    response_synthesizer_fallback_model: str = "gemini-2.5-flash"
     response_synthesizer_fallback_temperature: float = 0.1
-    response_synthesizer_thinking_budget: float | str = 0
+    response_synthesizer_thinking_budget: float | str = 500
 
     # Translation models settings
     ja_translation_model_name: str = "gpt-4o-2024-08-06"
