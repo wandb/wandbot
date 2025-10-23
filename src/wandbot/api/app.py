@@ -24,6 +24,13 @@ is_initialized = False
 is_initializing = False
 
 
+def _is_truthy(value: str | None, default: bool = False) -> bool:
+    """Interpret common string values as booleans."""
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 async def initialize():
     global is_initialized, is_initializing
     print(f"STARTUP: initialize() function called - is_initialized: {is_initialized}, is_initializing: {is_initializing}")
@@ -44,15 +51,32 @@ async def initialize():
                 logger.info(f"STARTUP: 💾 Initial disk usage: {initial_disk_used} MB")
 
             # 0/3: Initialize Weave
-            try:
-                logger.info("STARTUP: 0/3, Starting Weave...")
-                import weave
+            weave_enabled = _is_truthy(os.getenv("WANDB_TRACING_ENABLED"), default=True)
+            weave_required = _is_truthy(os.getenv("WANDB_TRACING_REQUIRED"))
+            if weave_enabled:
+                try:
+                    logger.info("STARTUP: 0/3, Starting Weave...")
+                    import weave
 
-                weave.init(f"{app_config.wandb_entity}/{app_config.wandb_project}")
-                logger.info("STARTUP: 0/3, ✅ Weave initialized")
-            except Exception as e:
-                logger.error(f"STARTUP: 0/3, ❌ Weave failed to initialize:{e}")
-                raise
+                    wandb_api_key = os.getenv("WANDB_API_KEY")
+                    if not wandb_api_key:
+                        logger.warning(
+                            "STARTUP: 0/3, ⚠️ WANDB_API_KEY not set; skipping Weave initialization"
+                        )
+                    else:
+                        import wandb
+
+                        # Ensure wandb client is authenticated before initializing Weave
+                        wandb.login(key=wandb_api_key, relogin=True)
+                        weave.init(f"{app_config.wandb_entity}/{app_config.wandb_project}")
+                        logger.info("STARTUP: 0/3, ✅ Weave initialized")
+                except Exception as e:
+                    logger.error(f"STARTUP: 0/3, ❌ Weave failed to initialize:{e}")
+                    if weave_required:
+                        raise
+                    logger.warning("STARTUP: 0/3, ⚠️ Continuing without Weave tracing")
+            else:
+                logger.info("STARTUP: 0/3, ⏭️ Weave tracing disabled; skipping initialization")
 
             # Check disk usage
             if os.getenv("LOG_LEVEL") == "DEBUG":
