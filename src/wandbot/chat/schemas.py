@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
     chat_history: List[QuestionAnswer] | None = None
     application: str | None = None
     language: str = "en"
+    stream: bool = False
 
 
 class ChatResponse(BaseModel):

@@ -144,3 +144,45 @@ class RAGPipeline:
          self, question: str, chat_history: List[Tuple[str, str]] | None = None
      ) -> RAGPipelineOutput:
         return run_sync(self.__acall__(question, chat_history))
+
+    async def astream(
+        self, question: str, chat_history: List[Tuple[str, str]] | None = None
+    ) -> None:
+        """Stream tokens from the response synthesizer."""
+        if chat_history is None:
+            chat_history = []
+
+        enhanced_query = await self.query_enhancer({"query": question, "chat_history": chat_history})
+        retrieval_result = await self.retrieval_engine.__acall__(enhanced_query)
+
+        async for token in self.response_synthesizer.stream(retrieval_result):
+            yield token
+
+        response = self.response_synthesizer.stream_output
+
+        self.stream_result = RAGPipelineOutput(
+            question=enhanced_query["standalone_query"],
+            answer=response["response"],
+            sources="\n".join(
+                [doc.metadata["source"] for doc in retrieval_result.documents]
+            ),
+            source_documents=response["context_str"],
+            system_prompt=response["response_prompt"],
+            model=response["response_model"],
+            total_tokens=0,
+            prompt_tokens=0,
+            completion_tokens=0,
+            time_taken=0,
+            start_time=datetime.datetime.now(),
+            end_time=datetime.datetime.now(),
+            api_call_statuses={
+                "web_search_success": retrieval_result.retrieval_info["api_statuses"]["web_search_api"].success,
+                "reranker_api_error_info": retrieval_result.retrieval_info["api_statuses"]["reranker_api"].error_info,
+                "reranker_api_success": retrieval_result.retrieval_info["api_statuses"]["reranker_api"].success,
+                "query_enhancer_llm_api_error_info": enhanced_query.get("api_statuses", {}).get("query_enhancer_llm_api", {}).error_info if enhanced_query.get("api_statuses") else None,
+                "query_enhancer_llm_api_success": enhanced_query.get("api_statuses", {}).get("query_enhancer_llm_api", {}).success if enhanced_query.get("api_statuses") else False,
+                "embedding_api_error_info": retrieval_result.retrieval_info["api_statuses"]["embedding_api"].error_info,
+                "embedding_api_success": retrieval_result.retrieval_info["api_statuses"]["embedding_api"].success,
+            },
+            response_synthesis_llm_messages=response.get("response_synthesis_llm_messages"),
+        )

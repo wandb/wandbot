@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from starlette import status
 
 from wandbot.chat.schemas import ChatRequest, ChatResponse
@@ -36,14 +37,22 @@ async def query(request: APIQueryRequest) -> APIQueryResponse:
 
     try:
         chat_instance = chat_components["chat"]
-        result = await chat_instance.__acall__(
-            ChatRequest(
-                question=request.question,
-                chat_history=request.chat_history,
-                language=request.language,
-                application=request.application,
-            ),
+        chat_req = ChatRequest(
+            question=request.question,
+            chat_history=request.chat_history,
+            language=request.language,
+            application=request.application,
+            stream=request.stream,
         )
+
+        if chat_req.stream:
+            async def event_gen():
+                async for token in chat_instance.astream(chat_req):
+                    yield f"data: {token}\n\n"
+
+            return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+        result = await chat_instance.__acall__(chat_req)
         return APIQueryResponse(**result.model_dump())
     except Exception as e:
         logger.error(f"Error processing chat query: {e}")

@@ -314,6 +314,36 @@ class ResponseSynthesizer:
             "api_statuses": {"response_synthesis_llm_api": llm_api_status},
         }
 
+    async def stream(self, inputs: RetrievalResult):
+        """Stream response tokens while capturing the final result."""
+        formatted_input = self._format_input(inputs)
+        messages = self.get_messages(formatted_input)
+
+        result = ""
+        used_model = self.model
+        try:
+            async for token in self.model.stream(messages=messages):
+                result += token
+                yield token
+        except Exception as e:
+            logger.warning(f"Primary Response Synthesizer model failed, trying fallback: {str(e)}")
+            used_model = self.fallback_model
+            async for token in self.fallback_model.stream(messages=messages):
+                result += token
+                yield token
+
+        self.stream_output = {
+            "query_str": formatted_input["query_str"],
+            "context_str": formatted_input["context_str"],
+            "response": result,
+            "response_model": used_model.model_name,
+            "response_synthesis_llm_messages": messages,
+            "response_prompt": RESPONSE_SYNTHESIS_SYSTEM_PROMPT,
+            "api_statuses": {
+                "response_synthesis_llm_api": None
+            },
+        }
+
     def _format_input(self, inputs: RetrievalResult) -> Dict[str, str]:
         """Format the input data for the prompt template."""
         return {
