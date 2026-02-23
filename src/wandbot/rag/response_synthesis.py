@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from string import Formatter
 from typing import Any, Dict, List, Tuple
 
 import weave
@@ -5,15 +7,40 @@ import weave
 from wandbot.configs.chat_config import ChatConfig
 from wandbot.models.llm import LLMModel
 from wandbot.schema.api_status import APIStatus
+from wandbot.schema.document import Document
 from wandbot.schema.retrieval import RetrievalResult
 from wandbot.utils import get_logger
-from langchain_core.prompts import PromptTemplate, format_document
-from wandbot.schema.document import Document
 from wandbot.utils import clean_document_content
 
 
 logger = get_logger(__name__)
 retry_chat_config = ChatConfig()
+
+
+@dataclass(frozen=True)
+class PromptTemplate:
+    template: str
+
+    @classmethod
+    def from_template(cls, template: str) -> "PromptTemplate":
+        return cls(template=template)
+
+
+def format_document(document: Document, prompt: PromptTemplate) -> str:
+    available_values: Dict[str, Any] = {
+        "page_content": document.page_content,
+        **document.metadata,
+    }
+    template_fields = {
+        field_name
+        for _, field_name, _, _ in Formatter().parse(prompt.template)
+        if field_name
+    }
+    format_values = {
+        field_name: available_values.get(field_name, "")
+        for field_name in template_fields
+    }
+    return prompt.template.format(**format_values)
 
 RESPONSE_SYNTHESIS_SYSTEM_PROMPT = """# Role
 

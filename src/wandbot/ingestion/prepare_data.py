@@ -29,8 +29,6 @@ from urllib.parse import urljoin, urlparse
 import nbformat
 import pandas as pd
 from google.cloud import bigquery
-from langchain_community.document_loaders import TextLoader
-from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from nbformat.validator import normalize
 
@@ -69,7 +67,14 @@ logging.basicConfig(
 ingestion_config = IngestionConfig()
 
 
-class DataLoader(BaseLoader):
+def load_text_document(file_path: pathlib.Path | str) -> Document:
+    path = pathlib.Path(file_path)
+    with path.open("r", encoding="utf-8", errors="ignore") as file:
+        contents = file.read()
+    return Document(page_content=contents, metadata={})
+
+
+class DataLoader:
     """A base class for data loaders.
 
     This class provides a base implementation for lazy loading of documents.
@@ -396,7 +401,7 @@ class DocodileDataLoader(DataLoader):
                 logger.debug(f"Processing source file: {f_name}")
                 try:
                     # Load the document content first
-                    document = TextLoader(str(f_name)).load()[0]
+                    document = load_text_document(f_name)
                     contents = document.page_content
                     document.page_content = clean_contents(contents)
                     document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
@@ -448,7 +453,7 @@ class DocodileDataLoader(DataLoader):
             for f_name in document_files:
                 logger.debug(f"Processing source file: {f_name}")
                 try:
-                    document = TextLoader(str(f_name)).load()[0]
+                    document = load_text_document(f_name)
                     contents = document.page_content
                     document.page_content = clean_contents(contents)
                     document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
@@ -557,7 +562,7 @@ class CodeDataLoader(DataLoader):
                     doc_source_url = document_files[f_name] # Use calculated remote path
 
                     if os.path.splitext(f_name)[-1] == ".ipynb":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         notebook = nbformat.reads(contents, as_version=4)
                         _, notebook = normalize(
@@ -573,7 +578,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     elif os.path.splitext(f_name)[-1] == ".md":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         cleaned_body = clean_contents(contents)
                         document.page_content = cleaned_body
@@ -583,7 +588,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     else:
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         document.metadata["source_type"] = (
                             "code"
                             if self.config.source_type == "code"
@@ -639,7 +644,7 @@ class CodeDataLoader(DataLoader):
                     doc_metadata_source = f_name
                     doc_source_url = document_files[f_name]
                     if os.path.splitext(f_name)[-1] == ".ipynb":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         # ... (rest of ipynb processing) ...
                         notebook = nbformat.reads(contents, as_version=4)
@@ -656,7 +661,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     elif os.path.splitext(f_name)[-1] == ".md":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         # ... (rest of md processing) ...
                         cleaned_body = clean_contents(contents)
@@ -667,7 +672,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     else:
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         document.metadata["source_type"] = (
                             "code"
                             if self.config.source_type == "code"

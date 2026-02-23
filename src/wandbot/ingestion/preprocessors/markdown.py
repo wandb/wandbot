@@ -7,7 +7,6 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
-from langchain_core.documents import BaseDocumentTransformer
 
 from wandbot.configs.ingestion_config import DocodileEnglishStoreConfig
 from wandbot.schema.document import Document
@@ -128,8 +127,7 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
         """
         split_documents = []
         for document in documents:
-            # Use Langchain's splitter to get basic text chunks and their metadata (like headers)
-            # Note: langchain's split_text may return its own Document type, not ours
+            # Use the markdown header splitter to get text chunks and header metadata.
             chunks = self.split_text(document.page_content)
 
             original_doc_id = document.metadata.get("id")
@@ -140,7 +138,7 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
             for chunk in chunks:
                 # Create new metadata, copying from parent
                 new_metadata = document.metadata.copy()
-                # Update with any specific metadata from the langchain chunk (e.g., header info)
+                # Update with metadata emitted by the splitter (e.g., header info)
                 new_metadata.update(chunk.metadata)
 
                 # Set parent_id to the original document's ID
@@ -161,7 +159,7 @@ class CustomMarkdownTextSplitter(MarkdownHeaderTextSplitter):
         return split_documents
 
 
-class MarkdownTextTransformer(BaseDocumentTransformer):
+class MarkdownTextTransformer:
     def __init__(
         self,
         lang_detect,

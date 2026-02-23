@@ -24,7 +24,6 @@ import pathlib
 from typing import Any, List, Sequence
 
 import tiktoken
-from langchain_core.documents import BaseDocumentTransformer
 
 import wandb
 from wandbot.ingestion.preprocessors.markdown import MarkdownTextTransformer
@@ -62,7 +61,7 @@ def len_function_with_doc(document: Document) -> int:
     return len(tokenizer.encode(document.page_content))
 
 
-class DocumentTransformer(BaseDocumentTransformer):
+class DocumentTransformer:
     def __init__(
         self,
         lang_detect,

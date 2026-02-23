@@ -6,7 +6,6 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     TokenTextSplitter,
 )
-from langchain_core.documents import BaseDocumentTransformer
 from tree_sitter import Node
 from tree_sitter_languages import get_language, get_parser
 
@@ -444,7 +443,7 @@ source_lines:\t{definition["span"]}
     return final_definition
 
 
-class PythonCodeTextTransformer(BaseDocumentTransformer):
+class PythonCodeTextTransformer:
     def __init__(self, chunk_size: int):
         self.chunk_size = chunk_size
         self.parser = get_parser("python")
@@ -473,7 +472,7 @@ class PythonCodeTextTransformer(BaseDocumentTransformer):
         return transformed_documents
 
 
-class CodeTextTransformer(BaseDocumentTransformer):
+class CodeTextTransformer:
     def __init__(
         self,
         lang_detect,
