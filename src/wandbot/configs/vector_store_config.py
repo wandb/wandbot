@@ -16,11 +16,16 @@ class VectorStoreConfig(BaseSettings):
     )
     
     # Vector Store
-    vectordb_collection_name: str = "chroma_index-v61" #"vectorstore", vectorstore-chroma_index-v54
+    vectordb_collection_name: str = Field(
+        "chroma_index-v63", env="VECTORDB_COLLECTION_NAME"
+    )  # Keep aligned with latest ingestion target collection.
     vectordb_index_dir: pathlib.Path = Field(
         pathlib.Path("artifacts/vector_stores"), env="VECTORDB_INDEX_DIR"
     )
-    vectordb_index_artifact_url: str = "wandbot/wandbot-dev/chroma_index:v61"
+    vectordb_index_artifact_url: str = Field(
+        "wandbot/wandbot-dev/chroma_index:v63",
+        env="VECTORDB_INDEX_ARTIFACT_URL",
+    )
     distance: str = "l2"  # used in retrieval from vectordb
     distance_key: str = "hnsw:space"  # used in retrieval from vectordb
     

@@ -16,6 +16,7 @@ Typical usage example:
 
 import concurrent.futures
 import datetime
+import fnmatch
 import json
 import logging
 import os
@@ -28,8 +29,6 @@ from urllib.parse import urljoin, urlparse
 import nbformat
 import pandas as pd
 from google.cloud import bigquery
-from langchain_community.document_loaders import TextLoader
-from langchain_community.document_loaders.base import BaseLoader
 from nbconvert import MarkdownExporter
 from nbformat.validator import normalize
 
@@ -68,7 +67,14 @@ logging.basicConfig(
 ingestion_config = IngestionConfig()
 
 
-class DataLoader(BaseLoader):
+def load_text_document(file_path: pathlib.Path | str) -> Document:
+    path = pathlib.Path(file_path)
+    with path.open("r", encoding="utf-8", errors="ignore") as file:
+        contents = file.read()
+    return Document(page_content=contents, metadata={})
+
+
+class DataLoader:
     """A base class for data loaders.
 
     This class provides a base implementation for lazy loading of documents.
@@ -117,7 +123,7 @@ class DataLoader(BaseLoader):
             / self.config.data_source.base_path
         )
         logger.info(f"Constructed search base path: {search_base.resolve()}")
-         # Add detailed check before the main conditional
+        # Add detailed check before the main conditional
         logger.debug(f"Checking existence of search base: {search_base}")
         logger.debug(f"  os.path.exists: {os.path.exists(search_base)}")
         logger.debug(f"  os.path.isdir: {os.path.isdir(search_base)}")
@@ -136,6 +142,24 @@ class DataLoader(BaseLoader):
             found_files = list(search_base.rglob(file_pattern))
             logger.info(f"Found {len(found_files)} source files matching pattern '{file_pattern}' recursively in {search_base}")
             local_paths.extend(found_files)
+        exclude_patterns = self.config.data_source.exclude_patterns
+        if exclude_patterns:
+            filtered_paths = []
+            excluded_count = 0
+            for local_path in local_paths:
+                relative_path = local_path.relative_to(search_base).as_posix()
+                should_exclude = any(
+                    fnmatch.fnmatch(relative_path, pattern)
+                    for pattern in exclude_patterns
+                )
+                if should_exclude:
+                    excluded_count += 1
+                    continue
+                filtered_paths.append(local_path)
+            logger.info(
+                f"Excluded {excluded_count} source files using exclude patterns: {exclude_patterns}"
+            )
+            local_paths = filtered_paths
         return local_paths
 
 
@@ -163,6 +187,125 @@ class DocodileDataLoader(DataLoader):
         meta = extract_frontmatter(file_path)
         output = meta.get("slug", "")
         return output
+
+    @staticmethod
+    def normalize_route(raw_route: str) -> str:
+        route = raw_route.strip().replace("\\", "/")
+        route = route.split("?")[0].split("#")[0].strip("/")
+        if route in {"index", "_index"}:
+            return ""
+        if route.endswith("/index"):
+            route = route[: -len("/index")]
+        if route.endswith("/_index"):
+            route = route[: -len("/_index")]
+        return route.strip("/")
+
+    def route_from_file_path(
+        self, base_path: pathlib.Path, file_path: pathlib.Path
+    ) -> str:
+        relative = file_path.relative_to(base_path).as_posix()
+        if relative.endswith((".mdx", ".md")):
+            relative = relative.rsplit(".", 1)[0]
+        return self.normalize_route(relative)
+
+    def extract_route(
+        self, base_path: pathlib.Path, file_path: pathlib.Path
+    ) -> str:
+        try:
+            slug = self.extract_slug(file_path)
+            if isinstance(slug, str) and slug.strip():
+                return self.normalize_route(slug)
+        except Exception as e:
+            logger.debug(
+                f"Failed to extract frontmatter slug from {file_path}: {e}. Falling back to path-based route."
+            )
+        return self.route_from_file_path(base_path, file_path)
+
+    @classmethod
+    def _collect_routes_from_pages(cls, pages: Any) -> set[str]:
+        routes: set[str] = set()
+        if isinstance(pages, str):
+            routes.add(cls.normalize_route(pages))
+            return routes
+        if isinstance(pages, list):
+            for page in pages:
+                routes.update(cls._collect_routes_from_pages(page))
+            return routes
+        if isinstance(pages, dict):
+            if "pages" in pages:
+                routes.update(cls._collect_routes_from_pages(pages["pages"]))
+            if "page" in pages and isinstance(pages["page"], str):
+                routes.add(cls.normalize_route(pages["page"]))
+        return routes
+
+    @classmethod
+    def load_published_routes(cls, base_path: pathlib.Path, config_file: str) -> set[str]:
+        docs_config_path = base_path / config_file
+        if not docs_config_path.exists():
+            return set()
+        try:
+            with docs_config_path.open() as f:
+                docs_config = json.load(f)
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse {docs_config_path} for published routes: {e}"
+            )
+            return set()
+
+        routes = set()
+
+        def collect(node: Any):
+            if isinstance(node, dict):
+                if "pages" in node:
+                    routes.update(cls._collect_routes_from_pages(node["pages"]))
+                for value in node.values():
+                    if isinstance(value, (dict, list)):
+                        collect(value)
+            elif isinstance(node, list):
+                for item in node:
+                    collect(item)
+
+        collect(docs_config)
+        normalized_routes = {
+            cls.normalize_route(route) for route in routes if isinstance(route, str)
+        }
+        logger.info(
+            f"Loaded {len(normalized_routes)} published routes from {docs_config_path}"
+        )
+        return normalized_routes
+
+    def _get_local_paths(self):
+        local_paths = super()._get_local_paths()
+        if not self.config.data_source.include_only_published_docs:
+            return local_paths
+
+        base_path = (
+            self.config.data_source.local_path
+            / self.config.data_source.base_path
+        )
+        published_routes = self.load_published_routes(
+            base_path=base_path,
+            config_file=self.config.data_source.published_docs_config_file,
+        )
+        if not published_routes:
+            logger.warning(
+                "Published-doc filtering is enabled but no published routes were loaded. "
+                "Continuing with all discovered markdown files."
+            )
+            return local_paths
+
+        filtered_paths = []
+        excluded_count = 0
+        for local_path in local_paths:
+            route = self.extract_route(base_path, local_path)
+            if route in published_routes:
+                filtered_paths.append(local_path)
+            else:
+                excluded_count += 1
+        logger.info(
+            f"Filtered out {excluded_count} unpublished markdown files using Mintlify route config."
+        )
+        return filtered_paths
 
     @staticmethod
     def extract_description(file_path: pathlib.Path) -> str:
@@ -217,49 +360,9 @@ class DocodileDataLoader(DataLoader):
         Returns:
             The generated site URL.
         """
-        relative_path = file_path.relative_to(base_path)
-        chapter = ""
-        slug = ""
-        file_loc = ""
-        file_name = file_path.stem
-
-        try:
-            if relative_path.parts[0] == "guides":
-                chapter = "guides"
-                slug = self.extract_slug((base_path / "guides") / "_index.md")
-                file_loc = file_path.relative_to((base_path / "guides")).parent
-            elif relative_path.parts[0] == "ref":
-                chapter = "ref"
-                slug = self.extract_slug((base_path / "ref") / "_index.md")
-                file_loc = file_path.relative_to((base_path / "ref")).parent
-            elif relative_path.parts[0] == "tutorials":
-                chapter = "tutorials"
-                slug = self.extract_slug((base_path / "tutorials") / "_index.md")
-                file_loc = file_path.relative_to((base_path / "tutorials")).parent
-            else:
-                # Fallback or handle other top-level directories if necessary
-                chapter = relative_path.parts[0] if relative_path.parts else ""
-                file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
-
-            if file_path.name in ("_index.md",):
-                file_name = ""
-
-        except Exception as e:
-            logger.debug(
-                f"Failed to extract slug for URL generation from {file_path} due to frontmatter error: {e}. Using relative path for URL."
-            )
-            # Fallback logic: use relative path directly if slug extraction fails
-            chapter = relative_path.parts[0] if relative_path.parts else ""
-            file_loc = relative_path.parent if len(relative_path.parts) > 1 else ""
-            file_name = file_path.stem if file_path.name not in ("_index.md",) else ""
-
-        site_relative_path = os.path.join(chapter, slug, file_loc, file_name)
-        # Clean up potential double slashes or leading/trailing slashes from fallback paths
-        site_relative_path = "/".join(filter(None, str(site_relative_path).split("/")))
-
-        site_url = urljoin(
-            str(self.config.data_source.remote_path), str(site_relative_path)
-        )
+        route = self.extract_route(base_path, file_path)
+        remote_root = f"{str(self.config.data_source.remote_path).rstrip('/')}/"
+        site_url = urljoin(remote_root, route)
         if "other/" in site_url:
             site_url = site_url.replace("other/", "")
 
@@ -298,7 +401,7 @@ class DocodileDataLoader(DataLoader):
                 logger.debug(f"Processing source file: {f_name}")
                 try:
                     # Load the document content first
-                    document = TextLoader(str(f_name)).load()[0]
+                    document = load_text_document(f_name)
                     contents = document.page_content
                     document.page_content = clean_contents(contents)
                     document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
@@ -350,7 +453,7 @@ class DocodileDataLoader(DataLoader):
             for f_name in document_files:
                 logger.debug(f"Processing source file: {f_name}")
                 try:
-                    document = TextLoader(str(f_name)).load()[0]
+                    document = load_text_document(f_name)
                     contents = document.page_content
                     document.page_content = clean_contents(contents)
                     document.metadata["file_type"] = os.path.splitext(str(f_name))[-1]
@@ -459,7 +562,7 @@ class CodeDataLoader(DataLoader):
                     doc_source_url = document_files[f_name] # Use calculated remote path
 
                     if os.path.splitext(f_name)[-1] == ".ipynb":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         notebook = nbformat.reads(contents, as_version=4)
                         _, notebook = normalize(
@@ -475,7 +578,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     elif os.path.splitext(f_name)[-1] == ".md":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         cleaned_body = clean_contents(contents)
                         document.page_content = cleaned_body
@@ -485,7 +588,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     else:
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         document.metadata["source_type"] = (
                             "code"
                             if self.config.source_type == "code"
@@ -541,7 +644,7 @@ class CodeDataLoader(DataLoader):
                     doc_metadata_source = f_name
                     doc_source_url = document_files[f_name]
                     if os.path.splitext(f_name)[-1] == ".ipynb":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         # ... (rest of ipynb processing) ...
                         notebook = nbformat.reads(contents, as_version=4)
@@ -558,7 +661,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     elif os.path.splitext(f_name)[-1] == ".md":
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         contents = document.page_content
                         # ... (rest of md processing) ...
                         cleaned_body = clean_contents(contents)
@@ -569,7 +672,7 @@ class CodeDataLoader(DataLoader):
                             else self.config.source_type
                         )
                     else:
-                        document = TextLoader(doc_metadata_source).load()[0]
+                        document = load_text_document(doc_metadata_source)
                         document.metadata["source_type"] = (
                             "code"
                             if self.config.source_type == "code"

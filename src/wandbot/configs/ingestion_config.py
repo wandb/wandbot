@@ -44,6 +44,9 @@ class DataSource(BaseSettings):
     branch: Optional[str] = None
     base_path: Optional[str] = ""
     file_patterns: List[str] = ["*.*"]
+    exclude_patterns: List[str] = []
+    include_only_published_docs: bool = False
+    published_docs_config_file: str = "docs.json"
     is_git_repo: bool = False
     git_id_file: Optional[pathlib.Path] = Field(None, env="WANDBOT_GIT_ID_FILE")
 
@@ -94,8 +97,10 @@ class DocodileEnglishStoreConfig(DataStoreConfig):
         remote_path="https://docs.wandb.ai/",
         repo_path="https://github.com/wandb/docs",
         branch="main",
-        base_path="content",
+        base_path="",
         file_patterns=["*.md", "*.mdx"],
+        exclude_patterns=["ja/**", "ko/**", "ja.mdx", "ko.mdx"],
+        include_only_published_docs=True,
         is_git_repo=True,
     )
     language: str = "en"
