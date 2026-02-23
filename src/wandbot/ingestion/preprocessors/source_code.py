@@ -1,7 +1,7 @@
 import json
 from typing import Any, Callable, List, Sequence
 
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     Language,
     RecursiveCharacterTextSplitter,
     TokenTextSplitter,

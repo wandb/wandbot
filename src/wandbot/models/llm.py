@@ -249,13 +249,85 @@ class AsyncAnthropicLLMModel(BaseLLMModel):
             )
 
 class AsyncGoogleGenAILLMModel(BaseLLMModel):
+    SUPPORTED_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
         self.client = genai.Client(api_key=api_key)
+        self.thinking_level = kwargs.get("thinking_level")
         self.thinking_budget = kwargs.get("thinking_budget")
+        if "thinking_level" not in genai_types.ThinkingConfig.model_fields:
+            raise ValueError(
+                "google-genai SDK is too old for Gemini 3 thinking_level support. "
+                "Upgrade to google-genai>=1.64.0."
+            )
+
+    @staticmethod
+    def _model_supports_thinking_controls(model_name: str) -> bool:
+        model_name = model_name.lower()
+        return "gemini-3" in model_name
+
+    @staticmethod
+    def _coerce_thinking_budget(thinking_budget: Any) -> Optional[int]:
+        if thinking_budget is None:
+            return None
+        if isinstance(thinking_budget, bool):
+            return None
+        if isinstance(thinking_budget, str):
+            stripped = thinking_budget.strip()
+            if not stripped:
+                return None
+            try:
+                thinking_budget = float(stripped)
+            except ValueError:
+                logger.warning(
+                    "Invalid thinking_budget value '%s'. Ignoring thinking budget.",
+                    thinking_budget,
+                )
+                return None
+        if isinstance(thinking_budget, (int, float)):
+            if thinking_budget <= 0:
+                return None
+            return int(thinking_budget)
+        logger.warning(
+            "Unsupported thinking_budget type '%s'. Ignoring thinking budget.",
+            type(thinking_budget).__name__,
+        )
+        return None
+
+    def _build_thinking_config(self) -> Optional[genai_types.ThinkingConfig]:
+        if not self._model_supports_thinking_controls(self.model_name):
+            return None
+
+        thinking_level: Optional[str] = None
+        if isinstance(self.thinking_level, str):
+            normalized_level = self.thinking_level.strip().lower()
+            if normalized_level:
+                thinking_level = normalized_level
+
+        if thinking_level and thinking_level not in self.SUPPORTED_THINKING_LEVELS:
+            raise ValueError(
+                f"Invalid thinking_level '{thinking_level}'. Expected one of: "
+                f"{sorted(self.SUPPORTED_THINKING_LEVELS)}"
+            )
+
+        thinking_budget = self._coerce_thinking_budget(self.thinking_budget)
+
+        if thinking_level and thinking_budget is not None:
+            raise ValueError(
+                "Set either thinking_level or thinking_budget for Gemini 3, not both."
+            )
+
+        if thinking_level:
+            return genai_types.ThinkingConfig(thinking_level=thinking_level)
+
+        if thinking_budget is not None:
+            return genai_types.ThinkingConfig(thinking_budget=thinking_budget)
+
+        return None
 
     @weave.op
     async def create(self, 
@@ -277,9 +349,9 @@ class AsyncGoogleGenAILLMModel(BaseLLMModel):
                 generation_config_args["response_mime_type"] = "application/json"
                 generation_config_args["response_schema"] = self.response_model
             
-
-            if "2.5" in self.model_name and self.thinking_budget is not None:
-                generation_config_args["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=self.thinking_budget)    
+            thinking_config = self._build_thinking_config()
+            if thinking_config is not None:
+                generation_config_args["thinking_config"] = thinking_config
 
             # Create the config object
             gen_config = genai_types.GenerateContentConfig(**generation_config_args)

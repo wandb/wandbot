@@ -254,6 +254,7 @@ class ResponseSynthesizer:
         fallback_provider: str,
         fallback_model_name: str,
         fallback_temperature: float,
+        thinking_level: str | None,
         thinking_budget: float | str,
         max_retries: int = 3,
     ):
@@ -262,6 +263,7 @@ class ResponseSynthesizer:
             model_name=primary_model_name,
             temperature=primary_temperature,
             max_retries=max_retries,
+            thinking_level=thinking_level,
             thinking_budget=thinking_budget,
         )
         self.fallback_model = LLMModel(
@@ -269,6 +271,7 @@ class ResponseSynthesizer:
             model_name=fallback_model_name,
             temperature=fallback_temperature,
             max_retries=max_retries,
+            thinking_level=thinking_level,
             thinking_budget=thinking_budget,
         )
 

@@ -2,7 +2,7 @@ import json
 from hashlib import md5
 from typing import Any, Callable, Dict, List, Optional, Sequence, TypedDict
 
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     Language,
     MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,

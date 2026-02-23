@@ -292,6 +292,7 @@ class QueryEnhancer:
         fallback_model_provider: str,
         fallback_model_name: str,
         fallback_temperature: float,
+        thinking_level: str | None,
         thinking_budget: float | str,
         max_retries: int
     ):
@@ -301,6 +302,7 @@ class QueryEnhancer:
             temperature=temperature,
             response_model=EnhancedQuery,
             max_retries=max_retries,
+            thinking_level=thinking_level,
             thinking_budget=thinking_budget
         )
         self.fallback_model = LLMModel(
@@ -309,6 +311,7 @@ class QueryEnhancer:
             temperature=fallback_temperature,
             response_model=EnhancedQuery,
             max_retries=max_retries,
+            thinking_level=thinking_level,
             thinking_budget=thinking_budget
         )
 

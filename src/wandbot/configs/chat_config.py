@@ -36,20 +36,22 @@ class ChatConfig(BaseSettings):
     
     # Query enhancer settings
     query_enhancer_provider: str = "google"
-    query_enhancer_model: str = "gemini-2.5-flash-lite"
+    query_enhancer_model: str = "gemini-3-flash-preview"
     query_enhancer_temperature: float = 1.0
     query_enhancer_fallback_provider: str = "google"
-    query_enhancer_fallback_model: str = "gemini-2.5-flash-lite"
+    query_enhancer_fallback_model: str = "gemini-3-flash-preview"
     query_enhancer_fallback_temperature: float = 1.0
+    query_enhancer_thinking_level: str | None = None
     query_enhancer_thinking_budget: float | str = 0
     
     # Response synthesis model settings
     response_synthesizer_provider: str = "google"
-    response_synthesizer_model: str = "gemini-2.5-flash"
+    response_synthesizer_model: str = "gemini-3-flash-preview"
     response_synthesizer_temperature: float = 0.1
     response_synthesizer_fallback_provider: str = "google"
-    response_synthesizer_fallback_model: str = "gemini-2.5-flash"
+    response_synthesizer_fallback_model: str = "gemini-3-flash-preview"
     response_synthesizer_fallback_temperature: float = 0.1
+    response_synthesizer_thinking_level: str | None = None
     response_synthesizer_thinking_budget: float | str = 500
 
     # Translation models settings
